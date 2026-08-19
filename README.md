@@ -18,7 +18,7 @@ Ce README ne la remplace pas : en cas de divergence, le Master Document gagne.
 | Phase | Contenu | Statut |
 |-------|---------|--------|
 | 0 | Fondations : structure, Git, configs, validation de `design_params.yaml` | **Terminée** |
-| 1 | Geometry — `fusion/parametric_driver.py` | À faire |
+| 1 | Geometry — `fusion/parametric_driver.py` | **Terminée** (validation sur seed réel en attente) |
 | 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | À faire |
 | 3 | Master Pipeline — enchaînement, validation, archivage | À faire |
 | 4 | Agent + boucle d'optimisation | À faire |
@@ -62,7 +62,7 @@ driver dans son propre interpréteur Python embarqué.
 │   └── cfd_settings.yaml         conditions CFD, jamais touchées par l'agent
 ├── fusion/
 │   ├── seed_design.f3d           fourni par l'utilisateur (non versionné)
-│   └── parametric_driver.py      Phase 1
+│   └── parametric_driver.py      paramètres → recalcul → STEP  Phase 1 ✔
 ├── openfoam/
 │   ├── templates/                case de base            Phase 2
 │   ├── run_cfd.sh                                        Phase 2
@@ -127,6 +127,49 @@ report = validate_design_params(proposal, previous=last_successful)
 if not report.ok:
     print(report.format())        # feedback à renvoyer à l'agent
 ```
+
+---
+
+## Le driver Fusion (`fusion/parametric_driver.py`)
+
+Il applique les valeurs du YAML aux User Parameters, force un recalcul, et
+exporte `data/iterations/iter_XXXX/geometry.step`.
+
+### Dans Fusion 360
+
+1. Ouvrir le modèle paramétrique (ou déposer le seed en `fusion/seed_design.f3d`).
+2. **Utilities > ADD-INS > Scripts and Add-Ins > Scripts > (+)** et pointer ce
+   fichier, puis **Run**.
+
+Le document actif est utilisé en priorité ; à défaut, le seed `.f3d` est importé
+dans un nouveau document. `FUSION_FORCE_SEED_IMPORT=1` force toujours le seed.
+
+Les noms de `parameters` dans `design_params.yaml` doivent correspondre
+**exactement** aux User Parameters Fusion (*Modify > Change Parameters*). Sinon
+le driver s'arrête sans rien modifier et liste les noms disponibles.
+
+### Hors Fusion — mode simulation
+
+Sans le module `adsk`, le driver valide la configuration, construit les
+expressions et calcule les chemins, sans appeler aucune API :
+
+```bash
+python3 fusion/parametric_driver.py --dry-run
+```
+
+Codes de retour : `0` succès, `1` échec, `3` mode simulation (aucun STEP produit).
+
+### Statut retourné
+
+Le driver ne lève jamais : il retourne un dict et écrit le même contenu dans
+`data/iterations/iter_XXXX/fusion_status.json` (avec le journal
+`fusion_driver.log`). C'est le canal de retour vers le master pipeline, qui
+s'exécute dans un autre processus que Fusion.
+
+`status` vaut `OK`, `DRY_RUN`, ou l'une des causes d'échec : `CONFIG_ERROR`,
+`SEED_MISSING`, `SEED_IMPORT_FAILED`, `NO_DESIGN`, `PARAM_NOT_FOUND`,
+`PARAM_SET_FAILED`, `RECOMPUTE_FAILED`, `GEOMETRY_EMPTY`, `EXPORT_FAILED`,
+`FUSION_UNAVAILABLE`, `UNEXPECTED_ERROR`.
 
 ---
 
