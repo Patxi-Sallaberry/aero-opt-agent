@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — maillage de fond (background mesh)                         |
+| Boite hexaedrique dimensionnee en multiples de la corde, dans laquelle      |
+| snappyHexMesh viendra decouper l aile.                                      |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale   1;   // les coordonnees sont deja en metres
+
+vertices
+(
+    (@@X_MIN@@ @@Y_MIN@@ @@Z_MIN@@)
+    (@@X_MAX@@ @@Y_MIN@@ @@Z_MIN@@)
+    (@@X_MAX@@ @@Y_MAX@@ @@Z_MIN@@)
+    (@@X_MIN@@ @@Y_MAX@@ @@Z_MIN@@)
+    (@@X_MIN@@ @@Y_MIN@@ @@Z_MAX@@)
+    (@@X_MAX@@ @@Y_MIN@@ @@Z_MAX@@)
+    (@@X_MAX@@ @@Y_MAX@@ @@Z_MAX@@)
+    (@@X_MIN@@ @@Y_MAX@@ @@Z_MAX@@)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (@@N_X@@ @@N_Y@@ @@N_Z@@) simpleGrading (1 1 1)
+);
+
+edges ();
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces ((0 4 7 3));
+    }
+    outlet
+    {
+        type patch;
+        faces ((1 2 6 5));
+    }
+    bottom
+    {
+        type patch;
+        faces ((0 1 5 4));
+    }
+    top
+    {
+        type patch;
+        faces ((3 7 6 2));
+    }
+    // Faces normales a l envergure. En quasi-2D elles sont en `symmetry` et
+    // l aile les traverse de part en part : pas de bout d aile dans le
+    // domaine, donc pas de tourbillon marginal.
+    sideMin
+    {
+        type @@SIDE_PATCH_TYPE@@;
+        faces ((0 3 2 1));
+    }
+    sideMax
+    {
+        type @@SIDE_PATCH_TYPE@@;
+        faces ((4 5 6 7));
+    }
+);
+
+mergePatchPairs ();
+
+// ************************************************************************* //

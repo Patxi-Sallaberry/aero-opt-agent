@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — pression cinematique (p/rho, en m2/s2)                     |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+    "(top|bottom)"
+    {
+        type            slip;
+    }
+    "(sideMin|sideMax)"
+    {
+        type            @@SIDE_FIELD_TYPE@@;
+    }
+    wing
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

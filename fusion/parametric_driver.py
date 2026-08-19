@@ -166,7 +166,26 @@ REBUILD_ATTRIBUTE_NAME = "generated"
 # Géométrie du seed d'origine (script NACA_Parametric) : à purger au premier
 # rebuild, sinon elle cohabiterait avec la nouvelle et le STEP contiendrait
 # deux ailes.
+#
+# ATTENTION : ces noms sont ceux des FEATURES du générateur. Fusion nomme les
+# corps indépendamment ("Body1"...), donc filtrer les corps par ces noms ne
+# suffit pas — c'est ce qui a laissé passer une aile fantôme au premier run
+# réel. D'où le mode de purge ci-dessous.
 LEGACY_GEOMETRY_NAMES = ("NACA_2412_Profile", "Wing_Section")
+
+# Stratégie de purge avant reconstruction :
+#   "all"    : tout corps et toute esquisse du composant racine sont supprimés.
+#              Défaut, car le document est dédié à l'aile optimisée et c'est le
+#              seul mode qui garantit qu'il ne reste rien de l'itération
+#              précédente, quel que soit le nom donné par Fusion.
+#   "tagged" : ne supprime que ce que le driver a marqué (attribut aeroOpt) ou
+#              ce qui porte un nom connu. À utiliser si le document contient
+#              d'autres géométries à conserver — le contrôle post-reconstruction
+#              refusera alors d'exporter s'il reste un corps étranger.
+PURGE_MODE_ALL = "all"
+PURGE_MODE_TAGGED = "tagged"
+PURGE_MODES = (PURGE_MODE_ALL, PURGE_MODE_TAGGED)
+DEFAULT_PURGE_MODE = PURGE_MODE_ALL
 
 # Conversions vers les unités internes de Fusion (cm et radians).
 LENGTH_TO_CM: dict[str, float] = {
@@ -1145,63 +1164,103 @@ def _is_driver_generated(entity: Any) -> bool:  # pragma: no cover
     return name in (REBUILD_SKETCH_NAME, REBUILD_BODY_NAME) or name in LEGACY_GEOMETRY_NAMES
 
 
-def _purge_previous_geometry(root: Any) -> int:  # pragma: no cover - nécessite Fusion
+def resolve_purge_mode(requested: str | None = None) -> str:
+    """Détermine la stratégie de purge (argument > environnement > défaut)."""
+    mode = (requested or os.environ.get("FUSION_PURGE_MODE") or "").strip().lower()
+    if not mode:
+        return DEFAULT_PURGE_MODE
+    if mode not in PURGE_MODES:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"mode de purge inconnu : {mode!r} — attendu {list(PURGE_MODES)}",
+        )
+    return mode
+
+
+def _purge_previous_geometry(
+    root: Any, mode: str | None = None
+) -> int:  # pragma: no cover - nécessite Fusion
     """Supprime la géométrie de l'itération précédente.
 
-    Sans cette purge, chaque itération empilerait une aile de plus dans le
-    document et le STEP exporté en contiendrait plusieurs — la CFD tournerait
-    alors sur une géométrie absurde sans que rien ne le signale.
+    Sans cette purge, chaque itération empile une aile de plus dans le document
+    et le STEP en contient plusieurs — la CFD tourne alors sur une géométrie
+    absurde sans que rien ne le signale. Et le contrôle de cohérence côté CFD
+    ne l'attrape pas : deux ailes superposées ont la même boîte englobante
+    qu'une seule.
 
-    Ne touche QUE ce que le driver a créé (attribut `aeroOpt`) ou ce que le
-    générateur du seed a laissé (noms connus). Le reste du document est la
-    propriété de l'utilisateur.
+    En mode "all" (défaut) tout est supprimé du composant racine ; en mode
+    "tagged", seulement ce que le driver a marqué ou ce qui porte un nom connu.
     """
+    mode = resolve_purge_mode(mode)
     removed = 0
 
-    # Les esquisses d'abord : Fusion supprime en cascade les features qui les
-    # consomment, donc l'extrusion et son corps partent avec.
-    sketches = [root.sketches.item(i) for i in range(root.sketches.count)]
-    for sketch in reversed(sketches):
-        if not _is_driver_generated(sketch):
-            continue
-        name = sketch.name
+    def _delete(entity: Any, kind: str) -> None:
+        nonlocal removed
+        name = getattr(entity, "name", "?")
         try:
-            sketch.deleteMe()
+            entity.deleteMe()
             removed += 1
-            logger.info("Purge de l'esquisse '%s'.", name)
+            logger.info("Purge %s '%s'.", kind, name)
         except Exception as exc:
             raise DriverError(
                 STATUS_REBUILD_FAILED,
-                f"suppression impossible de l'esquisse '{name}' : {exc}",
+                f"suppression impossible de {kind} '{name}' : {exc}",
             ) from exc
+
+    # Les esquisses d'abord : Fusion supprime en cascade les features qui les
+    # consomment. Le corps produit, lui, peut survivre — d'où la passe suivante.
+    sketches = [root.sketches.item(i) for i in range(root.sketches.count)]
+    for sketch in reversed(sketches):
+        if mode == PURGE_MODE_ALL or _is_driver_generated(sketch):
+            _delete(sketch, "de l'esquisse")
 
     bodies = [root.bRepBodies.item(i) for i in range(root.bRepBodies.count)]
     for body in reversed(bodies):
-        if not _is_driver_generated(body):
-            continue
-        name = body.name
-        try:
-            body.deleteMe()
-            removed += 1
-            logger.info("Purge du corps '%s'.", name)
-        except Exception as exc:
+        if mode == PURGE_MODE_ALL or _is_driver_generated(body):
+            _delete(body, "du corps")
+
+    remaining = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
+    if remaining:
+        if mode == PURGE_MODE_ALL:
             raise DriverError(
                 STATUS_REBUILD_FAILED,
-                f"suppression impossible du corps '{name}' : {exc}",
-            ) from exc
-
-    leftovers = [
-        root.bRepBodies.item(i).name
-        for i in range(root.bRepBodies.count)
-        if _is_driver_generated(root.bRepBodies.item(i))
-    ]
-    if leftovers:
-        raise DriverError(
-            STATUS_REBUILD_FAILED,
-            f"géométrie de l'itération précédente encore présente après purge : "
-            f"{leftovers} — le STEP contiendrait plusieurs ailes",
+                f"corps encore présents après une purge complète : {remaining} — "
+                f"ils appartiennent peut-être à un composant verrouillé",
+            )
+        logger.warning(
+            "Purge ciblée : %d corps conservé(s) car non reconnu(s) : %s. "
+            "S'ils font partie de l'aile, l'export contiendra plusieurs "
+            "géométries — passer FUSION_PURGE_MODE=all.",
+            len(remaining),
+            remaining,
         )
     return removed
+
+
+def assert_only_created_bodies(root: Any, created: int) -> int:
+    """Vérifie qu'il ne reste dans le document QUE la géométrie reconstruite.
+
+    C'est le garde-fou décisif du mode rebuild. Un corps de plus, et le STEP
+    exporte deux ailes superposées — que le contrôle de boîte englobante côté
+    CFD ne peut pas distinguer d'une aile unique, puisqu'elles occupent le même
+    volume. Le premier run réel a produit exactement ce cas.
+
+    Returns:
+        Le nombre de corps présents (égal à `created` en cas de succès).
+    """
+    total = root.bRepBodies.count
+    if total != created:
+        names = [root.bRepBodies.item(i).name for i in range(total)]
+        raise DriverError(
+            STATUS_REBUILD_FAILED,
+            f"le composant racine contient {total} corps alors que la "
+            f"reconstruction en a créé {created} : {names}. Un reliquat de "
+            f"l'itération précédente subsiste — l'export contiendrait plusieurs "
+            f"géométries superposées. Vérifier FUSION_PURGE_MODE (actuellement "
+            f"'{resolve_purge_mode()}').",
+            details={"bodies": names, "created": created},
+        )
+    return total
 
 
 def _rebuild_geometry(
@@ -1281,7 +1340,8 @@ def _rebuild_geometry(
         )
 
     _tag_generated(sketch)
-    for i in range(extrude.bodies.count):
+    created = extrude.bodies.count
+    for i in range(created):
         body = extrude.bodies.item(i)
         body.name = REBUILD_BODY_NAME
         _tag_generated(body)
@@ -1291,6 +1351,8 @@ def _rebuild_geometry(
     except Exception:
         pass
 
+    total = assert_only_created_bodies(root, created)
+
     summary = {
         key: plan[key]
         for key in (
@@ -1299,7 +1361,13 @@ def _rebuild_geometry(
         )
     }
     summary["purged_entities"] = removed
-    logger.info("Reconstruction terminée (%d corps).", extrude.bodies.count)
+    summary["bodies"] = total
+    summary["purge_mode"] = resolve_purge_mode()
+    logger.info(
+        "Reconstruction terminée : %d corps créé(s), %d entité(s) purgée(s).",
+        created,
+        removed,
+    )
     return summary, warnings
 
 

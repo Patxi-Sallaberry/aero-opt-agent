@@ -1,0 +1,36 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — criteres de qualite de maillage                            |
+| Les seuils viennent de cfd_settings.yaml (mesh.check_mesh) : ils doivent    |
+| rester coherents avec ceux que postprocess.py verifie dans checkMesh.       |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      meshQualityDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+maxNonOrtho             @@MAX_NON_ORTHO@@;
+maxBoundarySkewness     20;
+maxInternalSkewness     @@MAX_SKEWNESS@@;
+maxConcave              80;
+minVol                  1e-13;
+minTetQuality           1e-15;
+minArea                 -1;
+minTwist                0.02;
+minDeterminant          0.001;
+minFaceWeight           0.02;
+minVolRatio             0.01;
+minTriangleTwist        -1;
+
+nSmoothScale            4;
+errorReduction          0.75;
+
+relaxed
+{
+    maxNonOrtho         75;
+}
+
+// ************************************************************************* //

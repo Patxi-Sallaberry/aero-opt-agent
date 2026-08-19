@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — taux de dissipation specifique                             |
+| omega = sqrt(k) / (Cmu^0.25 * L), avec L l echelle de longueur turbulente   |
+| de cfd_settings.yaml.                                                        |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      omega;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 -1 0 0 0 0];
+
+internalField   uniform @@OMEGA_INF@@;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform @@OMEGA_INF@@;
+    }
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      uniform @@OMEGA_INF@@;
+        value           uniform @@OMEGA_INF@@;
+    }
+    "(top|bottom)"
+    {
+        type            slip;
+    }
+    "(sideMin|sideMax)"
+    {
+        type            @@SIDE_FIELD_TYPE@@;
+    }
+    wing
+    {
+        type            omegaWallFunction;
+        value           uniform @@OMEGA_INF@@;
+    }
+}
+
+// ************************************************************************* //

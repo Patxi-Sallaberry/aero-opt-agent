@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — energie cinetique turbulente                               |
+| k = 1.5 * (I * U)^2, calcule par case_builder.py depuis flow.velocity_ms et |
+| flow.turbulent_intensity de cfd_settings.yaml.                              |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      k;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform @@K_INF@@;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform @@K_INF@@;
+    }
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      uniform @@K_INF@@;
+        value           uniform @@K_INF@@;
+    }
+    "(top|bottom)"
+    {
+        type            slip;
+    }
+    "(sideMin|sideMax)"
+    {
+        type            @@SIDE_FIELD_TYPE@@;
+    }
+    wing
+    {
+        type            kqRWallFunction;
+        value           uniform @@K_INF@@;
+    }
+}
+
+// ************************************************************************* //

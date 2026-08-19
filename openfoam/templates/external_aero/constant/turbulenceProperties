@@ -1,0 +1,24 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — modele de turbulence                                       |
+| kOmegaSST : reference pour l aerodynamique externe avec gradients de        |
+| pression adverses (decollement de bord de fuite).                            |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      turbulenceProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+simulationType  RAS;
+
+RAS
+{
+    RASModel        @@TURBULENCE_MODEL@@;
+    turbulence      on;
+    printCoeffs     on;
+}
+
+// ************************************************************************* //

@@ -1,0 +1,132 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — maillage de l aile par snappyHexMesh                       |
+| La surface d entree est constant/triSurface/wing.stl, ecrite par            |
+| case_builder.py depuis la geometrie exportee par Fusion.                     |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+castellatedMesh true;
+snap            true;
+addLayers       @@ADD_LAYERS@@;
+
+geometry
+{
+    wing.stl
+    {
+        type triSurfaceMesh;
+        name wing;
+    }
+
+    // Boite de raffinement autour du profil et de son sillage proche.
+    refinementBox
+    {
+        type searchableBox;
+        min (@@BOX_X_MIN@@ @@BOX_Y_MIN@@ @@BOX_Z_MIN@@);
+        max (@@BOX_X_MAX@@ @@BOX_Y_MAX@@ @@BOX_Z_MAX@@);
+    }
+}
+
+castellatedMeshControls
+{
+    maxLocalCells       @@MAX_LOCAL_CELLS@@;
+    maxGlobalCells      @@MAX_GLOBAL_CELLS@@;
+    minRefinementCells  10;
+    maxLoadUnbalance    0.10;
+    nCellsBetweenLevels 3;
+
+    features
+    (
+        {
+            file "wing.eMesh";
+            level @@FEATURE_LEVEL@@;
+        }
+    );
+
+    refinementSurfaces
+    {
+        wing
+        {
+            level (@@SURFACE_LEVEL_MIN@@ @@SURFACE_LEVEL_MAX@@);
+            patchInfo { type wall; }
+        }
+    }
+
+    resolveFeatureAngle 30;
+
+    refinementRegions
+    {
+        refinementBox
+        {
+            mode inside;
+            levels ((1e15 @@BOX_LEVEL@@));
+        }
+    }
+
+    // Point situe dans le fluide, JAMAIS a l interieur de l aile : c est lui
+    // qui dit a snappy quel cote garder. case_builder.py le place en amont du
+    // bord d attaque, hors de toute enveloppe du profil.
+    locationInMesh (@@LOCATION_IN_MESH@@);
+
+    allowFreeStandingZoneFaces false;
+}
+
+snapControls
+{
+    nSmoothPatch    3;
+    tolerance       2.0;
+    nSolveIter      50;
+    nRelaxIter      5;
+    nFeatureSnapIter 10;
+    implicitFeatureSnap false;
+    explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+}
+
+addLayersControls
+{
+    relativeSizes    true;
+
+    layers
+    {
+        wing
+        {
+            nSurfaceLayers @@N_LAYERS@@;
+        }
+    }
+
+    expansionRatio        @@EXPANSION_RATIO@@;
+    finalLayerThickness   @@FINAL_LAYER_THICKNESS@@;
+    minThickness          @@MIN_LAYER_THICKNESS@@;
+    nGrow                 0;
+
+    featureAngle          130;
+    slipFeatureAngle      30;
+    nRelaxIter            5;
+    nSmoothSurfaceNormals 1;
+    nSmoothNormals        3;
+    nSmoothThickness      10;
+    maxFaceThicknessRatio 0.5;
+    maxThicknessToMedialRatio 0.3;
+    minMedialAxisAngle    90;
+    nBufferCellsNoExtrude 0;
+    nLayerIter            50;
+    nRelaxedIter          20;
+}
+
+meshQualityControls
+{
+    #include "meshQualityDict"
+}
+
+writeFlags ( scalarLevels layerSets layerFields );
+
+mergeTolerance 1e-6;
+
+// ************************************************************************* //

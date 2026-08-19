@@ -811,6 +811,147 @@ def test_mode_parameters_ne_calcule_pas_de_geometrie(tmp_path):
 
 
 # ─────────────────────────────────────────────────────────────
+# Purge de la géométrie précédente
+#
+# Non-régression du premier run réel : la purge n'a retiré que l'esquisse
+# 'NACA_2412_Profile', le corps du seed a survécu (Fusion le nomme "Body1",
+# pas "Wing_Section" — ce nom-là est celui de la feature), et le STEP exporté
+# contenait deux ailes superposées.
+# ─────────────────────────────────────────────────────────────
+
+
+class FakeAttributes:
+    def __init__(self, tagged: bool = False) -> None:
+        self._values = {(pd.REBUILD_ATTRIBUTE_GROUP, pd.REBUILD_ATTRIBUTE_NAME): "1"} \
+            if tagged else {}
+
+    def itemByName(self, group: str, name: str):
+        return self._values.get((group, name))
+
+    def add(self, group: str, name: str, value: str) -> None:
+        self._values[(group, name)] = value
+
+
+class FakeEntity:
+    """Esquisse ou corps Fusion, supprimable."""
+
+    def __init__(self, name: str, tagged: bool = False, undeletable: bool = False):
+        self.name = name
+        self.attributes = FakeAttributes(tagged)
+        self.undeletable = undeletable
+        self.owner: "FakeEntityCollection | None" = None
+
+    def deleteMe(self) -> bool:
+        if self.undeletable:
+            raise RuntimeError("entité verrouillée")
+        if self.owner is not None:
+            self.owner.remove(self)
+        return True
+
+
+class FakeEntityCollection:
+    def __init__(self, items: list[FakeEntity]) -> None:
+        self._items = list(items)
+        for item in self._items:
+            item.owner = self
+
+    def item(self, index: int) -> FakeEntity:
+        return self._items[index]
+
+    @property
+    def count(self) -> int:
+        return len(self._items)
+
+    def remove(self, entity: FakeEntity) -> None:
+        self._items.remove(entity)
+
+    @property
+    def names(self) -> list[str]:
+        return [i.name for i in self._items]
+
+
+class FakeRoot:
+    def __init__(self, sketches: list[FakeEntity], bodies: list[FakeEntity]) -> None:
+        self.sketches = FakeEntityCollection(sketches)
+        self.bRepBodies = FakeEntityCollection(bodies)
+
+
+def _seed_document() -> FakeRoot:
+    """Le document tel qu'il était au premier run réel."""
+    return FakeRoot(
+        sketches=[FakeEntity("NACA_2412_Profile")],
+        bodies=[FakeEntity("Body1")],   # nommé par Fusion, pas par le générateur
+    )
+
+
+def test_purge_all_vide_le_composant_racine():
+    root = _seed_document()
+    removed = pd._purge_previous_geometry(root, mode="all")
+    assert removed == 2
+    assert root.sketches.count == 0 and root.bRepBodies.count == 0
+
+
+def test_purge_tagged_laisse_le_corps_non_reconnu(caplog):
+    # Comportement du premier run : l'esquisse part, le corps reste.
+    root = _seed_document()
+    removed = pd._purge_previous_geometry(root, mode="tagged")
+    assert removed == 1
+    assert root.bRepBodies.names == ["Body1"]
+
+
+def test_purge_tagged_supprime_ce_qui_est_marque():
+    root = FakeRoot(
+        sketches=[FakeEntity(pd.REBUILD_SKETCH_NAME, tagged=True)],
+        bodies=[FakeEntity("peu importe", tagged=True), FakeEntity("Autre")],
+    )
+    pd._purge_previous_geometry(root, mode="tagged")
+    assert root.bRepBodies.names == ["Autre"]
+
+
+def test_purge_all_echoue_si_un_corps_resiste():
+    root = FakeRoot(sketches=[], bodies=[FakeEntity("Verrouille", undeletable=True)])
+    with pytest.raises(pd.DriverError) as exc:
+        pd._purge_previous_geometry(root, mode="all")
+    assert exc.value.status == pd.STATUS_REBUILD_FAILED
+
+
+def test_garde_fou_refuse_deux_ailes():
+    # Le cas exact du premier run : 1 corps reconstruit + 1 reliquat.
+    root = FakeRoot(sketches=[], bodies=[FakeEntity("Body1"),
+                                        FakeEntity(pd.REBUILD_BODY_NAME)])
+    with pytest.raises(pd.DriverError) as exc:
+        pd.assert_only_created_bodies(root, created=1)
+    assert exc.value.status == pd.STATUS_REBUILD_FAILED
+    assert "Body1" in exc.value.message
+    assert "superposées" in exc.value.message
+
+
+def test_garde_fou_accepte_la_geometrie_seule():
+    root = FakeRoot(sketches=[], bodies=[FakeEntity(pd.REBUILD_BODY_NAME)])
+    assert pd.assert_only_created_bodies(root, created=1) == 1
+
+
+@pytest.mark.parametrize(
+    "requested,attendu", [(None, "all"), ("all", "all"), ("tagged", "tagged"),
+                          ("TAGGED", "tagged")]
+)
+def test_resolution_du_mode_de_purge(requested, attendu, monkeypatch):
+    monkeypatch.delenv("FUSION_PURGE_MODE", raising=False)
+    assert pd.resolve_purge_mode(requested) == attendu
+
+
+def test_mode_de_purge_depuis_lenvironnement(monkeypatch):
+    monkeypatch.setenv("FUSION_PURGE_MODE", "tagged")
+    assert pd.resolve_purge_mode() == "tagged"
+
+
+def test_mode_de_purge_inconnu_refuse(monkeypatch):
+    monkeypatch.delenv("FUSION_PURGE_MODE", raising=False)
+    with pytest.raises(pd.DriverError):
+        pd.resolve_purge_mode("aggressif")
+
+
+# ─────────────────────────────────────────────────────────────
 # Export STEP (doublures)
 # ─────────────────────────────────────────────────────────────
 

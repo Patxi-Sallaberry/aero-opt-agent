@@ -5,19 +5,29 @@
 # Il définit les conditions de simulation, qui doivent rester
 # identiques d'une itération à l'autre pour que les comparaisons
 # Cd / Cl / Cl_Cd soient valides.
+#
+# REPÈRE GÉOMÉTRIQUE (impose par le driver Fusion) :
+#   +X = corde, du bord d'attaque vers le bord de fuite
+#   +Y = épaisseur / portance
+#   +Z = envergure (direction d'extrusion)
+# L'incidence est portée par la GÉOMÉTRIE : le profil est tourné
+# à la construction, l'écoulement reste aligné sur +X. Les
+# directions de portance et de traînée ne bougent donc jamais.
 # ─────────────────────────────────────────────────────────────
 
 case:
   name: "external_aero"
   template_dir: "openfoam/templates/external_aero"
-  solver: "simpleFoam"           # simpleFoam (RANS stationnaire) | pimpleFoam
+  solver: "simpleFoam"           # RANS stationnaire, incompressible
   turbulence_model: "kOmegaSST"
+  wing_patch: "wing"             # nom du patch créé par snappyHexMesh
 
 # Conditions de l'écoulement libre
 flow:
   velocity_ms: 20.0              # vitesse infini amont (m/s)
-  direction: [1.0, 0.0, 0.0]     # direction de l'écoulement (unitaire)
-  lift_direction: [0.0, 0.0, 1.0]
+  direction: [1.0, 0.0, 0.0]     # traînée = projection sur cet axe
+  lift_direction: [0.0, 1.0, 0.0]
+  pitch_axis: [0.0, 0.0, 1.0]    # axe d'envergure
   rho_kg_m3: 1.225               # masse volumique air (15 °C, 1 atm)
   nu_m2_s: 1.5e-5                # viscosité cinématique
   turbulent_intensity: 0.05
@@ -25,22 +35,57 @@ flow:
 
 # Grandeurs de référence pour l'adimensionnement des coefficients
 reference:
-  area_m2: 0.09                  # surface de référence (mise à jour par le pipeline)
-  length_m: 0.30                 # corde de référence (mise à jour par le pipeline)
-  center_of_rotation: [0.0, 0.0, 0.0]
+  # from_design : Aref = corde x envergure, lRef = corde, recalculés à CHAQUE
+  #   itération depuis design_params.yaml. Indispensable — figer Aref pendant
+  #   que la corde varie rendrait les Cd/Cl incomparables entre itérations.
+  # fixed : utilise area_m2 / length_m ci-dessous, quelle que soit la forme.
+  mode: "from_design"
+  area_m2: 0.024                 # utilisé seulement si mode = fixed
+  length_m: 0.30                 # utilisé seulement si mode = fixed
+  # Centre de réduction des moments, en fraction de corde depuis le bord
+  # d'attaque (0.25 = foyer aérodynamique classique).
+  center_of_rotation_chord_fraction: 0.25
 
-# Domaine de calcul, exprimé en multiples de la longueur de référence
+# Domaine de calcul, exprimé en multiples de la corde
 domain:
   upstream_factor: 5.0
   downstream_factor: 12.0
-  lateral_factor: 5.0
   vertical_factor: 5.0
+  # Traitement de la direction d'envergure :
+  #   symmetry : quasi-2D. Le domaine occupe une tranche INTÉRIEURE à l'aile,
+  #     bornée par deux plans de symétrie que la géométrie traverse de part en
+  #     part. Pas de bout d'aile, donc pas de tourbillon marginal — c'est le
+  #     modèle correct pour un tronçon de profil, et le moins coûteux.
+  #     ATTENTION : dans ce mode, `span` n'a AUCUN effet aérodynamique (voir
+  #     README) — le fixer plutôt que l'optimiser.
+  #   full_3d : l'aile entière est dans le domaine, bouts compris. `span`
+  #     devient réellement influent (allongement, tourbillons marginaux), au
+  #     prix d'un maillage bien plus lourd.
+  spanwise_treatment: "symmetry"
+  # Fraction centrale de l'envergure retenue en quasi-2D.
+  spanwise_fraction: 0.5
+  # Marge latérale en multiples de corde, en full_3d uniquement.
+  spanwise_margin_factor: 3.0
 
-# Maillage — snappyHexMesh
+# Maillage — blockMesh puis snappyHexMesh
 mesh:
-  base_cell_size_m: 0.02
+  # Taille de maille de fond, en fraction de corde : le maillage suit
+  # automatiquement l'échelle de la géométrie quand la corde change.
+  base_cell_per_chord: 8.0
   surface_refinement_level: [3, 4]
+  feature_refinement_level: 4
+  feature_angle_deg: 150
+  refinement_box:
+    # Boîte de raffinement autour du profil et de son sillage proche,
+    # en multiples de corde.
+    upstream: 0.5
+    downstream: 3.0
+    vertical: 1.0
+    level: 2
+  max_local_cells: 2000000
+  max_global_cells: 8000000
   boundary_layers:
+    enabled: true
     n_layers: 5
     expansion_ratio: 1.2
     final_layer_thickness: 0.4
@@ -73,9 +118,16 @@ convergence:
 
 # Extraction des coefficients aérodynamiques (functionObject forceCoeffs)
 force_coeffs:
-  patches: ["wing"]              # patch(s) de la géométrie importée
   write_interval: 1
   outputs: ["Cd", "Cl", "Cl_Cd"]
+
+# Cohérence géométrie / paramètres : la boîte englobante du STL est comparée
+# à ce que design_params.yaml décrit. C'est le garde-fou qui détecte qu'une
+# itération a exporté une géométrie inchangée ou erronée AVANT de dépenser
+# une heure de calcul.
+geometry_check:
+  enabled: true
+  tolerance_pct: 5.0
 
 # Ressources d'exécution
 execution:

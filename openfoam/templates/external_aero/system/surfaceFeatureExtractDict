@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — extraction des aretes vives de l aile                      |
+| Produit constant/triSurface/wing.eMesh, consomme par snappyHexMesh pour     |
+| capturer proprement le bord de fuite.                                        |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      surfaceFeatureExtractDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+wing.stl
+{
+    extractionMethod    extractFromSurface;
+
+    extractFromSurfaceCoeffs
+    {
+        // Angle au dela duquel une arete est consideree vive. 150 deg garde
+        // le bord de fuite sans marquer toute la discretisation de la spline.
+        includedAngle   @@FEATURE_ANGLE@@;
+    }
+
+    writeObj            no;
+}
+
+// ************************************************************************* //

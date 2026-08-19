@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — viscosite turbulente                                       |
+| nutUSpaldingWallFunction : insensible au y+, donc valable en paroi resolue  |
+| comme en loi de paroi. Sur une boucle d optimisation ou l epaisseur du      |
+| profil et donc la premiere maille varient d une iteration a l autre, c est  |
+| ce qui evite d avoir a re-regler le maillage a chaque forme.                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      nut;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -1 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+    outlet
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+    "(top|bottom)"
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+    "(sideMin|sideMax)"
+    {
+        type            @@SIDE_FIELD_TYPE@@;
+    }
+    wing
+    {
+        type            nutUSpaldingWallFunction;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

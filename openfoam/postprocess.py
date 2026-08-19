@@ -1,0 +1,442 @@
+"""Extraction des coefficients aérodynamiques vers `results.json`.
+
+    python3 openfoam/postprocess.py --iteration-dir data/iterations/iter_0000
+    python3 openfoam/postprocess.py --iteration-dir ... \
+        --failure-status MESH_CHECK_FAILED --failure-message "..."
+
+`results.json` est le SEUL canal de retour de la CFD vers le master pipeline et
+vers l'agent. Il est donc écrit dans tous les cas, succès comme échec — un run
+qui s'arrête sans laisser de results.json rend l'itération illisible en aval.
+
+Schéma (Master Doc §3.3), toujours présent :
+
+    {
+      "iteration": 5, "success": true,
+      "Cd": 0.043, "Cl": 1.18, "Cl_Cd": 27.4,
+      "mesh_ok": true, "error_message": null
+    }
+
+Les champs supplémentaires (statut, convergence, dispersion, fenêtre de
+moyenne) servent au diagnostic et permettent à l'agent de distinguer un
+résultat solide d'un résultat encore instable.
+
+Deux principes tenus ici :
+
+- **Aucune valeur inventée.** En cas d'échec, Cd/Cl/Cl_Cd valent `null`, jamais
+  0.0 : un zéro se propagerait dans la boucle d'optimisation comme une mesure
+  légitime.
+- **Lecture pilotée par l'en-tête.** Les colonnes sont retrouvées par leur nom
+  dans l'en-tête du fichier, pas par leur position, qui varie selon les
+  versions d'OpenFOAM.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+RESULTS_FILENAME = "results.json"
+CASE_DIR_NAME = "cfd"
+
+STATUS_OK = "OK"
+STATUS_NO_COEFFICIENTS = "NO_COEFFICIENTS"
+STATUS_COEFFICIENTS_UNREADABLE = "COEFFICIENTS_UNREADABLE"
+STATUS_NOT_FINITE = "COEFFICIENTS_NOT_FINITE"
+
+# Noms de colonnes possibles selon les versions et les conventions.
+CD_KEYS = ("Cd", "Cd_total", "cd")
+CL_KEYS = ("Cl", "Cl_total", "cl")
+
+
+class PostProcessError(Exception):
+    def __init__(self, status: str, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lecture des coefficients
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def find_coefficient_file(case_dir: Path) -> Path:
+    """Localise le fichier de coefficients le plus récent.
+
+    Les chemins et les noms ont changé au fil des versions
+    (`coefficient.dat`, `forceCoeffs.dat`), et un redémarrage crée un
+    sous-dossier de temps supplémentaire : on prend le plus récent.
+    """
+    root = case_dir / "postProcessing"
+    if not root.is_dir():
+        raise PostProcessError(
+            STATUS_NO_COEFFICIENTS,
+            f"aucun dossier postProcessing dans {case_dir} — le functionObject "
+            f"forceCoeffs n'a rien écrit ; le solveur a-t-il tourné ?",
+        )
+
+    candidates = [
+        p for p in root.rglob("*.dat")
+        if p.name in ("coefficient.dat", "forceCoeffs.dat")
+        or p.name.startswith("coefficient")
+    ]
+    if not candidates:
+        raise PostProcessError(
+            STATUS_NO_COEFFICIENTS,
+            f"aucun fichier de coefficients sous {root}",
+        )
+    return max(candidates, key=lambda p: (p.stat().st_mtime, len(str(p))))
+
+
+def parse_coefficient_file(path: Path) -> dict[str, list[float]]:
+    """Lit un fichier de coefficients OpenFOAM en colonnes nommées."""
+    header: list[str] | None = None
+    rows: list[list[float]] = []
+
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            # La dernière ligne de commentaire contenant "Time" porte les noms
+            # de colonnes.
+            candidate = line.lstrip("#").strip()
+            tokens = candidate.split()
+            if tokens and tokens[0] in ("Time", "time"):
+                header = tokens
+            continue
+        parts = line.split()
+        try:
+            rows.append([float(v) for v in parts])
+        except ValueError:
+            continue
+
+    if not rows:
+        raise PostProcessError(
+            STATUS_COEFFICIENTS_UNREADABLE, f"aucune donnée numérique dans {path}"
+        )
+    if header is None:
+        raise PostProcessError(
+            STATUS_COEFFICIENTS_UNREADABLE,
+            f"en-tête de colonnes introuvable dans {path} — impossible de savoir "
+            f"quelle colonne est Cd et laquelle est Cl",
+        )
+
+    width = min(len(header), min(len(r) for r in rows))
+    return {header[i]: [r[i] for r in rows] for i in range(width)}
+
+
+def _pick(columns: Mapping[str, Sequence[float]], keys: Sequence[str], path: Path):
+    for key in keys:
+        if key in columns:
+            return list(columns[key])
+    raise PostProcessError(
+        STATUS_COEFFICIENTS_UNREADABLE,
+        f"aucune colonne parmi {list(keys)} dans {path} — colonnes présentes : "
+        f"{list(columns)}",
+    )
+
+
+def _mean(values: Sequence[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _stdev(values: Sequence[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    mean = _mean(values)
+    return math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
+
+
+def average_coefficients(
+    columns: Mapping[str, Sequence[float]],
+    path: Path,
+    window: int,
+    stability_tol: float,
+) -> dict[str, Any]:
+    """Moyenne Cd et Cl sur la fin du calcul et juge la stabilité.
+
+    Une valeur instantanée à la dernière itération n'a pas de sens en RANS
+    stationnaire : elle oscille. On moyenne sur une fenêtre, et on mesure la
+    dispersion pour dire si le résultat est exploitable — c'est ce qui permet
+    à l'agent de ne pas prendre une décision sur du bruit.
+    """
+    cd_all = _pick(columns, CD_KEYS, path)
+    cl_all = _pick(columns, CL_KEYS, path)
+    times = list(columns.get("Time") or columns.get("time") or range(len(cd_all)))
+
+    n = min(len(cd_all), len(cl_all))
+    if n == 0:
+        raise PostProcessError(STATUS_COEFFICIENTS_UNREADABLE, f"{path} : 0 échantillon")
+    window = max(1, min(int(window), n))
+
+    cd_window = cd_all[-window:]
+    cl_window = cl_all[-window:]
+    cd, cl = _mean(cd_window), _mean(cl_window)
+
+    if not (math.isfinite(cd) and math.isfinite(cl)):
+        raise PostProcessError(
+            STATUS_NOT_FINITE,
+            f"coefficients non finis (Cd={cd}, Cl={cl}) — le calcul a diverge",
+        )
+
+    cd_std, cl_std = _stdev(cd_window), _stdev(cl_window)
+    # Dispersion relative : sur un Cd proche de zéro, un écart-type absolu ne
+    # veut rien dire.
+    cd_rel = cd_std / abs(cd) if abs(cd) > 1e-12 else float("inf")
+    cl_rel = cl_std / abs(cl) if abs(cl) > 1e-12 else float("inf")
+    stable = cd_rel <= stability_tol and cl_rel <= stability_tol
+
+    cl_cd = cl / cd if abs(cd) > 1e-12 else None
+
+    return {
+        "Cd": cd,
+        "Cl": cl,
+        "Cl_Cd": cl_cd,
+        "Cd_std": cd_std,
+        "Cl_std": cl_std,
+        "Cd_rel_std": cd_rel if math.isfinite(cd_rel) else None,
+        "Cl_rel_std": cl_rel if math.isfinite(cl_rel) else None,
+        "coefficients_stable": stable,
+        "averaging_window": window,
+        "samples": n,
+        "last_time": float(times[-1]) if times else None,
+        "source": str(path),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# checkMesh et convergence
+# ─────────────────────────────────────────────────────────────────────────────
+
+_FAILED_CHECKS_RE = re.compile(r"Failed\s+(\d+)\s+mesh\s+checks", re.IGNORECASE)
+_CELLS_RE = re.compile(r"^\s*cells:\s+(\d+)", re.MULTILINE)
+
+
+def read_check_mesh(log_path: Path) -> dict[str, Any]:
+    """Verdict de checkMesh : réussi, échoué, ou non exécuté."""
+    if not log_path.is_file():
+        return {
+            "mesh_ok": False,
+            "mesh_checked": False,
+            "mesh_message": f"checkMesh non exécuté (journal absent : {log_path.name})",
+            "n_cells": None,
+        }
+
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    cells_match = _CELLS_RE.search(text)
+    n_cells = int(cells_match.group(1)) if cells_match else None
+
+    failed = _FAILED_CHECKS_RE.search(text)
+    if failed:
+        return {
+            "mesh_ok": False,
+            "mesh_checked": True,
+            "mesh_message": f"checkMesh : {failed.group(1)} contrôle(s) en échec",
+            "n_cells": n_cells,
+        }
+    if "Mesh OK" in text:
+        return {
+            "mesh_ok": True,
+            "mesh_checked": True,
+            "mesh_message": "checkMesh : maillage valide",
+            "n_cells": n_cells,
+        }
+    return {
+        "mesh_ok": False,
+        "mesh_checked": True,
+        "mesh_message": "checkMesh : verdict illisible dans le journal",
+        "n_cells": n_cells,
+    }
+
+
+def read_solver_convergence(log_dir: Path, solver: str) -> dict[str, Any]:
+    """Cherche dans le journal du solveur s'il s'est arrêté sur convergence."""
+    log_path = log_dir / f"{solver}.log"
+    if not log_path.is_file():
+        return {"solver_converged": None, "solver_iterations": None}
+
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    converged = "SIMPLE solution converged" in text or "solution converged" in text
+    times = re.findall(r"^Time = (\d+(?:\.\d+)?)", text, re.MULTILINE)
+    return {
+        "solver_converged": converged,
+        "solver_iterations": int(float(times[-1])) if times else None,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Écriture de results.json
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _base_result(iteration: Any, design_id: Any) -> dict[str, Any]:
+    """Squelette commun : les clés du contrat existent TOUJOURS."""
+    return {
+        "iteration": iteration,
+        "design_id": design_id,
+        "success": False,
+        "status": None,
+        "Cd": None,
+        "Cl": None,
+        "Cl_Cd": None,
+        "mesh_ok": False,
+        "error_message": None,
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def write_results(iteration_dir: Path, result: Mapping[str, Any]) -> Path:
+    target = Path(iteration_dir) / RESULTS_FILENAME
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
+    return target
+
+
+def _read_design(design_params_path: Path | None) -> tuple[Any, Any]:
+    if design_params_path is None:
+        return None, None
+    try:
+        from pipeline.utils import load_yaml
+
+        data = load_yaml(design_params_path)
+        return data.get("iteration"), data.get("design_id")
+    except Exception:
+        return None, None
+
+
+def build_failure(
+    iteration_dir: Path,
+    status: str,
+    message: str,
+    design_params_path: Path | None = None,
+) -> dict[str, Any]:
+    """results.json d'échec : coefficients à null, cause explicite."""
+    iteration, design_id = _read_design(design_params_path)
+    result = _base_result(iteration, design_id)
+    mesh = read_check_mesh(Path(iteration_dir) / "logs" / "checkMesh.log")
+    result.update(
+        {
+            "success": False,
+            "status": status,
+            "error_message": message,
+            "mesh_ok": mesh["mesh_ok"],
+            "mesh": mesh,
+        }
+    )
+    return result
+
+
+def postprocess(
+    iteration_dir: Path,
+    design_params_path: Path | None = None,
+    cfd_settings_path: Path | None = None,
+) -> dict[str, Any]:
+    """Assemble results.json à partir d'un case calculé."""
+    iteration_dir = Path(iteration_dir)
+    case_dir = iteration_dir / CASE_DIR_NAME
+    log_dir = iteration_dir / "logs"
+
+    window, tol, solver = 200, 0.02, "simpleFoam"
+    if cfd_settings_path is not None:
+        try:
+            from pipeline.utils import load_yaml
+
+            cfd = load_yaml(cfd_settings_path)
+            convergence = cfd.get("convergence", {}) or {}
+            window = int(convergence.get("averaging_window", window))
+            tol = float(convergence.get("coeff_stability_tol", tol))
+            solver = str((cfd.get("case", {}) or {}).get("solver", solver))
+        except Exception:
+            pass  # valeurs par défaut : le post-traitement ne doit pas échouer ici
+
+    iteration, design_id = _read_design(design_params_path)
+    result = _base_result(iteration, design_id)
+
+    mesh = read_check_mesh(log_dir / "checkMesh.log")
+    result["mesh_ok"] = mesh["mesh_ok"]
+    result["mesh"] = mesh
+
+    path = find_coefficient_file(case_dir)
+    columns = parse_coefficient_file(path)
+    coefficients = average_coefficients(columns, path, window, tol)
+
+    result.update(coefficients)
+    result.update(read_solver_convergence(log_dir, solver))
+    result["success"] = True
+    result["status"] = STATUS_OK
+    # « converged » résume les deux conditions qui rendent un point exploitable :
+    # un maillage valide et des coefficients stabilisés.
+    result["converged"] = bool(
+        coefficients["coefficients_stable"] and result["mesh_ok"]
+    )
+    if not result["converged"]:
+        result["warning"] = (
+            "résultat exploitable mais peu sûr : "
+            + ("coefficients encore instables" if not coefficients["coefficients_stable"]
+               else "")
+            + ("" if result["mesh_ok"] else " maillage non validé")
+        ).strip()
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="openfoam/postprocess.py",
+        description="Extrait Cd / Cl / Cl_Cd d'un case OpenFOAM vers results.json.",
+    )
+    parser.add_argument("--iteration-dir", required=True)
+    parser.add_argument("--design-params", default=None)
+    parser.add_argument("--cfd-settings", default=None)
+    parser.add_argument(
+        "--failure-status", default=None,
+        help="écrit un results.json d'échec avec ce statut au lieu de dépouiller",
+    )
+    parser.add_argument("--failure-message", default="")
+    args = parser.parse_args(argv)
+
+    iteration_dir = Path(args.iteration_dir)
+    design_params = Path(args.design_params) if args.design_params else None
+    cfd_settings = Path(args.cfd_settings) if args.cfd_settings else None
+
+    if args.failure_status:
+        result = build_failure(
+            iteration_dir, args.failure_status, args.failure_message, design_params
+        )
+        write_results(iteration_dir, result)
+        print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        return 0  # l'échec est rapporté DANS le fichier, l'écriture a réussi
+
+    try:
+        result = postprocess(iteration_dir, design_params, cfd_settings)
+    except PostProcessError as exc:
+        result = build_failure(iteration_dir, exc.status, exc.message, design_params)
+        write_results(iteration_dir, result)
+        print(json.dumps(result, indent=2, ensure_ascii=False, default=str),
+              file=sys.stderr)
+        return 1
+
+    write_results(iteration_dir, result)
+    print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

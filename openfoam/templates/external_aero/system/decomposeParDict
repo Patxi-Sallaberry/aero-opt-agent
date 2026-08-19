@@ -1,0 +1,24 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — decoupage pour le calcul parallele                         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+numberOfSubdomains  @@N_PROCS@@;
+
+method              @@DECOMPOSITION_METHOD@@;
+
+// Utilise seulement si method vaut simple/hierarchical : scotch, le defaut,
+// ignore ces coefficients.
+coeffs
+{
+    n               (@@N_PROCS@@ 1 1);
+}
+
+// ************************************************************************* //

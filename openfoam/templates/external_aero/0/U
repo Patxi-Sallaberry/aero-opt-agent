@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — champ de vitesse                                           |
+| L incidence est portee par la GEOMETRIE (le profil est tourne par le        |
+| driver Fusion), pas par la direction de l ecoulement : l ecoulement reste   |
+| aligne sur +X d une iteration a l autre, et les directions de portance et   |
+| de trainee ne bougent jamais.                                                |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (@@U_INF_VECTOR@@);
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (@@U_INF_VECTOR@@);
+    }
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      uniform (0 0 0);
+        value           uniform (@@U_INF_VECTOR@@);
+    }
+    "(top|bottom)"
+    {
+        type            slip;
+    }
+    "(sideMin|sideMax)"
+    {
+        type            @@SIDE_FIELD_TYPE@@;
+    }
+    wing
+    {
+        type            noSlip;
+    }
+}
+
+// ************************************************************************* //
