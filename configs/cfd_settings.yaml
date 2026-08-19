@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────────────
+# cfd_settings.yaml — paramètres de simulation OpenFOAM.
+#
+# IMPORTANT : ce fichier n'est JAMAIS modifié par l'agent LLM.
+# Il définit les conditions de simulation, qui doivent rester
+# identiques d'une itération à l'autre pour que les comparaisons
+# Cd / Cl / Cl_Cd soient valides.
+# ─────────────────────────────────────────────────────────────
+
+case:
+  name: "external_aero"
+  template_dir: "openfoam/templates/external_aero"
+  solver: "simpleFoam"           # simpleFoam (RANS stationnaire) | pimpleFoam
+  turbulence_model: "kOmegaSST"
+
+# Conditions de l'écoulement libre
+flow:
+  velocity_ms: 20.0              # vitesse infini amont (m/s)
+  direction: [1.0, 0.0, 0.0]     # direction de l'écoulement (unitaire)
+  lift_direction: [0.0, 0.0, 1.0]
+  rho_kg_m3: 1.225               # masse volumique air (15 °C, 1 atm)
+  nu_m2_s: 1.5e-5                # viscosité cinématique
+  turbulent_intensity: 0.05
+  turbulent_length_scale_m: 0.01
+
+# Grandeurs de référence pour l'adimensionnement des coefficients
+reference:
+  area_m2: 0.09                  # surface de référence (mise à jour par le pipeline)
+  length_m: 0.30                 # corde de référence (mise à jour par le pipeline)
+  center_of_rotation: [0.0, 0.0, 0.0]
+
+# Domaine de calcul, exprimé en multiples de la longueur de référence
+domain:
+  upstream_factor: 5.0
+  downstream_factor: 12.0
+  lateral_factor: 5.0
+  vertical_factor: 5.0
+
+# Maillage — snappyHexMesh
+mesh:
+  base_cell_size_m: 0.02
+  surface_refinement_level: [3, 4]
+  boundary_layers:
+    n_layers: 5
+    expansion_ratio: 1.2
+    final_layer_thickness: 0.4
+    min_thickness: 0.02
+  check_mesh:
+    enabled: true                # OBLIGATOIRE (Master Doc §4.3)
+    fail_on_error: true
+    max_non_orthogonality: 70.0
+    max_skewness: 4.0
+    max_aspect_ratio: 1000.0
+
+# Contrôle du solveur
+solver_control:
+  start_time: 0
+  end_time: 2000                 # nombre d'itérations SIMPLE
+  write_interval: 500
+  purge_write: 2
+  max_wall_time_s: 5400          # garde-fou : abandon au-delà (1 h 30)
+
+# Critères de convergence des résidus
+convergence:
+  residual_p: 1.0e-4
+  residual_U: 1.0e-5
+  residual_k: 1.0e-5
+  residual_omega: 1.0e-5
+  # Moyenne des coefficients sur les N dernières itérations
+  averaging_window: 200
+  # Écart-type relatif max sur la fenêtre pour déclarer la convergence
+  coeff_stability_tol: 0.02
+
+# Extraction des coefficients aérodynamiques (functionObject forceCoeffs)
+force_coeffs:
+  patches: ["wing"]              # patch(s) de la géométrie importée
+  write_interval: 1
+  outputs: ["Cd", "Cl", "Cl_Cd"]
+
+# Ressources d'exécution
+execution:
+  n_processors: 4
+  decomposition_method: "scotch"
+  keep_case_after_run: true      # archivage dans data/iterations/iter_XXXX/

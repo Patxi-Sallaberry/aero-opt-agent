@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────
+# Core First v1.0 — dépendances minimales
+# Installation : python3 -m pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────
+
+# Configuration & validation (Phase 0)
+PyYAML==6.0.2            # lecture/écriture design_params.yaml & cfd_settings.yaml
+python-dotenv==1.0.1     # chargement du .env
+
+# Post-processing CFD (Phase 2)
+numpy==2.1.3             # lecture des forceCoeffs, moyennes de convergence
+
+# Agent / orchestrateur LLM (Phase 4)
+anthropic==0.39.0        # client API Claude
+
+# Tests (toutes phases)
+pytest==8.3.3
+
+# ─────────────────────────────────────────────────────────────
+# NOTE : le driver Fusion 360 (fusion/parametric_driver.py) s'exécute
+# dans l'interpréteur Python embarqué de Fusion (module `adsk`) et
+# n'utilise AUCUNE de ces dépendances hors PyYAML (vendorisé si besoin).
+# OpenFOAM est une dépendance système, pas une dépendance pip.
+# ─────────────────────────────────────────────────────────────

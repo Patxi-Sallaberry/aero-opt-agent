@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# Secrets / environnement
+# ─────────────────────────────────────────────────────────────
+.env
+.env.local
+*.key
+*.pem
+
+# ─────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ─────────────────────────────────────────────────────────────
+# Résultats d'itérations (lourds, régénérables)
+# Seuls les fichiers de synthèse sont versionnés.
+# ─────────────────────────────────────────────────────────────
+data/iterations/*
+!data/iterations/.gitkeep
+
+# ─────────────────────────────────────────────────────────────
+# CAO / géométrie (binaires lourds)
+# ─────────────────────────────────────────────────────────────
+*.f3d
+*.f3z
+*.step
+*.stp
+*.stl
+*.iges
+*.igs
+*.obj
+
+# ─────────────────────────────────────────────────────────────
+# OpenFOAM — sorties de run
+# ─────────────────────────────────────────────────────────────
+openfoam/run/
+openfoam/**/processor*/
+openfoam/**/postProcessing/
+openfoam/**/dynamicCode/
+openfoam/**/*.OpenFOAM
+openfoam/**/*.foam
+openfoam/**/log.*
+openfoam/**/*.log
+# Répertoires temporels générés par le solveur (0.001, 100, 2500, ...)
+# Le répertoire "0" du template reste versionné.
+openfoam/templates/*/[1-9]*/
+openfoam/templates/*/0.[0-9]*/
+
+# ─────────────────────────────────────────────────────────────
+# OS / éditeurs
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~

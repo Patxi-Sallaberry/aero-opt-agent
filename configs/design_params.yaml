@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────
+# design_params.yaml — SEUL fichier modifié par l'agent LLM.
+#
+# Contrat strict (Master Doc §3.1) :
+#   - value doit rester dans [min, max]
+#   - |value_nouveau - value_precedent| / |value_precedent| * 100
+#       <= max_delta_pct   (par rapport à la DERNIÈRE ITÉRATION RÉUSSIE)
+#   - toutes les valeurs sont numériques
+#
+# Validation : python3 pipeline/utils.py configs/design_params.yaml
+# ─────────────────────────────────────────────────────────────
+
+iteration: 0
+design_id: "wing_v01"
+
+parameters:
+  chord_mm:
+    value: 300.0
+    min: 220.0
+    max: 420.0
+    max_delta_pct: 7.0
+    unit: "mm"
+  aoa_deg:
+    value: 4.0
+    min: -1.0
+    max: 10.0
+    max_delta_pct: 12.0
+    unit: "deg"
+  # Ajouter ici TOUS les User Parameters du modèle Fusion 360.
+  # Un nom de paramètre doit correspondre EXACTEMENT au User Parameter
+  # Fusion (userParameters.itemByName), sinon le driver échoue.
+
+constraints:
+  topology_preserving: true
+  min_wall_thickness_mm: 1.5
+
+objectives:
+  primary: "maximize_Cl_Cd"     # ou "maximize_downforce" / "minimize_Cd"
