@@ -132,8 +132,28 @@ if not report.ok:
 
 ## Le driver Fusion (`fusion/parametric_driver.py`)
 
-Il applique les valeurs du YAML aux User Parameters, force un recalcul, et
-exporte `data/iterations/iter_XXXX/geometry.step`.
+Il applique les valeurs du YAML au design Fusion, obtient la géométrie
+correspondante, et exporte `data/iterations/iter_XXXX/geometry.step`.
+
+### Deux stratégies de géométrie
+
+| Mode | Ce qu'il fait | Quand |
+|------|---------------|-------|
+| `rebuild` (défaut) | Met à jour les User Parameters, **puis reconstruit** la géométrie : profil NACA 4 chiffres retracé à la corde, l'épaisseur et la cambrure demandées, tourné de l'incidence, extrudé sur l'envergure. | Modèle dont les cotes ne sont pas réellement pilotées par ses paramètres — **le cas du seed livré**. |
+| `parameters` | Met à jour les User Parameters et laisse Fusion recalculer. | Modèle réellement paramétrique. |
+
+Le seed (`fusion/seed_design.f3d`, généré par un script NACA) crée bien ses
+5 User Parameters, mais trace son profil par une spline passant par des points
+calculés en dur et l'extrude sur une longueur brute. **Modifier ses paramètres
+n'y déplace pas un point** : sans `rebuild`, chaque itération exporterait un
+STEP identique et l'agent optimiserait dans le vide, sans la moindre erreur
+pour le signaler.
+
+Choix du mode : `--geometry-mode`, ou `FUSION_GEOMETRY_MODE` dans `.env`.
+
+La forme du profil (famille NACA, position de cambrure `p = 0.4`, 80 points par
+surface) est fixée dans `parametric_driver.py` : c'est une décision de
+conception, ni de l'agent, ni de la CFD.
 
 ### Dans Fusion 360
 
@@ -168,8 +188,11 @@ s'exécute dans un autre processus que Fusion.
 
 `status` vaut `OK`, `DRY_RUN`, ou l'une des causes d'échec : `CONFIG_ERROR`,
 `SEED_MISSING`, `SEED_IMPORT_FAILED`, `NO_DESIGN`, `PARAM_NOT_FOUND`,
-`PARAM_SET_FAILED`, `RECOMPUTE_FAILED`, `GEOMETRY_EMPTY`, `EXPORT_FAILED`,
-`FUSION_UNAVAILABLE`, `UNEXPECTED_ERROR`.
+`PARAM_SET_FAILED`, `RECOMPUTE_FAILED`, `REBUILD_FAILED`, `GEOMETRY_EMPTY`,
+`EXPORT_FAILED`, `FUSION_UNAVAILABLE`, `UNEXPECTED_ERROR`.
+
+En mode `rebuild`, le statut porte aussi `geometry` : corde et envergure en cm,
+ratios appliqués, incidence, et l'emprise de la géométrie produite.
 
 ---
 

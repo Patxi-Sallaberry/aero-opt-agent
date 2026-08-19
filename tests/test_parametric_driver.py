@@ -538,6 +538,214 @@ def test_camber_nul_reste_une_expression_valide():
 
 
 # ─────────────────────────────────────────────────────────────
+# Mode rebuild : calcul du profil (pur, testable hors Fusion)
+# ─────────────────────────────────────────────────────────────
+
+
+def _chord_extent(profile: dict) -> float:
+    xs = [x for x, _ in profile["upper"] + profile["lower"]]
+    return max(xs) - min(xs)
+
+
+def _max_thickness(profile: dict) -> float:
+    # Épaisseur mesurée verticalement, point à point (valable à incidence nulle).
+    return max(yu - yl for (_, yu), (_, yl) in zip(profile["upper"], profile["lower"]))
+
+
+def test_profil_ferme_au_bord_dattaque_et_de_fuite():
+    p = pd.naca4_profile(30.0, 0.12, 0.02)
+    assert p["upper"][0] == pytest.approx(p["lower"][0], abs=1e-12)   # bord d'attaque
+    assert p["upper"][-1] == pytest.approx(p["lower"][-1], abs=1e-9)  # bord de fuite
+
+
+def test_nombre_de_points():
+    p = pd.naca4_profile(30.0, 0.12, 0.02, n_points=40)
+    assert len(p["upper"]) == 41 and len(p["lower"]) == 41
+
+
+def test_corde_respectee():
+    assert _chord_extent(pd.naca4_profile(30.0, 0.12, 0.0)) == pytest.approx(30.0, rel=1e-3)
+    assert _chord_extent(pd.naca4_profile(42.0, 0.12, 0.0)) == pytest.approx(42.0, rel=1e-3)
+
+
+def test_epaisseur_relative_respectee():
+    # t/c = 0.12 sur une corde de 30 cm -> environ 3.6 cm d'épaisseur max.
+    p = pd.naca4_profile(30.0, 0.12, 0.0)
+    assert _max_thickness(p) / 30.0 == pytest.approx(0.12, rel=0.02)
+
+
+def test_epaisseur_suit_le_parametre():
+    fin = _max_thickness(pd.naca4_profile(30.0, 0.08, 0.0))
+    epais = _max_thickness(pd.naca4_profile(30.0, 0.20, 0.0))
+    assert epais / fin == pytest.approx(0.20 / 0.08, rel=0.02)
+
+
+def test_cambrure_nulle_donne_un_profil_symetrique():
+    p = pd.naca4_profile(30.0, 0.12, 0.0)
+    for (_, yu), (_, yl) in zip(p["upper"], p["lower"]):
+        assert yu == pytest.approx(-yl, abs=1e-12)
+
+
+def test_la_cambrure_est_mise_a_lechelle_de_la_corde():
+    # Le générateur d'origine oubliait ce facteur : la ligne de cambrure
+    # restait en unités normalisées, ~1/corde fois trop petite, et le
+    # paramètre `camber` n'avait presque aucun effet sur la géométrie.
+    ligne_moyenne = lambda p: max(
+        (yu + yl) / 2.0 for (_, yu), (_, yl) in zip(p["upper"], p["lower"])
+    )
+    cambre = ligne_moyenne(pd.naca4_profile(30.0, 0.12, 0.02))
+    # 2 % de cambrure sur 30 cm de corde -> flèche de l'ordre de 0.6 cm.
+    assert cambre == pytest.approx(0.6, rel=0.05)
+    # et elle doit croître proportionnellement à la corde
+    assert ligne_moyenne(pd.naca4_profile(60.0, 0.12, 0.02)) == pytest.approx(
+        2 * cambre, rel=0.02
+    )
+
+
+def test_la_cambrure_change_reellement_la_geometrie():
+    symetrique = pd.naca4_profile(30.0, 0.12, 0.0)
+    cambre = pd.naca4_profile(30.0, 0.06, 0.0)
+    assert symetrique != cambre  # garde-fou trivial
+    plat = pd.naca4_profile(30.0, 0.12, 0.0)["upper"]
+    courbe = pd.naca4_profile(30.0, 0.12, 0.04)["upper"]
+    ecart = max(abs(a[1] - b[1]) for a, b in zip(plat, courbe))
+    assert ecart > 0.5  # cm : franchement visible, pas un epsilon
+
+
+@pytest.mark.parametrize("aoa_deg", [5.0, -5.0, 12.0])
+def test_incidence_tourne_le_profil(aoa_deg):
+    import math
+
+    aoa = math.radians(aoa_deg)
+    droit = pd.naca4_profile(30.0, 0.12, 0.0, 0.0)
+    tourne = pd.naca4_profile(30.0, 0.12, 0.0, aoa)
+    # Le bord d'attaque est à l'origine : il ne bouge pas.
+    assert tourne["upper"][0] == pytest.approx(droit["upper"][0], abs=1e-9)
+    # Le bord de fuite descend pour une incidence positive (nez cabré).
+    x_te, y_te = tourne["upper"][-1]
+    assert y_te == pytest.approx(-30.0 * math.sin(aoa), abs=0.05)
+    assert x_te == pytest.approx(30.0 * math.cos(aoa), abs=0.05)
+
+
+def test_la_rotation_conserve_la_corde():
+    import math
+
+    for aoa_deg in (0.0, 8.0, -3.0):
+        p = pd.naca4_profile(30.0, 0.12, 0.02, math.radians(aoa_deg))
+        le, te = p["upper"][0], p["upper"][-1]
+        longueur = math.hypot(te[0] - le[0], te[1] - le[1])
+        assert longueur == pytest.approx(30.0, rel=1e-3)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"chord_cm": 0.0}, {"chord_cm": -1.0},
+        {"thickness": 0.0}, {"thickness": -0.1},
+        {"camber": -0.01},
+        {"n_points": 3},
+        {"camber_position": 0.0}, {"camber_position": 1.0},
+    ],
+)
+def test_valeurs_de_profil_aberrantes_refusees(kwargs):
+    base = {"chord_cm": 30.0, "thickness": 0.12, "camber": 0.02}
+    base.update(kwargs)
+    with pytest.raises(pd.DriverError):
+        pd.naca4_profile(**base)
+
+
+# ─────────────────────────────────────────────────────────────
+# Mode rebuild : traduction design_params -> géométrie
+# ─────────────────────────────────────────────────────────────
+
+
+def test_plan_de_reconstruction_depuis_la_config_livree():
+    plan = pd.profile_from_parameters(pd.load_config(REAL_CONFIG)["parameters"])
+    assert plan["chord_cm"] == pytest.approx(30.0)    # 300 mm
+    assert plan["span_cm"] == pytest.approx(8.0)      # 80 mm
+    assert plan["thickness"] == pytest.approx(0.12)
+    assert plan["camber"] == pytest.approx(0.02)
+    assert plan["aoa_deg"] == pytest.approx(0.0)
+
+
+def test_conversion_des_unites_de_longueur():
+    for unit, attendu in (("mm", 30.0), ("cm", 300.0), ("m", 30000.0), ("in", 762.0)):
+        spec = {"value": 300.0, "min": 1.0, "max": 1e6, "max_delta_pct": 5.0,
+                "unit": unit}
+        assert pd.to_cm(spec, "chord") == pytest.approx(attendu)
+
+
+def test_conversion_des_angles():
+    import math
+
+    deg = {"value": 90.0, "min": -180.0, "max": 180.0, "max_delta_pct": 5.0,
+           "unit": "deg"}
+    rad = dict(deg, value=math.pi / 2, unit="rad")
+    assert pd.to_rad(deg, "aoa") == pytest.approx(math.pi / 2)
+    assert pd.to_rad(rad, "aoa") == pytest.approx(math.pi / 2)
+
+
+def test_une_longueur_sans_unite_est_refusee():
+    spec = {"value": 300.0, "min": 1.0, "max": 1e6, "max_delta_pct": 5.0,
+            "unit": "unitless"}
+    with pytest.raises(pd.DriverError):
+        pd.to_cm(spec, "chord")
+
+
+def test_un_ratio_avec_unite_est_refuse():
+    spec = {"value": 0.12, "min": 0.05, "max": 0.3, "max_delta_pct": 5.0,
+            "unit": "mm"}
+    with pytest.raises(pd.DriverError):
+        pd.to_dimensionless(spec, "thickness")
+
+
+def test_parametre_manquant_pour_le_rebuild(cfg):
+    with pytest.raises(pd.DriverError) as exc:
+        pd.profile_from_parameters(cfg["parameters"])  # chord_mm / aoa_deg
+    assert exc.value.status == pd.STATUS_CONFIG_ERROR
+    assert "chord" in exc.value.message
+
+
+@pytest.mark.parametrize(
+    "requested,attendu",
+    [(None, pd.GEOMETRY_MODE_REBUILD), ("rebuild", "rebuild"),
+     ("parameters", "parameters"), ("REBUILD", "rebuild")],
+)
+def test_resolution_du_mode(requested, attendu, monkeypatch):
+    monkeypatch.delenv("FUSION_GEOMETRY_MODE", raising=False)
+    assert pd.resolve_geometry_mode(requested) == attendu
+
+
+def test_mode_depuis_lenvironnement(monkeypatch):
+    monkeypatch.setenv("FUSION_GEOMETRY_MODE", "parameters")
+    assert pd.resolve_geometry_mode() == "parameters"
+
+
+def test_mode_inconnu_refuse(monkeypatch):
+    monkeypatch.delenv("FUSION_GEOMETRY_MODE", raising=False)
+    with pytest.raises(pd.DriverError):
+        pd.resolve_geometry_mode("magique")
+
+
+def test_le_mode_simulation_calcule_la_geometrie(tmp_path):
+    status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path,
+                      dry_run=True)
+    assert status["geometry_mode"] == pd.GEOMETRY_MODE_REBUILD
+    geo = status["geometry"]
+    assert geo["chord_cm"] == pytest.approx(30.0)
+    assert geo["span_cm"] == pytest.approx(8.0)
+    assert geo["bbox_cm"]["x_max"] == pytest.approx(30.0, rel=1e-3)
+    json.dumps(status)  # le plan doit rester sérialisable
+
+
+def test_mode_parameters_ne_calcule_pas_de_geometrie(tmp_path):
+    status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path,
+                      dry_run=True, geometry_mode="parameters")
+    assert status["geometry_mode"] == "parameters"
+    assert status["geometry"] is None
+
+
+# ─────────────────────────────────────────────────────────────
 # Export STEP (doublures)
 # ─────────────────────────────────────────────────────────────
 
@@ -584,8 +792,14 @@ def test_ancien_step_supprime_avant_export(tmp_path):
 # ─────────────────────────────────────────────────────────────
 
 
+# La fixture `cfg` décrit un design générique à deux paramètres : le mode
+# rebuild, lui, exige les cinq paramètres du seed. Ces tests portent sur la
+# mécanique de statut, d'où le mode 'parameters'.
+
+
 def test_mode_simulation_ne_produit_pas_de_step(tmp_path, cfg_file):
-    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True)
+    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
+                      geometry_mode="parameters")
     assert status["success"] is False
     assert status["status"] == pd.STATUS_DRY_RUN
     assert status["iteration"] == 3
@@ -594,13 +808,22 @@ def test_mode_simulation_ne_produit_pas_de_step(tmp_path, cfg_file):
 
 
 def test_mode_simulation_prevoit_les_expressions(tmp_path, cfg_file):
-    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True)
+    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
+                      geometry_mode="parameters")
     assert status["applied_parameters"]["chord_mm"]["expression"] == "300 mm"
     assert status["applied_parameters"]["aoa_deg"]["expression"] == "4 deg"
 
 
+def test_rebuild_refuse_une_config_sans_les_parametres_du_seed(tmp_path, cfg_file):
+    # Garde-fou : plutôt que de reconstruire n'importe quoi, le driver s'arrête.
+    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True)
+    assert status["status"] == pd.STATUS_CONFIG_ERROR
+    assert "chord" in status["error_message"]
+
+
 def test_statut_et_journal_ecrits_dans_le_dossier_diteration(tmp_path, cfg_file):
-    pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True)
+    pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
+             geometry_mode="parameters")
     out = tmp_path / "iter_0003"
     status = json.loads((out / pd.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["status"] == pd.STATUS_DRY_RUN
@@ -624,16 +847,18 @@ def test_drive_config_absente(tmp_path):
 
 
 def test_statut_serialisable_en_json(tmp_path, cfg_file):
-    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True)
+    status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
+                      geometry_mode="parameters")
     json.dumps(status)  # ne doit pas lever
     for key in ("success", "status", "iteration", "design_id", "step_path",
-                "applied_parameters", "error_message", "warnings", "timestamp"):
+                "geometry_mode", "geometry", "applied_parameters",
+                "error_message", "warnings", "timestamp"):
         assert key in status
 
 
 def test_cli_retourne_3_en_mode_simulation(tmp_path, cfg_file, capsys):
     code = pd.main(["--config", str(cfg_file), "--iterations-dir", str(tmp_path),
-                    "--dry-run"])
+                    "--dry-run", "--geometry-mode", "parameters"])
     assert code == 3
     assert json.loads(capsys.readouterr().out)["status"] == pd.STATUS_DRY_RUN
 

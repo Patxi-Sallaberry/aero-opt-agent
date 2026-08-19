@@ -1,11 +1,28 @@
 """Driver paramétrique Fusion 360 — Phase 1 (Master Document §3.2).
 
-Rôle : appliquer les valeurs de `configs/design_params.yaml` aux User Parameters
-du design Fusion, forcer un recalcul, puis exporter la géométrie en STEP dans
+Rôle : appliquer les valeurs de `configs/design_params.yaml` au design Fusion,
+obtenir la géométrie correspondante, puis l'exporter en STEP dans
 `data/iterations/iter_XXXX/geometry.step`.
 
 Ce script ne fait QUE cela. Il ne connaît ni OpenFOAM, ni l'agent, ni le master
 pipeline, et il n'écrit jamais dans `configs/`.
+
+─────────────────────────────────────────────────────────────────────────────
+DEUX STRATÉGIES DE GÉOMÉTRIE
+─────────────────────────────────────────────────────────────────────────────
+`rebuild` (défaut) : les User Parameters sont mis à jour, PUIS la géométrie est
+reconstruite depuis la configuration — profil NACA 4 chiffres retracé à la
+corde, l'épaisseur et la cambrure demandées, tourné de l'incidence, extrudé sur
+l'envergure. Nécessaire dès que le modèle n'est pas réellement piloté par ses
+paramètres : c'est le cas du seed livré, dont le profil est une spline passant
+par des points calculés en dur et dont l'extrusion est une longueur brute.
+Modifier ses User Parameters n'y déplace pas un seul point — sans rebuild, le
+STEP serait identique à chaque itération et l'agent optimiserait dans le vide.
+
+`parameters` : mise à jour des User Parameters puis `computeAll()`. Réservé aux
+modèles dont les cotes sont réellement contraintes par les paramètres.
+
+Choix via `--geometry-mode` ou la variable FUSION_GEOMETRY_MODE.
 
 ─────────────────────────────────────────────────────────────────────────────
 EXÉCUTION DANS FUSION 360
@@ -53,7 +70,7 @@ récupérer une valeur de retour :
 
 Variables d'environnement reconnues (voir .env.example) :
     DESIGN_PARAMS_PATH, ITERATIONS_DIR, FUSION_SEED_PATH,
-    FUSION_FORCE_SEED_IMPORT, LOG_LEVEL
+    FUSION_FORCE_SEED_IMPORT, FUSION_GEOMETRY_MODE, LOG_LEVEL
 """
 
 from __future__ import annotations
@@ -108,9 +125,61 @@ STATUS_PARAM_NOT_FOUND = "PARAM_NOT_FOUND"
 STATUS_PARAM_SET_FAILED = "PARAM_SET_FAILED"
 STATUS_RECOMPUTE_FAILED = "RECOMPUTE_FAILED"
 STATUS_GEOMETRY_EMPTY = "GEOMETRY_EMPTY"
+STATUS_REBUILD_FAILED = "REBUILD_FAILED"
 STATUS_EXPORT_FAILED = "EXPORT_FAILED"
 STATUS_DRY_RUN = "DRY_RUN"
 STATUS_UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
+
+# ── Stratégie de géométrie ───────────────────────────────────────────────────
+# "parameters" : on met à jour les User Parameters et on laisse Fusion
+#                recalculer. N'a de sens que si le modèle est RÉELLEMENT
+#                paramétrique (cotes contraintes par les paramètres).
+# "rebuild"    : on met à jour les User Parameters (le contrat §3.2 reste
+#                honoré, et un humain qui ouvre le fichier voit les bonnes
+#                valeurs) PUIS on reconstruit la géométrie à partir de
+#                design_params.yaml.
+#
+# Le seed livré exige "rebuild" : son profil est une spline passant par des
+# points calculés en dur, et son extrusion une longueur brute — modifier les
+# User Parameters n'y déplace pas un seul point. C'est donc le défaut.
+GEOMETRY_MODE_PARAMETERS = "parameters"
+GEOMETRY_MODE_REBUILD = "rebuild"
+GEOMETRY_MODES = (GEOMETRY_MODE_REBUILD, GEOMETRY_MODE_PARAMETERS)
+DEFAULT_GEOMETRY_MODE = GEOMETRY_MODE_REBUILD
+
+# ── Reconstruction du profil (mode "rebuild") ────────────────────────────────
+# Paramètres de FORME, propriété du concepteur : ils ne sont ni dans
+# design_params.yaml (l'agent n'a pas à y toucher) ni dans cfd_settings.yaml
+# (ce n'est pas de la CFD). Les changer change la famille de profil.
+NACA_CAMBER_POSITION = 0.4      # p — position de la cambrure max (NACA 24xx)
+NACA_PROFILE_POINTS = 80        # points par surface : compromis fidélité/poids
+
+REBUILD_PARAMETERS = ("chord", "thickness", "camber", "span", "aoa")
+
+# Noms posés sur ce que le driver crée, pour pouvoir le retrouver et le
+# supprimer à l'itération suivante.
+REBUILD_SKETCH_NAME = "AERO_OPT_PROFILE"
+REBUILD_BODY_NAME = "AERO_OPT_WING"
+REBUILD_ATTRIBUTE_GROUP = "aeroOpt"
+REBUILD_ATTRIBUTE_NAME = "generated"
+
+# Géométrie du seed d'origine (script NACA_Parametric) : à purger au premier
+# rebuild, sinon elle cohabiterait avec la nouvelle et le STEP contiendrait
+# deux ailes.
+LEGACY_GEOMETRY_NAMES = ("NACA_2412_Profile", "Wing_Section")
+
+# Conversions vers les unités internes de Fusion (cm et radians).
+LENGTH_TO_CM: dict[str, float] = {
+    "mm": 0.1,
+    "cm": 1.0,
+    "m": 100.0,
+    "in": 2.54,
+    "ft": 30.48,
+}
+ANGLE_TO_RAD: dict[str, float] = {
+    "deg": math.pi / 180.0,
+    "rad": 1.0,
+}
 
 # Unités que Fusion accepte comme suffixe d'expression. La clé est ce qui peut
 # être écrit dans le YAML, la valeur ce qui est envoyé à Fusion.
@@ -537,6 +606,205 @@ def _env_flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def resolve_geometry_mode(requested: str | None = None) -> str:
+    """Détermine la stratégie de géométrie (argument > environnement > défaut)."""
+    mode = (requested or os.environ.get("FUSION_GEOMETRY_MODE") or "").strip().lower()
+    if not mode:
+        return DEFAULT_GEOMETRY_MODE
+    if mode not in GEOMETRY_MODES:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"mode de géométrie inconnu : {mode!r} — attendu {list(GEOMETRY_MODES)}",
+        )
+    return mode
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reconstruction de la géométrie (mode "rebuild")
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _spec(parameters: Mapping[str, Any], name: str) -> Mapping[str, Any]:
+    spec = parameters.get(name)
+    if not isinstance(spec, dict):
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"le mode '{GEOMETRY_MODE_REBUILD}' exige le paramètre '{name}' dans "
+            f"design_params.yaml — attendus : {list(REBUILD_PARAMETERS)}",
+        )
+    return spec
+
+
+def to_cm(spec: Mapping[str, Any], name: str) -> float:
+    """Convertit une longueur du YAML vers les cm internes de Fusion."""
+    unit = normalize_unit(spec.get("unit"))
+    if unit not in LENGTH_TO_CM:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"parameters.{name} : longueur attendue, unité {spec.get('unit')!r} "
+            f"reçue — attendu l'une de {sorted(LENGTH_TO_CM)}",
+        )
+    return float(spec["value"]) * LENGTH_TO_CM[unit]
+
+
+def to_rad(spec: Mapping[str, Any], name: str) -> float:
+    """Convertit un angle du YAML vers les radians internes de Fusion."""
+    unit = normalize_unit(spec.get("unit"))
+    if unit not in ANGLE_TO_RAD:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"parameters.{name} : angle attendu, unité {spec.get('unit')!r} "
+            f"reçue — attendu l'une de {sorted(ANGLE_TO_RAD)}",
+        )
+    return float(spec["value"]) * ANGLE_TO_RAD[unit]
+
+
+def to_dimensionless(spec: Mapping[str, Any], name: str) -> float:
+    """Lit un ratio ; refuse une unité, qui trahirait une erreur de modèle."""
+    if normalize_unit(spec.get("unit")) is not None:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"parameters.{name} : grandeur sans dimension attendue (ratio), "
+            f"unité {spec.get('unit')!r} reçue",
+        )
+    return float(spec["value"])
+
+
+def naca4_profile(
+    chord_cm: float,
+    thickness: float,
+    camber: float,
+    aoa_rad: float = 0.0,
+    n_points: int = NACA_PROFILE_POINTS,
+    camber_position: float = NACA_CAMBER_POSITION,
+) -> dict[str, list[tuple[float, float]]]:
+    """Points d'un profil NACA 4 chiffres, en centimètres, incidence appliquée.
+
+    `thickness` (t/c) et `camber` (m/c) sont des ratios ; `chord_cm` porte
+    l'échelle. L'incidence est appliquée analytiquement : les points sont
+    tournés de -aoa autour du bord d'attaque (origine), l'écoulement restant
+    dirigé selon +X. Une rotation calculée ici plutôt qu'une feature Move
+    Fusion évite d'ajouter une entrée fragile dans la timeline à chaque
+    itération.
+
+    Returns:
+        {"upper": [(x, y), ...], "lower": [...]} — extrados du bord d'attaque
+        vers le bord de fuite, intrados en sens inverse, pour former un
+        contour fermé.
+    """
+    if not chord_cm > 0:
+        raise DriverError(STATUS_REBUILD_FAILED, f"corde non positive : {chord_cm}")
+    if not thickness > 0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"épaisseur relative non positive : {thickness}"
+        )
+    if camber < 0:
+        raise DriverError(STATUS_REBUILD_FAILED, f"cambrure négative : {camber}")
+    if n_points < 10:
+        raise DriverError(STATUS_REBUILD_FAILED, f"n_points trop faible : {n_points}")
+    p = float(camber_position)
+    if not 0.0 < p < 1.0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"position de cambrure hors ]0, 1[ : {p}"
+        )
+
+    cos_a, sin_a = math.cos(-aoa_rad), math.sin(-aoa_rad)
+
+    def rotate(x: float, y: float) -> tuple[float, float]:
+        return x * cos_a - y * sin_a, x * sin_a + y * cos_a
+
+    upper: list[tuple[float, float]] = []
+    lower: list[tuple[float, float]] = []
+
+    for i in range(n_points + 1):
+        xc = i / n_points
+        x = chord_cm * xc
+
+        # Distribution d'épaisseur (bord de fuite fermé).
+        yt = (
+            5.0
+            * thickness
+            * chord_cm
+            * (
+                0.2969 * math.sqrt(xc)
+                - 0.1260 * xc
+                - 0.3516 * xc**2
+                + 0.2843 * xc**3
+                - 0.1036 * xc**4
+            )
+        )
+
+        # Ligne de cambrure. yc est mise à l'échelle de la corde, comme yt :
+        # sans ce facteur, la cambrure serait ~1/chord fois trop faible et le
+        # paramètre `camber` n'aurait quasiment aucun effet.
+        if camber == 0.0:
+            yc = 0.0
+            dyc = 0.0
+        elif xc < p:
+            yc = chord_cm * camber * (xc / (p * p)) * (2.0 * p - xc)
+            dyc = (2.0 * camber / (p * p)) * (p - xc)
+        else:
+            yc = (
+                chord_cm
+                * camber
+                * ((1.0 - xc) / ((1.0 - p) ** 2))
+                * (1.0 + xc - 2.0 * p)
+            )
+            dyc = (2.0 * camber / ((1.0 - p) ** 2)) * (p - xc)
+
+        theta = math.atan(dyc)
+        upper.append(rotate(x - yt * math.sin(theta), yc + yt * math.cos(theta)))
+        lower.append(rotate(x + yt * math.sin(theta), yc - yt * math.cos(theta)))
+
+    return {"upper": upper, "lower": lower}
+
+
+def profile_from_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Traduit design_params.yaml en une description géométrique complète.
+
+    Fonction pure : aucun appel Fusion. C'est elle qui est exécutée en mode
+    simulation pour vérifier la reconstruction sans ouvrir Fusion.
+    """
+    missing = [n for n in REBUILD_PARAMETERS if n not in parameters]
+    if missing:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"le mode '{GEOMETRY_MODE_REBUILD}' exige les paramètres "
+            f"{list(REBUILD_PARAMETERS)} ; manquant(s) : {missing}",
+        )
+
+    chord_cm = to_cm(_spec(parameters, "chord"), "chord")
+    span_cm = to_cm(_spec(parameters, "span"), "span")
+    thickness = to_dimensionless(_spec(parameters, "thickness"), "thickness")
+    camber = to_dimensionless(_spec(parameters, "camber"), "camber")
+    aoa_rad = to_rad(_spec(parameters, "aoa"), "aoa")
+
+    if not span_cm > 0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"envergure non positive : {span_cm} cm"
+        )
+
+    profile = naca4_profile(chord_cm, thickness, camber, aoa_rad)
+    xs = [x for x, _ in profile["upper"] + profile["lower"]]
+    ys = [y for _, y in profile["upper"] + profile["lower"]]
+
+    return {
+        "profile": profile,
+        "chord_cm": chord_cm,
+        "span_cm": span_cm,
+        "thickness": thickness,
+        "camber": camber,
+        "aoa_rad": aoa_rad,
+        "aoa_deg": math.degrees(aoa_rad),
+        "n_points": NACA_PROFILE_POINTS,
+        "camber_position": NACA_CAMBER_POSITION,
+        "bbox_cm": {
+            "x_min": min(xs), "x_max": max(xs),
+            "y_min": min(ys), "y_max": max(ys),
+        },
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Opérations Fusion
 # ─────────────────────────────────────────────────────────────────────────────
@@ -823,6 +1091,194 @@ def _check_timeline_health(design: Any) -> list[str]:  # pragma: no cover
     return warnings
 
 
+def _tag_generated(entity: Any) -> None:  # pragma: no cover - nécessite Fusion
+    """Marque une entité comme produite par le driver, pour la repurger."""
+    try:
+        entity.attributes.add(
+            REBUILD_ATTRIBUTE_GROUP, REBUILD_ATTRIBUTE_NAME, "1"
+        )
+    except Exception as exc:
+        logger.warning(
+            "Marquage impossible de '%s' (%s) — le repérage retombera sur le nom.",
+            getattr(entity, "name", "?"),
+            exc,
+        )
+
+
+def _is_driver_generated(entity: Any) -> bool:  # pragma: no cover
+    """Vrai si l'entité vient du driver, ou du générateur d'origine du seed."""
+    try:
+        if (
+            entity.attributes.itemByName(
+                REBUILD_ATTRIBUTE_GROUP, REBUILD_ATTRIBUTE_NAME
+            )
+            is not None
+        ):
+            return True
+    except Exception:
+        pass
+    name = getattr(entity, "name", "")
+    return name in (REBUILD_SKETCH_NAME, REBUILD_BODY_NAME) or name in LEGACY_GEOMETRY_NAMES
+
+
+def _purge_previous_geometry(root: Any) -> int:  # pragma: no cover - nécessite Fusion
+    """Supprime la géométrie de l'itération précédente.
+
+    Sans cette purge, chaque itération empilerait une aile de plus dans le
+    document et le STEP exporté en contiendrait plusieurs — la CFD tournerait
+    alors sur une géométrie absurde sans que rien ne le signale.
+
+    Ne touche QUE ce que le driver a créé (attribut `aeroOpt`) ou ce que le
+    générateur du seed a laissé (noms connus). Le reste du document est la
+    propriété de l'utilisateur.
+    """
+    removed = 0
+
+    # Les esquisses d'abord : Fusion supprime en cascade les features qui les
+    # consomment, donc l'extrusion et son corps partent avec.
+    sketches = [root.sketches.item(i) for i in range(root.sketches.count)]
+    for sketch in reversed(sketches):
+        if not _is_driver_generated(sketch):
+            continue
+        name = sketch.name
+        try:
+            sketch.deleteMe()
+            removed += 1
+            logger.info("Purge de l'esquisse '%s'.", name)
+        except Exception as exc:
+            raise DriverError(
+                STATUS_REBUILD_FAILED,
+                f"suppression impossible de l'esquisse '{name}' : {exc}",
+            ) from exc
+
+    bodies = [root.bRepBodies.item(i) for i in range(root.bRepBodies.count)]
+    for body in reversed(bodies):
+        if not _is_driver_generated(body):
+            continue
+        name = body.name
+        try:
+            body.deleteMe()
+            removed += 1
+            logger.info("Purge du corps '%s'.", name)
+        except Exception as exc:
+            raise DriverError(
+                STATUS_REBUILD_FAILED,
+                f"suppression impossible du corps '{name}' : {exc}",
+            ) from exc
+
+    leftovers = [
+        root.bRepBodies.item(i).name
+        for i in range(root.bRepBodies.count)
+        if _is_driver_generated(root.bRepBodies.item(i))
+    ]
+    if leftovers:
+        raise DriverError(
+            STATUS_REBUILD_FAILED,
+            f"géométrie de l'itération précédente encore présente après purge : "
+            f"{leftovers} — le STEP contiendrait plusieurs ailes",
+        )
+    return removed
+
+
+def _rebuild_geometry(
+    design: Any, parameters: Mapping[str, Any]
+) -> tuple[dict, list[str]]:  # pragma: no cover - nécessite Fusion
+    """Reconstruit l'aile à partir de design_params.yaml.
+
+    Purge la géométrie précédente, retrace le profil NACA aux nouvelles
+    valeurs, l'extrude sur `span` et marque le résultat pour la purge suivante.
+    L'incidence est déjà intégrée aux points du profil.
+    """
+    root = design.rootComponent
+    warnings: list[str] = []
+    plan = profile_from_parameters(parameters)
+
+    logger.info(
+        "Reconstruction : corde %.3f cm, envergure %.3f cm, t/c %.4f, m/c %.4f, "
+        "incidence %.3f deg",
+        plan["chord_cm"], plan["span_cm"], plan["thickness"], plan["camber"],
+        plan["aoa_deg"],
+    )
+
+    removed = _purge_previous_geometry(root)
+    if removed == 0:
+        warnings.append(
+            "aucune géométrie précédente à purger — premier passage, ou "
+            "géométrie non reconnue (ni attribut 'aeroOpt', ni nom connu)"
+        )
+
+    try:
+        sketch = root.sketches.add(root.xYConstructionPlane)
+        sketch.name = REBUILD_SKETCH_NAME
+
+        upper = adsk.core.ObjectCollection.create()
+        for x, y in plan["profile"]["upper"]:
+            upper.add(adsk.core.Point3D.create(x, y, 0))
+        lower = adsk.core.ObjectCollection.create()
+        for x, y in reversed(plan["profile"]["lower"]):
+            lower.add(adsk.core.Point3D.create(x, y, 0))
+
+        sketch.sketchCurves.sketchFittedSplines.add(upper)
+        sketch.sketchCurves.sketchFittedSplines.add(lower)
+    except DriverError:
+        raise
+    except Exception as exc:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"tracé du profil impossible : {exc}"
+        ) from exc
+
+    if sketch.profiles.count == 0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED,
+            "le contour du profil ne s'est pas refermé — extrados et intrados "
+            "ne se rejoignent pas ; valeurs d'épaisseur ou de cambrure "
+            "probablement extrêmes",
+        )
+
+    try:
+        extrudes = root.features.extrudeFeatures
+        ext_input = extrudes.createInput(
+            sketch.profiles.item(0),
+            adsk.fusion.FeatureOperations.NewBodyFeatureOperation,
+        )
+        ext_input.setDistanceExtent(
+            False, adsk.core.ValueInput.createByReal(plan["span_cm"])
+        )
+        extrude = extrudes.add(ext_input)
+        extrude.name = REBUILD_BODY_NAME
+    except Exception as exc:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"extrusion impossible : {exc}"
+        ) from exc
+
+    if extrude.bodies.count == 0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, "l'extrusion n'a produit aucun corps"
+        )
+
+    _tag_generated(sketch)
+    for i in range(extrude.bodies.count):
+        body = extrude.bodies.item(i)
+        body.name = REBUILD_BODY_NAME
+        _tag_generated(body)
+
+    try:
+        adsk.doEvents()
+    except Exception:
+        pass
+
+    summary = {
+        key: plan[key]
+        for key in (
+            "chord_cm", "span_cm", "thickness", "camber", "aoa_deg",
+            "n_points", "camber_position", "bbox_cm",
+        )
+    }
+    summary["purged_entities"] = removed
+    logger.info("Reconstruction terminée (%d corps).", extrude.bodies.count)
+    return summary, warnings
+
+
 def _export_step(
     design: Any, target: Path
 ) -> None:  # pragma: no cover - nécessite Fusion
@@ -905,6 +1361,8 @@ def _build_status(
     error_message: str | None = None,
     details: Any = None,
     warnings: list[str] | None = None,
+    geometry_mode: str | None = None,
+    geometry: Mapping[str, Any] | None = None,
 ) -> dict:
     """Assemble le dict de statut retourné et sérialisé en JSON."""
     return {
@@ -914,6 +1372,8 @@ def _build_status(
         "design_id": design_id,
         "config_path": _relative_to_repo(config_path) if config_path else None,
         "step_path": _relative_to_repo(step_path) if step_path else None,
+        "geometry_mode": geometry_mode,
+        "geometry": dict(geometry) if geometry else None,
         "applied_parameters": dict(applied) if applied else {},
         "error_message": error_message,
         "error_details": details,
@@ -952,6 +1412,7 @@ def drive(
     iterations_root: Path | None = None,
     dry_run: bool = False,
     app: Any = None,
+    geometry_mode: str | None = None,
 ) -> dict:
     """Exécute le cycle complet : config -> paramètres -> recalcul -> STEP.
 
@@ -965,6 +1426,10 @@ def drive(
             quand `adsk` n'est pas importable.
         app: instance `adsk.core.Application` déjà obtenue (injectée par
             `run()`), utilisée pour rediriger les logs vers Fusion.
+        geometry_mode: "rebuild" (défaut) reconstruit la géométrie depuis la
+            configuration ; "parameters" se contente de mettre à jour les User
+            Parameters et de recalculer — réservé aux modèles réellement
+            paramétriques. À défaut, FUSION_GEOMETRY_MODE puis le défaut.
 
     Returns:
         Le dict de statut (voir docstring du module). Ne lève pas : toute
@@ -983,9 +1448,13 @@ def drive(
     design_id: str | None = None
     out_dir: Path | None = None
     step_path: Path | None = None
+    geometry: dict | None = None
     warnings: list[str] = []
+    resolved_mode: str | None = None
 
     try:
+        geometry_mode = resolve_geometry_mode(geometry_mode)
+        resolved_mode = geometry_mode
         config = load_config(config_path)
         iteration = config["iteration"]
         design_id = config.get("design_id")
@@ -1015,6 +1484,28 @@ def drive(
             }
             for name, info in planned.items():
                 logger.info("Prévu : %-20s -> %s", name, info["expression"])
+
+            # En mode rebuild, la reconstruction est calculable hors Fusion :
+            # on la déroule vraiment, ce qui valide la géométrie prévue sans
+            # ouvrir la CAO.
+            if geometry_mode == GEOMETRY_MODE_REBUILD:
+                plan = profile_from_parameters(parameters)
+                geometry = {
+                    key: plan[key]
+                    for key in (
+                        "chord_cm", "span_cm", "thickness", "camber", "aoa_deg",
+                        "n_points", "camber_position", "bbox_cm",
+                    )
+                }
+                logger.info(
+                    "Profil calculé : %d points/surface, emprise x [%.3f, %.3f] cm, "
+                    "y [%.3f, %.3f] cm, extrusion %.3f cm",
+                    plan["n_points"],
+                    plan["bbox_cm"]["x_min"], plan["bbox_cm"]["x_max"],
+                    plan["bbox_cm"]["y_min"], plan["bbox_cm"]["y_max"],
+                    plan["span_cm"],
+                )
+
             reason = (
                 "dry-run demandé"
                 if dry_run
@@ -1035,6 +1526,8 @@ def drive(
                 applied=planned,
                 error_message=f"mode simulation — {reason} ; aucun STEP produit",
                 warnings=warnings,
+                geometry_mode=geometry_mode,
+                geometry=geometry,
             )
             write_status(status, out_dir)
             return status
@@ -1051,9 +1544,20 @@ def drive(
             setup_logging(log_file=out_dir / LOG_FILENAME, app=app)
 
         design = _get_design(app)  # pragma: no cover
+
+        # Les User Parameters sont mis à jour dans les DEUX modes : c'est le
+        # contrat §3.2, et un humain qui rouvre le document doit y lire les
+        # valeurs de l'itération, quelle que soit la façon dont la géométrie
+        # a été obtenue.
         applied, param_warnings = _apply_parameters(design, parameters)
         warnings.extend(param_warnings)
-        warnings.extend(_recompute(design))
+
+        if geometry_mode == GEOMETRY_MODE_REBUILD:
+            geometry, rebuild_warnings = _rebuild_geometry(design, parameters)
+            warnings.extend(rebuild_warnings)
+        else:
+            warnings.extend(_recompute(design))
+
         _export_step(design, step_path)
 
         logger.info("=== Itération %04d : succès ===", iteration)
@@ -1066,6 +1570,8 @@ def drive(
             step_path=step_path,
             applied=applied,
             warnings=warnings,
+            geometry_mode=geometry_mode,
+            geometry=geometry,
         )
         write_status(status, out_dir)
         return status
@@ -1082,6 +1588,7 @@ def drive(
             error_message=exc.message,
             details=exc.details,
             warnings=warnings,
+            geometry_mode=resolved_mode,
         )
         if out_dir is not None:
             write_status(status, out_dir)
@@ -1100,6 +1607,7 @@ def drive(
             error_message=f"{type(exc).__name__}: {exc}",
             details=trace,
             warnings=warnings,
+            geometry_mode=resolved_mode,
         )
         if out_dir is not None:
             write_status(status, out_dir)
@@ -1151,12 +1659,23 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="n'appelle aucune API Fusion, même si le module adsk est disponible",
     )
+    parser.add_argument(
+        "--geometry-mode",
+        choices=GEOMETRY_MODES,
+        default=None,
+        help=(
+            f"'{GEOMETRY_MODE_REBUILD}' (défaut) reconstruit la géométrie depuis "
+            f"la configuration ; '{GEOMETRY_MODE_PARAMETERS}' se contente de "
+            f"mettre à jour les User Parameters"
+        ),
+    )
     args = parser.parse_args(argv)
 
     status = drive(
         config_path=Path(args.config) if args.config else None,
         iterations_root=Path(args.iterations_dir) if args.iterations_dir else None,
         dry_run=args.dry_run,
+        geometry_mode=args.geometry_mode,
     )
     print(json.dumps(status, indent=2, ensure_ascii=False, default=str))
 
