@@ -5,6 +5,10 @@
 # du seed Fusion (fusion/seed_design.f3d). Renommer une clé ici sans la
 # renommer dans Fusion fait échouer le driver en PARAM_NOT_FOUND.
 #
+# Les `value` reproduisent l'état du seed tel que généré (NACA 2412,
+# tronçon de 80 mm, incidence nulle) : l'itération 0 doit décrire le
+# modèle réel, sinon le premier delta est calculé depuis une fiction.
+#
 # Contrat strict (Master Doc §3.1) :
 #   - value doit rester dans [min, max]
 #   - |value_nouveau - value_precedent| / |value_precedent| * 100
@@ -40,32 +44,34 @@ parameters:
     max_delta_pct: 8.0
     unit: "unitless"
 
-  # Cambrure relative (m/c). Sans dimension.
+  # Cambrure relative (m/c), position de cambrure max fixée à p = 0.4
+  # (famille NACA 24xx). Sans dimension.
   # 0.0 = profil symétrique, borne basse volontairement atteignable.
   # Au delà de ~0.09 le décollement de bord de fuite devient probable et la
   # CFD RANS stationnaire perd sa validité.
   camber:
-    value: 0.04
+    value: 0.02
     min: 0.0
     max: 0.09
     max_delta_pct: 10.0
     unit: "unitless"
 
-  # Envergure. Souvent contrainte par le règlement (largeur hors-tout) :
-  # max_delta_pct volontairement serré, c'est le paramètre le plus coûteux
-  # en taille de maillage.
+  # Profondeur d'extrusion du tronçon d'aile (le seed est une tranche de
+  # 80 mm, pas une aile complète). Peu d'influence aérodynamique tant que le
+  # calcul reste quasi-2D, mais coût de maillage direct : budget serré.
   span:
-    value: 1000.0
-    min: 700.0
-    max: 1400.0
+    value: 80.0
+    min: 50.0
+    max: 200.0
     max_delta_pct: 5.0
     unit: "mm"
 
   # Angle d'incidence. Le paramètre le plus sensible : quelques degrés
-  # suffisent à faire décrocher le profil. Peut passer par 0 — la règle de
-  # delta bascule alors sur un pourcentage de l'amplitude (voir README).
+  # suffisent à faire décrocher le profil. Vaut 0 dans le seed — la règle de
+  # delta bascule alors sur un pourcentage de l'amplitude, soit 1.68 deg par
+  # itération (voir README).
   aoa:
-    value: 4.0
+    value: 0.0
     min: -2.0
     max: 12.0
     max_delta_pct: 12.0

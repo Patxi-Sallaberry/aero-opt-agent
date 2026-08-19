@@ -473,12 +473,13 @@ def test_expressions_attendues_pour_le_seed(tmp_path):
         name: info["expression"]
         for name, info in status["applied_parameters"].items()
     }
+    # Valeurs du seed tel que généré : NACA 2412, tronçon de 80 mm, aoa nulle.
     assert expressions == {
         "chord": "300 mm",
         "thickness": "0.12",      # sans dimension : nombre nu
-        "camber": "0.04",         # sans dimension : nombre nu
-        "span": "1000 mm",
-        "aoa": "4 deg",
+        "camber": "0.02",         # sans dimension : nombre nu
+        "span": "80 mm",
+        "aoa": "0 deg",
     }
 
 
