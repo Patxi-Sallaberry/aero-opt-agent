@@ -592,6 +592,17 @@ def build_case(
             STATUS_GEOMETRY_MISSING, f"dossier d'itération absent : {iteration_dir}"
         )
 
+    # Contrôle en tête : inutile de rendre trente fichiers pour découvrir
+    # ensuite qu'aucune géométrie n'a été exportée.
+    if not any(
+        (iteration_dir / name).is_file() for name in ("geometry.stl", "geometry.step")
+    ):
+        raise CaseBuildError(
+            STATUS_GEOMETRY_MISSING,
+            f"ni geometry.stl ni geometry.step dans {iteration_dir} — le driver "
+            f"Fusion n'a pas produit de géométrie pour cette itération",
+        )
+
     try:
         design = load_yaml(design_params_path)
         cfd = load_yaml(cfd_settings_path)

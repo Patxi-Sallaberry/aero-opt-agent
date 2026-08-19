@@ -264,6 +264,11 @@ fi
 # ─────────────────────────────────────────────────────────────
 # 5. Post-traitement -> results.json
 # ─────────────────────────────────────────────────────────────
+if [ "$DRY_RUN" -eq 1 ]; then
+    log "--dry-run : case construit et enchainement verifie, aucun calcul lance"
+    exit 0
+fi
+
 log "-> postprocess"
 if ! "$PYTHON" "$REPO_ROOT/openfoam/postprocess.py" \
         --iteration-dir "$ITERATION_DIR" \

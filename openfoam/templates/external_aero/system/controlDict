@@ -1,6 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | aero-opt-agent — case template "external_aero"                              |
-| Les jetons @@NOM@@ sont substitues par openfoam/case_builder.py.            |
+| Les jetons en majuscules encadres de doubles arobases sont substitues par   |
+| openfoam/case_builder.py.                                                    |
 | Ne jamais editer le case genere : editer CE template.                       |
 \*---------------------------------------------------------------------------*/
 FoamFile

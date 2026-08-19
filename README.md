@@ -19,7 +19,7 @@ Ce README ne la remplace pas : en cas de divergence, le Master Document gagne.
 |-------|---------|--------|
 | 0 | Fondations : structure, Git, configs, validation de `design_params.yaml` | **Terminée** |
 | 1 | Geometry — `fusion/parametric_driver.py` | **Terminée** (validation sur seed réel en attente) |
-| 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | À faire |
+| 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | **Terminée** (validation sur solveur réel en attente) |
 | 3 | Master Pipeline — enchaînement, validation, archivage | À faire |
 | 4 | Agent + boucle d'optimisation | À faire |
 | 5 | Durcissement, messages d'erreur, tests sur design réel | À faire |
@@ -64,9 +64,10 @@ driver dans son propre interpréteur Python embarqué.
 │   ├── seed_design.f3d           fourni par l'utilisateur (non versionné)
 │   └── parametric_driver.py      paramètres → recalcul → STEP  Phase 1 ✔
 ├── openfoam/
-│   ├── templates/                case de base            Phase 2
-│   ├── run_cfd.sh                                        Phase 2
-│   └── postprocess.py            → results.json          Phase 2
+│   ├── templates/external_aero/  case de base            Phase 2 ✔
+│   ├── case_builder.py           YAML → case dimensionné Phase 2 ✔
+│   ├── run_cfd.sh                orchestration           Phase 2 ✔
+│   └── postprocess.py            → results.json          Phase 2 ✔
 ├── pipeline/
 │   ├── master_pipeline.py        point d'entrée unique   Phase 3
 │   ├── geometry_validator.py                             Phase 3
@@ -193,6 +194,67 @@ s'exécute dans un autre processus que Fusion.
 
 En mode `rebuild`, le statut porte aussi `geometry` : corde et envergure en cm,
 ratios appliqués, incidence, et l'emprise de la géométrie produite.
+
+---
+
+## La chaîne CFD (`openfoam/`)
+
+```bash
+openfoam/run_cfd.sh --iteration-dir data/iterations/iter_0000
+openfoam/run_cfd.sh --iteration-dir ... --dry-run     # construit le case sans calculer
+openfoam/run_cfd.sh --iteration-dir ... --mesh-only   # s'arrête après checkMesh
+```
+
+Enchaînement : `case_builder.py` → `blockMesh` → `surfaceFeatureExtract` →
+`snappyHexMesh` → `checkMesh` (obligatoire) → `simpleFoam` → `postprocess.py`.
+
+### Ce que le case emprunte à chaque itération
+
+`case_builder.py` ne recopie pas des constantes : il **dimensionne** le case à
+partir de `design_params.yaml`. Domaine et taille de maille en multiples de
+corde, `k` et `omega` depuis l'intensité turbulente, et surtout :
+
+- **`Aref` et `lRef` sont recalculés à chaque itération** (corde × envergure du
+  domaine, et corde). Figer la surface de référence pendant que la corde varie
+  ferait bouger les Cd/Cl alors que seule la normalisation aurait changé.
+- **La boîte englobante du STL est comparée à la géométrie demandée.** C'est le
+  garde-fou qui détecte qu'une itération a exporté une géométrie inchangée ou
+  mal mise à l'échelle — avant de dépenser une heure de calcul.
+
+### Envergure et quasi-2D
+
+Par défaut (`domain.spanwise_treatment: symmetry`), le domaine occupe une
+tranche **intérieure** à l'aile, bornée par deux plans de symétrie que la
+géométrie traverse : pas de bout d'aile, donc pas de tourbillon marginal. C'est
+le modèle correct pour un tronçon de profil.
+
+**Conséquence : `span` n'a alors aucun effet aérodynamique.** Le fixer plutôt
+que le laisser à l'agent, ou passer en `full_3d` — au prix d'un maillage bien
+plus lourd, et avec un allongement de 0,27 qui n'a plus grand-chose d'une aile.
+
+### `results.json`
+
+Écrit dans **tous** les cas, succès comme échec — c'est le seul canal de retour
+vers le pipeline et l'agent. En cas d'échec, `Cd`/`Cl`/`Cl_Cd` valent `null` et
+jamais `0.0` : un zéro se propagerait dans la boucle comme une mesure légitime.
+
+`converged` résume les deux conditions qui rendent un point exploitable : un
+maillage validé par checkMesh et des coefficients stabilisés (écart-type relatif
+sur la fenêtre de moyenne sous `coeff_stability_tol`).
+
+### Version d'OpenFOAM
+
+Le template vise **`simpleFoam`** : OpenFOAM.com (ESI, v2212+) ou OpenFOAM.org
+jusqu'à v10. Les versions OpenFOAM.org ≥ 11 ont remplacé `simpleFoam` par
+`foamRun -solver incompressibleFluid` — `run_cfd.sh` le détecte et le dit.
+Définir `FOAM_BASHRC` dans `.env`.
+
+### STEP → STL
+
+snappyHexMesh ne lit pas le STEP. `case_builder.py` prend `geometry.stl` s'il
+existe, sinon convertit `geometry.step` avec gmsh, sinon échoue en disant quoi
+faire. Le plus robuste est de faire exporter un STL au driver Fusion en même
+temps que le STEP, ce qui supprime la conversion du chemin critique.
 
 ---
 
