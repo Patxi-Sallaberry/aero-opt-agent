@@ -670,30 +670,57 @@ def _verify_parameter(
     Fusion peut accepter une expression et l'interpréter dans une autre unité
     que celle déclarée : sans cette relecture, un design_params en millimètres
     appliqué à un paramètre en pouces passerait totalement inaperçu.
+
+    Deux chemins de relecture, selon que le paramètre porte une unité ou non
+    (`thickness` et `camber` du seed sont sans dimension) :
+
+    - avec unité : `evaluateExpression(expr, unit)` renvoie la valeur dans
+      l'unité déclarée, comparaison directe ;
+    - sans unité : on lit `Parameter.value`. Passer une expression nue à
+      `evaluateExpression` lui ferait appliquer les unités par défaut du
+      document — « 0.12 » deviendrait 0.12 mm, soit 0.012 en unités internes,
+      et la vérification échouerait sur un paramètre pourtant correct.
     """
     warnings: list[str] = []
     declared_unit = normalize_unit(spec.get("unit"))
     requested = float(spec["value"])
+    fusion_unit = getattr(param, "unit", None)
 
     if declared_unit is not None:
-        fusion_unit = getattr(param, "unit", None)
         if fusion_unit and fusion_unit != declared_unit:
             warnings.append(
                 f"parameters.{name} : unité déclarée '{declared_unit}' != unité "
                 f"Fusion '{fusion_unit}' — la conversion est faite par Fusion, "
                 f"vérifier que c'est bien voulu"
             )
+    elif fusion_unit and str(fusion_unit).strip():
+        # Le YAML annonce une grandeur sans dimension, mais Fusion attend une
+        # unité : l'expression nue sera interprétée dans CETTE unité. La
+        # comparaison de valeur ci-dessous tranchera, l'avertissement dit où
+        # regarder.
+        warnings.append(
+            f"parameters.{name} : déclaré sans unité dans design_params.yaml "
+            f"mais le User Parameter Fusion est en '{fusion_unit}' — "
+            f"l'expression nue sera interprétée en '{fusion_unit}'"
+        )
 
     try:
-        units_manager = design.unitsManager
-        actual = (
-            units_manager.evaluateExpression(param.expression, declared_unit)
-            if declared_unit is not None
-            else units_manager.evaluateExpression(param.expression)
-        )
+        if declared_unit is not None:
+            actual = design.unitsManager.evaluateExpression(
+                param.expression, declared_unit
+            )
+        else:
+            actual = param.value
     except Exception as exc:
         warnings.append(
             f"parameters.{name} : relecture impossible de '{expression}' ({exc})"
+        )
+        return warnings
+
+    if isinstance(actual, bool) or not isinstance(actual, (int, float)):
+        warnings.append(
+            f"parameters.{name} : relecture non numérique ({actual!r}) — "
+            f"vérification de valeur ignorée"
         )
         return warnings
 

@@ -65,9 +65,19 @@ def cfg_file(tmp_path: Path, cfg: dict) -> Path:
 _UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0}
 _UNIT_TO_DEG = {"deg": 1.0, "rad": 57.29577951308232}
 
+# Fusion stocke ses valeurs en unités internes : cm pour les longueurs,
+# radians pour les angles, et le nombre nu pour les grandeurs sans dimension.
+_LENGTH_TO_CM = {"mm": 0.1, "cm": 1.0, "m": 100.0}
+_ANGLE_TO_RAD = {"deg": 0.017453292519943295, "rad": 1.0}
+
 
 class FakeParam:
-    """User Parameter Fusion : expression assignable, unité fixe."""
+    """User Parameter Fusion : expression assignable, unité fixe.
+
+    `value` reproduit le comportement réel de Fusion — conversion vers les
+    unités internes — pour que les tests des paramètres sans dimension soient
+    représentatifs.
+    """
 
     def __init__(self, name: str, expression: str, unit: str = "mm",
                  raise_on_set: bool = False) -> None:
@@ -85,6 +95,19 @@ class FakeParam:
         if self.raise_on_set:
             raise RuntimeError(f"expression refusée : {value}")
         self._expression = value
+
+    @property
+    def value(self) -> float:
+        parts = self._expression.split()
+        number = float(parts[0])
+        unit = parts[1] if len(parts) > 1 else self.unit
+        if not unit:
+            return number                      # grandeur sans dimension
+        if unit in _LENGTH_TO_CM:
+            return number * _LENGTH_TO_CM[unit]
+        if unit in _ANGLE_TO_RAD:
+            return number * _ANGLE_TO_RAD[unit]
+        return number
 
 
 class FakeUserParameters:
@@ -422,6 +445,95 @@ def test_valeur_relue_incoherente_echoue(cfg):
         pd._apply_parameters(design, {"chord_mm": cfg["parameters"]["chord_mm"]})
     assert exc.value.status == pd.STATUS_PARAM_SET_FAILED
     assert design.userParameters.itemByName("chord_mm").expression == "250 mm"
+
+
+# ─────────────────────────────────────────────────────────────
+# Paramètres du seed réel (chord, thickness, camber, span, aoa)
+# ─────────────────────────────────────────────────────────────
+
+SEED_PARAMETERS = {"chord", "thickness", "camber", "span", "aoa"}
+
+SPEC_THICKNESS = {
+    "value": 0.12, "min": 0.08, "max": 0.20, "max_delta_pct": 8.0,
+    "unit": "unitless",
+}
+SPEC_CAMBER = {
+    "value": 0.04, "min": 0.0, "max": 0.09, "max_delta_pct": 10.0,
+    "unit": "unitless",
+}
+
+
+def test_config_livree_couvre_exactement_les_parametres_du_seed():
+    assert set(pd.load_config(REAL_CONFIG)["parameters"]) == SEED_PARAMETERS
+
+
+def test_expressions_attendues_pour_le_seed(tmp_path):
+    status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path, dry_run=True)
+    expressions = {
+        name: info["expression"]
+        for name, info in status["applied_parameters"].items()
+    }
+    assert expressions == {
+        "chord": "300 mm",
+        "thickness": "0.12",      # sans dimension : nombre nu
+        "camber": "0.04",         # sans dimension : nombre nu
+        "span": "1000 mm",
+        "aoa": "4 deg",
+    }
+
+
+def test_parametres_sans_unite_appliques():
+    design = FakeDesign(
+        [FakeParam("thickness", "0.1", unit=""), FakeParam("camber", "0.02", unit="")]
+    )
+    applied, warnings = pd._apply_parameters(
+        design, {"thickness": SPEC_THICKNESS, "camber": SPEC_CAMBER}
+    )
+    assert design.userParameters.itemByName("thickness").expression == "0.12"
+    assert design.userParameters.itemByName("camber").expression == "0.04"
+    assert applied["thickness"]["requested_value"] == 0.12
+    assert warnings == []
+
+
+def test_relecture_sans_unite_nappelle_pas_evaluate_expression():
+    # Non-régression : `evaluateExpression("0.12")` appliquerait les unités par
+    # défaut du document et lirait 0.12 mm, faisant échouer un paramètre sain.
+    class ExplodingUnits(FakeUnitsManager):
+        def evaluateExpression(self, expression, unit=None):
+            raise AssertionError("evaluateExpression appelé sur une grandeur sans unité")
+
+    design = FakeDesign([FakeParam("camber", "0.02", unit="")])
+    design.unitsManager = ExplodingUnits()
+    pd._apply_parameters(design, {"camber": SPEC_CAMBER})  # ne doit pas lever
+    assert design.userParameters.itemByName("camber").expression == "0.04"
+
+
+def test_sans_unite_cote_yaml_mais_longueur_cote_fusion_echoue():
+    # Fusion lirait « 0.12 » comme 0.12 mm, soit 0.012 en interne : la
+    # relecture doit refuser, et le paramètre revenir en arrière.
+    design = FakeDesign([FakeParam("thickness", "1 mm", unit="mm")])
+    with pytest.raises(pd.DriverError) as exc:
+        pd._apply_parameters(design, {"thickness": SPEC_THICKNESS})
+    assert exc.value.status == pd.STATUS_PARAM_SET_FAILED
+    assert design.userParameters.itemByName("thickness").expression == "1 mm"
+
+
+def test_avertissement_si_fusion_attend_une_unite():
+    # unit 'cm' = unité interne de Fusion : la valeur relue coïncide, donc
+    # seul un avertissement doit remonter — pas un échec.
+    param = FakeParam("thickness", "0.12", unit="cm")
+    warnings = pd._verify_parameter(
+        FakeDesign([param]), param, "thickness", SPEC_THICKNESS, "0.12"
+    )
+    assert any("déclaré sans unité" in w for w in warnings)
+
+
+def test_camber_nul_reste_une_expression_valide():
+    # camber = 0.0 (profil symétrique) est une borne atteignable.
+    design = FakeDesign([FakeParam("camber", "0.04", unit="")])
+    spec = dict(SPEC_CAMBER, value=0.0)
+    pd._apply_parameters(design, {"camber": spec})
+    assert design.userParameters.itemByName("camber").expression == "0"
 
 
 # ─────────────────────────────────────────────────────────────
