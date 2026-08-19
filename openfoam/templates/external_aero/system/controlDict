@@ -1,0 +1,81 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| aero-opt-agent — case template "external_aero"                              |
+| Les jetons @@NOM@@ sont substitues par openfoam/case_builder.py.            |
+| Ne jamais editer le case genere : editer CE template.                       |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     @@SOLVER@@;
+
+startFrom       startTime;
+startTime       @@START_TIME@@;
+
+stopAt          endTime;
+endTime         @@END_TIME@@;
+
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   @@WRITE_INTERVAL@@;
+
+purgeWrite      @@PURGE_WRITE@@;
+
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+
+timeFormat      general;
+timePrecision   6;
+
+runTimeModifiable false;
+
+functions
+{
+    // ── Coefficients aerodynamiques ──────────────────────────────────────
+    // Aref et lRef sont recalcules a CHAQUE iteration a partir de
+    // design_params.yaml : garder une surface de reference figee pendant que
+    // la corde varie rendrait les Cd/Cl incomparables d une iteration a
+    // l autre.
+    forceCoeffs
+    {
+        type            forceCoeffs;
+        libs            ("libforces.so");
+        writeControl    timeStep;
+        writeInterval   @@FORCE_WRITE_INTERVAL@@;
+        log             yes;
+
+        patches         (@@WING_PATCH@@);
+        rho             rhoInf;
+        rhoInf          @@RHO@@;
+
+        liftDir         (@@LIFT_DIR@@);
+        dragDir         (@@DRAG_DIR@@);
+        pitchAxis       (@@PITCH_AXIS@@);
+        CofR            (@@COFR@@);
+
+        magUInf         @@MAG_U@@;
+        lRef            @@L_REF@@;
+        Aref            @@A_REF@@;
+    }
+
+    // ── Residus ──────────────────────────────────────────────────────────
+    // Exportes pour que le post-traitement puisse distinguer "converge" de
+    // "budget d iterations epuise".
+    residuals
+    {
+        type            solverInfo;
+        libs            ("libutilityFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   1;
+        fields          (U p k omega);
+    }
+}
+
+// ************************************************************************* //

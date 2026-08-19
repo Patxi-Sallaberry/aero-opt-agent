@@ -670,6 +670,30 @@ def to_dimensionless(spec: Mapping[str, Any], name: str) -> float:
     return float(spec["value"])
 
 
+def to_internal(spec: Mapping[str, Any], name: str) -> float:
+    """Valeur attendue dans les unités internes de Fusion.
+
+    Fusion stocke tout en centimètres et en radians ; une grandeur sans
+    dimension est stockée telle quelle. C'est le référentiel de comparaison de
+    `_verify_parameter` : il ne dépend ni de l'unité du document, ni de la
+    sémantique — ambiguë — du second argument d'`evaluateExpression`.
+    """
+    unit = normalize_unit(spec.get("unit"))
+    value = float(spec["value"])
+    if unit is None:
+        return value
+    if unit in LENGTH_TO_CM:
+        return value * LENGTH_TO_CM[unit]
+    if unit in ANGLE_TO_RAD:
+        return value * ANGLE_TO_RAD[unit]
+    raise DriverError(
+        STATUS_CONFIG_ERROR,
+        f"parameters.{name} : unité '{unit}' non convertible en unités internes "
+        f"Fusion — attendu une longueur {sorted(LENGTH_TO_CM)}, un angle "
+        f"{sorted(ANGLE_TO_RAD)}, ou une grandeur sans dimension",
+    )
+
+
 def naca4_profile(
     chord_cm: float,
     thickness: float,
@@ -939,15 +963,12 @@ def _verify_parameter(
     que celle déclarée : sans cette relecture, un design_params en millimètres
     appliqué à un paramètre en pouces passerait totalement inaperçu.
 
-    Deux chemins de relecture, selon que le paramètre porte une unité ou non
-    (`thickness` et `camber` du seed sont sans dimension) :
-
-    - avec unité : `evaluateExpression(expr, unit)` renvoie la valeur dans
-      l'unité déclarée, comparaison directe ;
-    - sans unité : on lit `Parameter.value`. Passer une expression nue à
-      `evaluateExpression` lui ferait appliquer les unités par défaut du
-      document — « 0.12 » deviendrait 0.12 mm, soit 0.012 en unités internes,
-      et la vérification échouerait sur un paramètre pourtant correct.
+    La comparaison se fait dans les UNITÉS INTERNES de Fusion — centimètres,
+    radians, et nombre nu pour les grandeurs sans dimension. C'est le seul
+    référentiel non ambigu : `Parameter.value` est documenté comme rendant la
+    valeur en unités internes, et `evaluateExpression` fait de même (son
+    second argument sert à interpréter une expression SANS unité, il ne choisit
+    pas l'unité de sortie — « 300 mm » y rend donc 30, pas 300).
     """
     warnings: list[str] = []
     declared_unit = normalize_unit(spec.get("unit"))
@@ -972,13 +993,10 @@ def _verify_parameter(
             f"l'expression nue sera interprétée en '{fusion_unit}'"
         )
 
+    expected = to_internal(spec, name)
+
     try:
-        if declared_unit is not None:
-            actual = design.unitsManager.evaluateExpression(
-                param.expression, declared_unit
-            )
-        else:
-            actual = param.value
+        actual = param.value
     except Exception as exc:
         warnings.append(
             f"parameters.{name} : relecture impossible de '{expression}' ({exc})"
@@ -992,13 +1010,19 @@ def _verify_parameter(
         )
         return warnings
 
-    tolerance = max(VALUE_TOL_ABS, abs(requested) * VALUE_TOL_REL)
-    if abs(float(actual) - requested) > tolerance:
+    tolerance = max(VALUE_TOL_ABS, abs(expected) * VALUE_TOL_REL)
+    if abs(float(actual) - expected) > tolerance:
+        internal_unit = (
+            "cm" if declared_unit in LENGTH_TO_CM
+            else "rad" if declared_unit in ANGLE_TO_RAD
+            else "sans dimension"
+        )
         raise DriverError(
             STATUS_PARAM_SET_FAILED,
             f"parameters.{name} : Fusion a retenu {float(actual):g} au lieu de "
-            f"{requested:g} pour l'expression '{expression}' — incohérence "
-            f"d'unité ou paramètre piloté par une autre expression",
+            f"{expected:g} ({internal_unit}, unités internes) pour l'expression "
+            f"'{expression}' = {requested:g} {declared_unit or 'sans unité'} — "
+            f"incohérence d'unité ou paramètre piloté par une autre expression",
         )
     return warnings
 

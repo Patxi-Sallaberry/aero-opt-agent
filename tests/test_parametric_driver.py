@@ -62,9 +62,6 @@ def cfg_file(tmp_path: Path, cfg: dict) -> Path:
 # Doublures Fusion
 # ─────────────────────────────────────────────────────────────
 
-_UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0}
-_UNIT_TO_DEG = {"deg": 1.0, "rad": 57.29577951308232}
-
 # Fusion stocke ses valeurs en unités internes : cm pour les longueurs,
 # radians pour les angles, et le nombre nu pour les grandeurs sans dimension.
 _LENGTH_TO_CM = {"mm": 0.1, "cm": 1.0, "m": 100.0}
@@ -126,19 +123,26 @@ class FakeUserParameters:
 
 
 class FakeUnitsManager:
-    """Évalue « <nombre> <unité> » et convertit vers l'unité demandée."""
+    """Reproduit le comportement RÉEL de `UnitsManager.evaluateExpression`.
+
+    Le résultat est toujours rendu en unités internes (cm, rad) : le second
+    argument sert uniquement à interpréter une expression dépourvue d'unité.
+    C'est précisément ce que la première version de ce faux avait faux — elle
+    rendait la valeur dans l'unité demandée, ce qui a laissé passer un bug
+    jusque dans Fusion (« 300 mm » y vaut 30, pas 300).
+    """
 
     def evaluateExpression(self, expression: str, unit: str | None = None) -> float:
         parts = expression.split()
         number = float(parts[0])
-        source = parts[1] if len(parts) > 1 else None
-        if unit is None or source is None or source == unit:
+        source = parts[1] if len(parts) > 1 else unit
+        if not source:
             return number
-        if source in _UNIT_TO_MM and unit in _UNIT_TO_MM:
-            return number * _UNIT_TO_MM[source] / _UNIT_TO_MM[unit]
-        if source in _UNIT_TO_DEG and unit in _UNIT_TO_DEG:
-            return number * _UNIT_TO_DEG[source] / _UNIT_TO_DEG[unit]
-        raise ValueError(f"conversion impossible {source} -> {unit}")
+        if source in _LENGTH_TO_CM:
+            return number * _LENGTH_TO_CM[source]
+        if source in _ANGLE_TO_RAD:
+            return number * _ANGLE_TO_RAD[source]
+        raise ValueError(f"unité inconnue : {source}")
 
 
 class FakeCollection:
@@ -435,16 +439,77 @@ def test_unite_differente_de_fusion_avertit(cfg):
 
 
 def test_valeur_relue_incoherente_echoue(cfg):
-    class DriftingUnits(FakeUnitsManager):
-        def evaluateExpression(self, expression, unit=None):
-            return super().evaluateExpression(expression, unit) * 2.0
+    # Un paramètre qui ne prend pas la valeur demandée (piloté par une autre
+    # expression, par exemple) doit échouer et déclencher le rollback.
+    class StuckParam(FakeParam):
+        @property
+        def value(self):
+            return 25.0  # reste à 250 mm quoi qu'on lui écrive
 
-    design = FakeDesign([FakeParam("chord_mm", "250 mm", unit="mm")])
-    design.unitsManager = DriftingUnits()
+    design = FakeDesign([StuckParam("chord_mm", "250 mm", unit="mm")])
     with pytest.raises(pd.DriverError) as exc:
         pd._apply_parameters(design, {"chord_mm": cfg["parameters"]["chord_mm"]})
     assert exc.value.status == pd.STATUS_PARAM_SET_FAILED
     assert design.userParameters.itemByName("chord_mm").expression == "250 mm"
+
+
+# ── Non-régression : la comparaison se fait en unités internes ──────────────
+# Bug remonté par le premier vrai run dans Fusion :
+#   « parameters.chord : Fusion a retenu 30 au lieu de 300 »
+# 300 mm VAUT 30 cm. Le paramètre était correct, la vérification fausse.
+
+
+@pytest.mark.parametrize(
+    "value,unit,attendu",
+    [
+        (300.0, "mm", 30.0),        # cm
+        (30.0, "cm", 30.0),
+        (0.3, "m", 30.0),
+        (1.0, "in", 2.54),
+        (90.0, "deg", 1.5707963267948966),   # rad
+        (1.0, "rad", 1.0),
+        (0.12, "unitless", 0.12),   # sans dimension : inchangé
+    ],
+)
+def test_conversion_vers_les_unites_internes(value, unit, attendu):
+    spec = {"value": value, "min": -1e6, "max": 1e6, "max_delta_pct": 5.0,
+            "unit": unit}
+    assert pd.to_internal(spec, "x") == pytest.approx(attendu)
+
+
+def test_millimetres_acceptes_par_la_verification():
+    # Le cas exact qui a échoué dans Fusion.
+    design = FakeDesign([FakeParam("chord", "250 mm", unit="mm")])
+    spec = {"value": 300.0, "min": 220.0, "max": 420.0, "max_delta_pct": 7.0,
+            "unit": "mm"}
+    applied, warnings = pd._apply_parameters(design, {"chord": spec})
+    assert design.userParameters.itemByName("chord").expression == "300 mm"
+    assert design.userParameters.itemByName("chord").value == pytest.approx(30.0)
+    assert warnings == []
+
+
+@pytest.mark.parametrize(
+    "unit,expression,interne",
+    [("mm", "300 mm", 30.0), ("cm", "30 cm", 30.0), ("m", "0.3 m", 30.0),
+     ("deg", "4 deg", 0.06981317007977318)],
+)
+def test_toutes_les_unites_passent_la_verification(unit, expression, interne):
+    valeurs = {"mm": 300.0, "cm": 30.0, "m": 0.3, "deg": 4.0}
+    design = FakeDesign([FakeParam("p", "0 " + unit, unit=unit)])
+    spec = {"value": valeurs[unit], "min": -1e6, "max": 1e6,
+            "max_delta_pct": 100.0, "unit": unit}
+    pd._apply_parameters(design, {"p": spec})
+    param = design.userParameters.itemByName("p")
+    assert param.expression == expression
+    assert param.value == pytest.approx(interne)
+
+
+def test_le_faux_units_manager_rend_bien_des_unites_internes():
+    # Verrou sur la doublure elle-même : c'est son ancienne version, qui
+    # rendait 300 pour « 300 mm », qui avait masqué le bug.
+    um = FakeUnitsManager()
+    assert um.evaluateExpression("300 mm", "mm") == pytest.approx(30.0)
+    assert um.evaluateExpression("4 deg", "deg") == pytest.approx(0.0698131700)
 
 
 # ─────────────────────────────────────────────────────────────
