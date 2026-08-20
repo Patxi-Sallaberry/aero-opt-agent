@@ -158,6 +158,10 @@ DEFAULT_GEOMETRY_MODE = GEOMETRY_MODE_REBUILD
 NACA_CAMBER_POSITION = 0.4      # p — position de la cambrure max (NACA 24xx)
 NACA_PROFILE_POINTS = 80        # points par surface : compromis fidélité/poids
 
+# En deçà de cette aire (en unités du STL, donc m²), une facette est
+# dégénérée : sa normale n'est pas définie et snappyHexMesh la traite mal.
+DEGENERATE_FACET_TOL = 1e-16
+
 REBUILD_PARAMETERS = ("chord", "thickness", "camber", "span", "aoa")
 
 # Noms posés sur ce que le driver crée, pour pouvoir le retrouver et le
@@ -190,6 +194,29 @@ PURGE_MODE_ALL = "all"
 PURGE_MODE_TAGGED = "tagged"
 PURGE_MODES = (PURGE_MODE_ALL, PURGE_MODE_TAGGED)
 DEFAULT_PURGE_MODE = PURGE_MODE_ALL
+
+# ── Producteur de géométrie ──────────────────────────────────────────────────
+#   "fusion"   : la géométrie vient de Fusion 360 (Master Doc §3.2). Exige que
+#                le script tourne DANS Fusion — l'API n'a pas de mode headless.
+#   "internal" : la géométrie est calculée et écrite directement en Python, par
+#                la même fonction `naca4_profile` que le mode rebuild. Produit
+#                un STL en mètres, sans STEP (pas de noyau CAO).
+#   "auto"     : Fusion si `adsk` est importable, interne sinon.
+#
+# Le mode interne existe pour une raison précise : sans lui, chaque itération de
+# la boucle d'optimisation attend qu'un humain clique sur Run dans Fusion, et le
+# système n'est pas autonome. La forme produite est identique — c'est le même
+# code de profil — mais ce n'est pas de la CAO : pas d'historique, pas de STEP,
+# pas de features. Fusion reste la référence dès qu'il est disponible.
+GEOMETRY_BACKEND_FUSION = "fusion"
+GEOMETRY_BACKEND_INTERNAL = "internal"
+GEOMETRY_BACKEND_AUTO = "auto"
+GEOMETRY_BACKENDS = (
+    GEOMETRY_BACKEND_AUTO,
+    GEOMETRY_BACKEND_FUSION,
+    GEOMETRY_BACKEND_INTERNAL,
+)
+DEFAULT_GEOMETRY_BACKEND = GEOMETRY_BACKEND_AUTO
 
 # Conversions vers les unités internes de Fusion (cm et radians).
 LENGTH_TO_CM: dict[str, float] = {
@@ -852,6 +879,163 @@ def profile_from_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def resolve_geometry_backend(requested: str | None = None) -> str:
+    """Détermine qui produit la géométrie (argument > environnement > défaut)."""
+    backend = (
+        requested or os.environ.get("FUSION_GEOMETRY_BACKEND") or ""
+    ).strip().lower()
+    if not backend:
+        backend = DEFAULT_GEOMETRY_BACKEND
+    if backend not in GEOMETRY_BACKENDS:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"producteur de géométrie inconnu : {backend!r} — attendu "
+            f"{list(GEOMETRY_BACKENDS)}",
+        )
+    if backend == GEOMETRY_BACKEND_AUTO:
+        return (
+            GEOMETRY_BACKEND_FUSION if FUSION_AVAILABLE else GEOMETRY_BACKEND_INTERNAL
+        )
+    return backend
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Écriture directe de la géométrie (mode "internal")
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _triangulate_prism(
+    plan: Mapping[str, Any], scale: float = 0.01
+) -> list[tuple[tuple[float, float, float], ...]]:
+    """Triangule le profil extrudé. `scale` convertit les cm du plan (0.01 = m).
+
+    Deux familles de facettes : les surfaces extrudées (extrados et intrados),
+    et les deux faces d'extrémité. Ces dernières sont pavées en reliant les
+    points d'extrados et d'intrados de MÊME station chordwise — un éventail
+    depuis un sommet laisserait des recouvrements sur un profil non convexe.
+    """
+    upper = [(x * scale, y * scale) for x, y in plan["profile"]["upper"]]
+    lower = [(x * scale, y * scale) for x, y in plan["profile"]["lower"]]
+    z0, z1 = 0.0, plan["span_cm"] * scale
+
+    tris: list[tuple] = []
+    for surface in (upper, lower):
+        for i in range(len(surface) - 1):
+            a, b = surface[i], surface[i + 1]
+            p1 = (a[0], a[1], z0)
+            p2 = (b[0], b[1], z0)
+            p3 = (b[0], b[1], z1)
+            p4 = (a[0], a[1], z1)
+            tris.append((p1, p2, p3))
+            tris.append((p1, p3, p4))
+
+    for z in (z0, z1):
+        for i in range(len(upper) - 1):
+            u1, u2 = upper[i], upper[i + 1]
+            l1, l2 = lower[i], lower[i + 1]
+            tris.append(((u1[0], u1[1], z), (u2[0], u2[1], z), (l2[0], l2[1], z)))
+            tris.append(((u1[0], u1[1], z), (l2[0], l2[1], z), (l1[0], l1[1], z)))
+
+    return _orient_outward(tris, upper, lower, (z0 + z1) / 2.0)
+
+
+def _orient_outward(tris, upper, lower, z_mid: float):
+    """Retourne les facettes dont la normale pointe vers l'intérieur.
+
+    snappyHexMesh se sert des normales pour distinguer l'intérieur du solide ;
+    une orientation incohérente produit un maillage aberrant. Plutôt que de
+    raisonner sur le sens de parcours, on compare chaque normale à la direction
+    « depuis un point intérieur ».
+    """
+    mid = len(upper) // 3
+    inside = (
+        (upper[mid][0] + lower[mid][0]) / 2.0,
+        (upper[mid][1] + lower[mid][1]) / 2.0,
+        z_mid,
+    )
+
+    oriented = []
+    for t in tris:
+        ux, uy, uz = (t[1][i] - t[0][i] for i in range(3))
+        vx, vy, vz = (t[2][i] - t[0][i] for i in range(3))
+        n = (uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx)
+        norm = math.sqrt(sum(c * c for c in n))
+        if norm <= DEGENERATE_FACET_TOL:
+            # Aux bords d'attaque et de fuite, extrados et intrados se
+            # rejoignent : le pavage des faces d'extrémité y produit des
+            # triangles d'aire nulle. snappyHexMesh les traite mal (normale
+            # indéfinie), on ne les écrit pas.
+            continue
+        centroid = tuple(sum(p[i] for p in t) / 3.0 for i in range(3))
+        outward = tuple(centroid[i] - inside[i] for i in range(3))
+        if sum(n[i] * outward[i] for i in range(3)) < 0:
+            t = (t[0], t[2], t[1])
+            n = tuple(-c for c in n)
+        oriented.append((tuple(c / norm for c in n), t))
+    return oriented
+
+
+def write_stl(plan: Mapping[str, Any], target: Path, name: str = "wing") -> Path:
+    """Écrit la géométrie du plan en STL ASCII, **en mètres**.
+
+    Le mètre est l'unité de travail d'OpenFOAM : écrire directement dedans
+    supprime toute ambiguïté d'unité, contrairement à un export CAO dont la
+    convention varie.
+    """
+    facets = _triangulate_prism(plan, scale=0.01)
+    if not facets:
+        raise DriverError(STATUS_REBUILD_FAILED, "aucune facette à écrire")
+
+    lines = [f"solid {name}"]
+    for normal, triangle in facets:
+        lines.append(
+            f"  facet normal {normal[0]:.6e} {normal[1]:.6e} {normal[2]:.6e}"
+        )
+        lines.append("    outer loop")
+        for p in triangle:
+            lines.append(f"      vertex {p[0]:.8e} {p[1]:.8e} {p[2]:.8e}")
+        lines.append("    endloop")
+        lines.append("  endfacet")
+    lines.append(f"endsolid {name}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    logger.info(
+        "STL écrit directement : %s (%d facettes, mètres)", target, len(facets)
+    )
+    return target
+
+
+def _drive_internal(
+    parameters: Mapping[str, Any], out_dir: Path
+) -> tuple[dict, Path, list[str]]:
+    """Produit la géométrie sans Fusion. Retourne (résumé, chemin STL, avertissements)."""
+    plan = profile_from_parameters(parameters)
+    logger.info(
+        "Géométrie interne : corde %.3f cm, envergure %.3f cm, t/c %.4f, "
+        "m/c %.4f, incidence %.3f deg",
+        plan["chord_cm"], plan["span_cm"], plan["thickness"], plan["camber"],
+        plan["aoa_deg"],
+    )
+    stl_path = write_stl(plan, out_dir / STL_FILENAME)
+
+    summary = {
+        key: plan[key]
+        for key in (
+            "chord_cm", "span_cm", "thickness", "camber", "aoa_deg",
+            "n_points", "camber_position", "bbox_cm",
+        )
+    }
+    summary["bodies"] = 1
+    summary["purged_entities"] = 0
+    summary["stl_units"] = "m"
+    warnings = [
+        "géométrie produite sans Fusion (mode interne) : pas de STEP, pas "
+        "d'historique CAO. La forme est celle de design_params.yaml."
+    ]
+    return summary, stl_path, warnings
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Opérations Fusion
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1500,6 +1684,7 @@ def _build_status(
     warnings: list[str] | None = None,
     geometry_mode: str | None = None,
     geometry: Mapping[str, Any] | None = None,
+    geometry_backend: str | None = None,
 ) -> dict:
     """Assemble le dict de statut retourné et sérialisé en JSON."""
     return {
@@ -1510,6 +1695,7 @@ def _build_status(
         "config_path": _relative_to_repo(config_path) if config_path else None,
         "step_path": _relative_to_repo(step_path) if step_path else None,
         "stl_path": _relative_to_repo(stl_path) if stl_path else None,
+        "geometry_backend": geometry_backend,
         "geometry_mode": geometry_mode,
         "geometry": dict(geometry) if geometry else None,
         "applied_parameters": dict(applied) if applied else {},
@@ -1551,23 +1737,25 @@ def drive(
     dry_run: bool = False,
     app: Any = None,
     geometry_mode: str | None = None,
+    geometry_backend: str | None = None,
 ) -> dict:
-    """Exécute le cycle complet : config -> paramètres -> recalcul -> STEP.
+    """Exécute le cycle complet : config -> géométrie -> export.
 
     Args:
         config_path: chemin de design_params.yaml. Défaut : DESIGN_PARAMS_PATH
             si défini dans l'environnement, sinon `configs/design_params.yaml`.
         iterations_root: racine d'archivage. Défaut : ITERATIONS_DIR ou
             `data/iterations`.
-        dry_run: n'appelle aucune API Fusion ; valide la configuration,
-            construit les expressions et calcule les chemins. Forcé à True
-            quand `adsk` n'est pas importable.
+        dry_run: n'écrit aucune géométrie ; valide la configuration, construit
+            les expressions et calcule les chemins.
         app: instance `adsk.core.Application` déjà obtenue (injectée par
             `run()`), utilisée pour rediriger les logs vers Fusion.
         geometry_mode: "rebuild" (défaut) reconstruit la géométrie depuis la
             configuration ; "parameters" se contente de mettre à jour les User
             Parameters et de recalculer — réservé aux modèles réellement
             paramétriques. À défaut, FUSION_GEOMETRY_MODE puis le défaut.
+        geometry_backend: "fusion", "internal", ou "auto" (défaut : Fusion s'il
+            est disponible, interne sinon). À défaut, FUSION_GEOMETRY_BACKEND.
 
     Returns:
         Le dict de statut (voir docstring du module). Ne lève pas : toute
@@ -1578,8 +1766,6 @@ def drive(
     iterations_root = iterations_root or _env_path(
         "ITERATIONS_DIR", DEFAULT_ITERATIONS_DIR
     )
-    simulated = dry_run or not FUSION_AVAILABLE
-
     setup_logging(app=app)  # journal console le temps de connaître l'itération
 
     iteration: int | None = None
@@ -1589,10 +1775,17 @@ def drive(
     geometry: dict | None = None
     warnings: list[str] = []
     resolved_mode: str | None = None
+    backend: str | None = None
 
     try:
         geometry_mode = resolve_geometry_mode(geometry_mode)
         resolved_mode = geometry_mode
+        backend = resolve_geometry_backend(geometry_backend)
+        # Le mode simulation ne concerne que le chemin Fusion : en mode
+        # interne, la géométrie est produite quoi qu'il arrive.
+        simulated = backend == GEOMETRY_BACKEND_FUSION and (
+            dry_run or not FUSION_AVAILABLE
+        )
         config = load_config(config_path)
         iteration = config["iteration"]
         design_id = config.get("design_id")
@@ -1605,11 +1798,67 @@ def drive(
         # Le journal bascule vers le dossier de l'itération dès qu'il est connu.
         setup_logging(log_file=out_dir / LOG_FILENAME, app=app)
         logger.info(
-            "=== Driver Fusion — itération %04d, design '%s'%s ===",
+            "=== Driver — itération %04d, design '%s', géométrie '%s'%s ===",
             iteration,
             design_id,
+            backend,
             " [MODE SIMULATION]" if simulated else "",
         )
+
+        # ── Géométrie produite sans Fusion ────────────────────────────────
+        if backend == GEOMETRY_BACKEND_INTERNAL:
+            if geometry_mode == GEOMETRY_MODE_PARAMETERS:
+                # Il n'y a pas de User Parameters à mettre à jour hors Fusion :
+                # le mode interne reconstruit forcément.
+                warnings.append(
+                    "mode 'parameters' sans objet pour le producteur interne — "
+                    "la géométrie est reconstruite"
+                )
+                geometry_mode = GEOMETRY_MODE_REBUILD
+                resolved_mode = geometry_mode
+
+            planned = {
+                name: {
+                    "expression": build_expression(spec["value"], spec.get("unit")),
+                    "requested_value": float(spec["value"]),
+                    "unit": spec.get("unit"),
+                }
+                for name, spec in parameters.items()
+            }
+
+            if dry_run:
+                plan = profile_from_parameters(parameters)
+                geometry = {
+                    key: plan[key]
+                    for key in ("chord_cm", "span_cm", "thickness", "camber",
+                                "aoa_deg", "n_points", "camber_position", "bbox_cm")
+                }
+                status = _build_status(
+                    False, STATUS_DRY_RUN,
+                    iteration=iteration, design_id=design_id,
+                    config_path=config_path, applied=planned,
+                    geometry_mode=geometry_mode,
+                    geometry=geometry, geometry_backend=backend,
+                    error_message="mode simulation — aucune géométrie écrite",
+                    warnings=warnings,
+                )
+                write_status(status, out_dir)
+                return status
+
+            geometry, stl_path, internal_warnings = _drive_internal(
+                parameters, out_dir
+            )
+            warnings.extend(internal_warnings)
+            logger.info("=== Itération %04d : succès ===", iteration)
+            status = _build_status(
+                True, STATUS_OK,
+                iteration=iteration, design_id=design_id,
+                config_path=config_path, stl_path=stl_path, applied=planned,
+                warnings=warnings, geometry_mode=geometry_mode,
+                geometry=geometry, geometry_backend=backend,
+            )
+            write_status(status, out_dir)
+            return status
 
         if simulated:
             planned = {
@@ -1730,6 +1979,7 @@ def drive(
             details=exc.details,
             warnings=warnings,
             geometry_mode=resolved_mode,
+            geometry_backend=backend,
         )
         if out_dir is not None:
             write_status(status, out_dir)
@@ -1749,6 +1999,7 @@ def drive(
             details=trace,
             warnings=warnings,
             geometry_mode=resolved_mode,
+            geometry_backend=backend,
         )
         if out_dir is not None:
             write_status(status, out_dir)
@@ -1801,6 +2052,16 @@ def main(argv: list[str] | None = None) -> int:
         help="n'appelle aucune API Fusion, même si le module adsk est disponible",
     )
     parser.add_argument(
+        "--geometry-backend",
+        choices=GEOMETRY_BACKENDS,
+        default=None,
+        help=(
+            "'internal' produit la géométrie sans Fusion (STL en mètres), "
+            "'fusion' exige de tourner dans Fusion, 'auto' choisit selon la "
+            "disponibilité de l'API"
+        ),
+    )
+    parser.add_argument(
         "--geometry-mode",
         choices=GEOMETRY_MODES,
         default=None,
@@ -1817,6 +2078,7 @@ def main(argv: list[str] | None = None) -> int:
         iterations_root=Path(args.iterations_dir) if args.iterations_dir else None,
         dry_run=args.dry_run,
         geometry_mode=args.geometry_mode,
+        geometry_backend=args.geometry_backend,
     )
     print(json.dumps(status, indent=2, ensure_ascii=False, default=str))
 

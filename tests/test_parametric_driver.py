@@ -805,9 +805,20 @@ def test_le_mode_simulation_calcule_la_geometrie(tmp_path):
 
 def test_mode_parameters_ne_calcule_pas_de_geometrie(tmp_path):
     status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path,
-                      dry_run=True, geometry_mode="parameters")
+                      dry_run=True, geometry_mode="parameters",
+                      geometry_backend="fusion")
     assert status["geometry_mode"] == "parameters"
     assert status["geometry"] is None
+
+
+def test_le_producteur_interne_ignore_le_mode_parameters(tmp_path):
+    # Hors Fusion il n'y a pas de User Parameters à mettre à jour : le mode
+    # 'parameters' n'a pas de sens, la géométrie est reconstruite.
+    status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path,
+                      dry_run=True, geometry_mode="parameters",
+                      geometry_backend="internal")
+    assert status["geometry_mode"] == "rebuild"
+    assert any("sans objet" in w for w in status["warnings"])
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1005,7 +1016,7 @@ def test_ancien_step_supprime_avant_export(tmp_path):
 
 def test_mode_simulation_ne_produit_pas_de_step(tmp_path, cfg_file):
     status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
-                      geometry_mode="parameters")
+                      geometry_mode="parameters", geometry_backend="fusion")
     assert status["success"] is False
     assert status["status"] == pd.STATUS_DRY_RUN
     assert status["iteration"] == 3
@@ -1015,7 +1026,7 @@ def test_mode_simulation_ne_produit_pas_de_step(tmp_path, cfg_file):
 
 def test_mode_simulation_prevoit_les_expressions(tmp_path, cfg_file):
     status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
-                      geometry_mode="parameters")
+                      geometry_mode="parameters", geometry_backend="fusion")
     assert status["applied_parameters"]["chord_mm"]["expression"] == "300 mm"
     assert status["applied_parameters"]["aoa_deg"]["expression"] == "4 deg"
 
@@ -1029,7 +1040,7 @@ def test_rebuild_refuse_une_config_sans_les_parametres_du_seed(tmp_path, cfg_fil
 
 def test_statut_et_journal_ecrits_dans_le_dossier_diteration(tmp_path, cfg_file):
     pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
-             geometry_mode="parameters")
+             geometry_mode="parameters", geometry_backend="fusion")
     out = tmp_path / "iter_0003"
     status = json.loads((out / pd.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["status"] == pd.STATUS_DRY_RUN
@@ -1054,7 +1065,7 @@ def test_drive_config_absente(tmp_path):
 
 def test_statut_serialisable_en_json(tmp_path, cfg_file):
     status = pd.drive(config_path=cfg_file, iterations_root=tmp_path, dry_run=True,
-                      geometry_mode="parameters")
+                      geometry_mode="parameters", geometry_backend="fusion")
     json.dumps(status)  # ne doit pas lever
     for key in ("success", "status", "iteration", "design_id", "step_path",
                 "stl_path", "geometry_mode", "geometry", "applied_parameters",
@@ -1064,7 +1075,8 @@ def test_statut_serialisable_en_json(tmp_path, cfg_file):
 
 def test_cli_retourne_3_en_mode_simulation(tmp_path, cfg_file, capsys):
     code = pd.main(["--config", str(cfg_file), "--iterations-dir", str(tmp_path),
-                    "--dry-run", "--geometry-mode", "parameters"])
+                    "--dry-run", "--geometry-mode", "parameters",
+                    "--geometry-backend", "fusion"])
     assert code == 3
     assert json.loads(capsys.readouterr().out)["status"] == pd.STATUS_DRY_RUN
 
