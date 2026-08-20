@@ -314,11 +314,17 @@ def test_le_document_actif_est_utilise(fusion, config, tmp_path):
 
 def test_import_du_seed_si_force(fusion, config, tmp_path, monkeypatch):
     driver, app, _ = fusion
+    # Le seed est un binaire propre au projet, absent du dépôt : le test
+    # fournit le sien. S'appuyer sur `fusion/seed_design.f3d` ferait échouer la
+    # suite sur tout clone frais — le driver ne vérifie que l'existence du
+    # fichier, l'import étant assuré par Fusion.
+    seed = tmp_path / "seed_de_test.f3d"
+    seed.write_bytes(b"PK\x03\x04 archive Fusion factice")
     monkeypatch.setenv("FUSION_FORCE_SEED_IMPORT", "1")
-    monkeypatch.setenv("FUSION_SEED_PATH", str(ROOT / "fusion" / "seed_design.f3d"))
+    monkeypatch.setenv("FUSION_SEED_PATH", str(seed))
     status = run(driver, config, tmp_path)
     assert status["success"] is True, status["error_message"]
-    assert len(app.importManager.imported) == 1
+    assert app.importManager.imported == [str(seed)]
 
 
 def test_seed_absent_signale(fusion, config, tmp_path, monkeypatch):
