@@ -206,6 +206,15 @@ def chart(
     labelled = [s for s in usable if s.get("label")]
     if labelled:
         legend_x, legend_y = left + 10, top + 14
+        # Fond opaque : sans lui, les courbes traversent le texte de la
+        # légende, qui devient illisible là où le tracé est dense.
+        legend_w = 42 + max(len(str(s["label"])) for s in labelled) * 6.6
+        out.append(
+            f'<rect x="{legend_x - 6}" y="{legend_y - 15}" '
+            f'width="{legend_w:.0f}" height="{len(labelled) * 17 + 8}" '
+            f'fill="{BACKGROUND}" fill-opacity="0.86" stroke="{GRID}" '
+            f'stroke-width="1" rx="3"/>'
+        )
         for index, serie in enumerate(labelled):
             color = serie.get("color") or COLORS[
                 usable.index(serie) % len(COLORS)
@@ -475,8 +484,10 @@ def comparison_bars(
         color = good if improved else bad
 
         left = margin + index * (panel_w + margin)
-        top_of_bars = top + 30
-        bars_h = panel_h - 30
+        # Assez de dégagement au dessus des barres pour que l'étiquette de
+        # valeur de la plus haute ne vienne pas percuter le titre du panneau.
+        top_of_bars = top + 48
+        bars_h = panel_h - 48
         reference = max(abs(before), abs(after), 1e-12)
 
         out.append(

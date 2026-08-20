@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Design optimisé — wing_v01</title>
+<style>
+  body { max-width: 900px; margin: 2.5rem auto; padding: 0 1.2rem;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         line-height: 1.65; color: #1c1c1c; background: #fff; }
+  h1 { font-size: 1.85rem; border-bottom: 2px solid #1f4e8c; padding-bottom: .4rem; }
+  h2 { font-size: 1.35rem; margin-top: 2.4rem; color: #1f4e8c; }
+  h3 { font-size: 1.1rem; margin-top: 1.8rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0;
+           font-size: .93rem; }
+  th, td { border: 1px solid #d8d8d8; padding: .45rem .7rem; text-align: left; }
+  th { background: #f2f5f9; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  pre { background: #f6f8fa; padding: .9rem 1.1rem; border-radius: 6px;
+         overflow-x: auto; font-size: .87rem; line-height: 1.45; }
+  code { background: #f0f2f5; padding: .1rem .35rem; border-radius: 3px;
+          font-size: .9em; }
+  pre code { background: none; padding: 0; }
+  figure { margin: 1.6rem 0; text-align: center; }
+  figure svg, figure img { max-width: 100%; height: auto;
+                            border: 1px solid #e4e4e4; border-radius: 4px; }
+  figcaption { font-size: .85rem; color: #666; margin-top: .5rem; }
+  .side-by-side { display: flex; gap: 1rem; align-items: flex-start;
+                   flex-wrap: wrap; margin: 1.6rem 0; }
+  .side-by-side figure { flex: 1 1 380px; margin: 0; }
+  .side-by-side figcaption { font-weight: 600; color: #444; }
+  blockquote { border-left: 4px solid #c1440e; margin: 1.2rem 0;
+                padding: .3rem 1rem; background: #fdf6f3; color: #444; }
+  li { margin: .45rem 0; }
+  hr { border: none; border-top: 1px solid #e0e0e0; margin: 2.5rem 0; }
+</style></head><body>
+<h1>Design optimisé — <code>wing_v01</code></h1>
+<p>Meilleure des <strong>12 itérations</strong> de la série <code>iterations</code> (12 réussies, 0 échouée), retenue sur l'objectif <code>maximize_Cl_Cd</code>.</p>
+<h2>Performances</h2>
+<table>
+<tr><th></th><th>Cd</th><th>Cl</th><th>Cl/Cd</th></tr>
+<tr><td>Départ (itération 0)</td><td>0.05081</td><td>0.17500</td><td>3.44</td></tr>
+<tr><td><strong>Optimisé (itération 11)</strong></td><td><strong>0.04699</strong></td><td><strong>0.22540</strong></td><td><strong>4.80</strong></td></tr>
+</table>
+<p><strong>Gain de finesse : +39.3 %</strong></p>
+<p>Maillage : ? cellules, non-orthogonalité —, skewness —. Coefficients moyennés sur ? itérations, écart-type relatif — sur Cd — <strong>encore instables</strong>.</p>
+<h2>Paramètres : départ → arrivée</h2>
+<table>
+<tr><th>paramètre</th><th>départ</th><th>arrivée</th><th>écart</th><th>bornes</th></tr>
+<tr><td><code>chord</code></td><td>300</td><td><strong>298.53</strong> mm</td><td>-0.5 %</td><td>220 … 420</td></tr>
+<tr><td><code>thickness</code></td><td>0.12</td><td><strong>0.109693</strong> unitless</td><td>-8.6 %</td><td>0.08 … 0.2</td></tr>
+<tr><td><code>camber</code></td><td>0.02</td><td><strong>0.0242</strong> unitless</td><td>+21.0 %</td><td>0 … 0.09</td></tr>
+<tr><td><code>span</code></td><td>80</td><td><strong>80</strong> mm</td><td>inchangé</td><td>79 … 81</td></tr>
+<tr><td><code>aoa</code></td><td>0</td><td><strong>0</strong> deg</td><td>inchangé</td><td>-2 … 12</td></tr>
+</table>
+<h2>Avant / après</h2>
+<p>Le seed de départ face au design retenu, tous deux mesurés <strong>dans le même régime CFD</strong> (même régime) — comparer un maillage fin à un maillage d'exploration gonflerait le gain sans qu'il soit réel.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="system-ui, sans-serif">
+<rect width="900" height="300" fill="#ffffff"/>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Performances — même régime</text>
+<rect x="20.0" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
+<rect x="66.5" y="118.1" width="71.1" height="83.9" fill="#9aa5b1" rx="2"/>
+<text x="102.0" y="112.1" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.1750</text>
+<text x="102.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
+<rect x="175.8" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
+<text x="211.3" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.2254</text>
+<text x="211.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
+<text x="156.7" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Portance (Cl)</text>
+<text x="156.7" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+28.8 %</text>
+<text x="156.7" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
+<rect x="313.3" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
+<rect x="359.8" y="94.0" width="71.1" height="108.0" fill="#9aa5b1" rx="2"/>
+<text x="395.3" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.05081</text>
+<text x="395.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
+<rect x="469.1" y="102.1" width="71.1" height="99.9" fill="#2e7d32" rx="2"/>
+<text x="504.7" y="96.1" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.04699</text>
+<text x="504.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
+<text x="450.0" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Traînée (Cd)</text>
+<text x="450.0" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">-7.5 %</text>
+<text x="450.0" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
+<rect x="606.7" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
+<rect x="653.1" y="124.5" width="71.1" height="77.5" fill="#9aa5b1" rx="2"/>
+<text x="688.7" y="118.5" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">3.44</text>
+<text x="688.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
+<rect x="762.5" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
+<text x="798.0" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">4.80</text>
+<text x="798.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
+<text x="743.3" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Finesse (Cl/Cd)</text>
+<text x="743.3" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+39.3 %</text>
+<text x="743.3" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
+</svg><figcaption>Performances avant / après</figcaption></figure>
+<table>
+<tr><th></th><th>seed</th><th>optimisé</th><th>écart</th></tr>
+<tr><td><strong>Portance Cl</strong></td><td>0.1750</td><td><strong>0.2254</strong></td><td>+28.8 % ✓</td></tr>
+<tr><td><strong>Traînée Cd</strong></td><td>0.05081</td><td><strong>0.04699</strong></td><td>-7.5 % ✓</td></tr>
+<tr><td><strong>Finesse Cl/Cd</strong></td><td>3.44</td><td><strong>4.80</strong></td><td>+39.3 % ✓</td></tr>
+</table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" width="900" height="330" font-family="system-ui, sans-serif">
+<rect width="900" height="330" fill="#ffffff"/>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Section : avant / après</text>
+<rect x="22.0" y="46" width="417.0" height="216.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
+<line x1="38.68" y1="161.07" x2="422.32" y2="161.07" stroke="#5a5a5a" stroke-width="1" stroke-dasharray="5 4"/>
+<path d="M38.68,161.07 L42.77,153.36 L47.33,150.15 L51.98,147.71 L56.67,145.68 L61.40,143.94 L66.15,142.40 L70.92,141.03 L75.70,139.79 L80.50,138.68 L85.30,137.67 L90.12,136.75 L94.95,135.92 L99.78,135.17 L104.62,134.49 L109.46,133.88 L114.31,133.33 L119.16,132.84 L124.02,132.40 L128.87,132.02 L133.74,131.70 L138.60,131.42 L143.46,131.19 L148.33,131.00 L153.20,130.86 L158.06,130.76 L162.93,130.70 L167.80,130.68 L172.67,130.70 L177.54,130.76 L182.40,130.85 L187.27,130.98 L192.14,131.14 L196.96,131.33 L201.79,131.55 L206.61,131.79 L211.44,132.06 L216.26,132.34 L221.08,132.65 L225.90,132.98 L230.73,133.33 L235.55,133.70 L240.36,134.08 L245.18,134.49 L250.00,134.92 L254.81,135.36 L259.63,135.83 L264.44,136.31 L269.25,136.81 L274.06,137.32 L278.87,137.85 L283.68,138.40 L288.48,138.96 L293.29,139.54 L298.09,140.14 L302.89,140.75 L307.69,141.38 L312.49,142.02 L317.29,142.68 L322.08,143.35 L326.88,144.04 L331.67,144.74 L336.46,145.46 L341.24,146.20 L346.03,146.95 L350.81,147.71 L355.60,148.49 L360.38,149.29 L365.15,150.10 L369.93,150.92 L374.70,151.76 L379.48,152.62 L384.25,153.49 L389.01,154.38 L393.78,155.29 L398.54,156.21 L403.30,157.14 L408.06,158.10 L412.82,159.07 L417.57,160.06 L422.32,161.07 L422.32,161.07 L417.48,161.44 L412.64,161.81 L407.81,162.17 L402.97,162.54 L398.14,162.89 L393.31,163.25 L388.49,163.60 L383.67,163.95 L378.84,164.30 L374.03,164.64 L369.21,164.98 L364.39,165.32 L359.58,165.66 L354.77,165.99 L349.96,166.33 L345.15,166.66 L340.35,166.99 L335.55,167.32 L330.74,167.64 L325.94,167.97 L321.15,168.29 L316.35,168.61 L311.56,168.93 L306.76,169.24 L301.97,169.56 L297.18,169.87 L292.39,170.18 L287.61,170.49 L282.82,170.79 L278.04,171.09 L273.26,171.39 L268.48,171.68 L263.70,171.98 L258.92,172.26 L254.14,172.55 L249.37,172.82 L244.59,173.10 L239.82,173.37 L235.05,173.63 L230.27,173.88 L225.50,174.13 L220.74,174.38 L215.97,174.61 L211.20,174.84 L206.43,175.05 L201.67,175.26 L196.90,175.46 L192.14,175.64 L187.41,175.82 L182.69,175.99 L177.96,176.16 L173.24,176.32 L168.52,176.48 L163.79,176.62 L159.07,176.76 L154.35,176.89 L149.62,177.00 L144.90,177.10 L140.17,177.18 L135.44,177.25 L130.71,177.29 L125.98,177.32 L121.25,177.32 L116.51,177.29 L111.76,177.24 L107.02,177.15 L102.26,177.02 L97.51,176.86 L92.74,176.64 L87.97,176.37 L83.18,176.03 L78.39,175.62 L73.58,175.12 L68.76,174.52 L63.92,173.77 L59.05,172.85 L54.15,171.68 L49.21,170.12 L44.18,167.83 L38.68,161.07 Z" fill="#c1440e" fill-opacity="0.16" stroke="#c1440e" stroke-width="2" stroke-linejoin="round"/>
+<text x="230.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#c1440e">Seed (départ)</text>
+<text x="230.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">corde 300 mm · incidence 0.00° · épaisseur 0.120</text>
+<rect x="461.0" y="46" width="417.0" height="216.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
+<line x1="477.68" y1="161.07" x2="859.44" y2="161.07" stroke="#5a5a5a" stroke-width="1" stroke-dasharray="5 4"/>
+<path d="M477.68,161.07 L481.68,153.93 L486.20,150.88 L490.80,148.53 L495.46,146.56 L500.16,144.85 L504.88,143.34 L509.62,141.98 L514.38,140.75 L519.15,139.63 L523.94,138.61 L528.73,137.68 L533.54,136.84 L538.35,136.06 L543.17,135.36 L547.99,134.73 L552.82,134.15 L557.66,133.64 L562.50,133.18 L567.34,132.77 L572.18,132.42 L577.03,132.11 L581.87,131.85 L586.72,131.64 L591.57,131.47 L596.43,131.35 L601.28,131.27 L606.13,131.22 L610.98,131.22 L615.83,131.26 L620.68,131.33 L625.53,131.44 L630.38,131.59 L635.19,131.76 L639.99,131.96 L644.80,132.19 L649.60,132.43 L654.41,132.70 L659.21,132.99 L664.01,133.31 L668.81,133.64 L673.61,133.99 L678.40,134.36 L683.20,134.75 L688.00,135.17 L692.79,135.59 L697.58,136.04 L702.37,136.51 L707.16,136.99 L711.95,137.49 L716.74,138.01 L721.52,138.54 L726.31,139.10 L731.09,139.66 L735.87,140.25 L740.65,140.85 L745.42,141.47 L750.20,142.10 L754.97,142.75 L759.74,143.41 L764.51,144.09 L769.28,144.79 L774.04,145.50 L778.81,146.23 L783.57,146.97 L788.33,147.73 L793.09,148.51 L797.84,149.30 L802.59,150.10 L807.35,150.93 L812.09,151.76 L816.84,152.62 L821.58,153.49 L826.32,154.38 L831.06,155.28 L835.80,156.20 L840.53,157.14 L845.26,158.09 L849.99,159.07 L854.72,160.06 L859.44,161.07 L859.44,161.07 L854.62,161.31 L849.80,161.56 L844.98,161.80 L840.17,162.04 L835.36,162.28 L830.55,162.52 L825.75,162.76 L820.94,163.00 L816.14,163.23 L811.35,163.47 L806.55,163.71 L801.76,163.94 L796.97,164.18 L792.18,164.42 L787.39,164.66 L782.61,164.89 L777.82,165.13 L773.04,165.37 L768.26,165.61 L763.49,165.85 L758.71,166.09 L753.94,166.33 L749.17,166.57 L744.40,166.81 L739.63,167.05 L734.87,167.29 L730.10,167.53 L725.34,167.77 L720.58,168.00 L715.82,168.24 L711.07,168.48 L706.31,168.72 L701.56,168.95 L696.80,169.18 L692.05,169.41 L687.30,169.64 L682.55,169.87 L677.80,170.09 L673.06,170.31 L668.31,170.53 L663.57,170.74 L658.82,170.95 L654.08,171.15 L649.34,171.35 L644.60,171.54 L639.86,171.72 L635.12,171.90 L630.38,172.07 L625.69,172.23 L621.00,172.39 L616.30,172.56 L611.61,172.72 L606.92,172.88 L602.23,173.04 L597.53,173.19 L592.84,173.34 L588.15,173.47 L583.45,173.61 L578.76,173.73 L574.06,173.84 L569.36,173.93 L564.66,174.01 L559.95,174.08 L555.24,174.12 L550.53,174.14 L545.81,174.14 L541.08,174.10 L536.35,174.04 L531.61,173.93 L526.86,173.77 L522.10,173.57 L517.33,173.30 L512.55,172.95 L507.75,172.51 L502.92,171.95 L498.07,171.24 L493.19,170.30 L488.25,169.01 L483.22,167.06 L477.68,161.07 Z" fill="#1f4e8c" fill-opacity="0.16" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
+<text x="669.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1f4e8c">Design optimisé</text>
+<text x="669.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">corde 299 mm · incidence 0.00° · épaisseur 0.110</text>
+</svg><figcaption>Sections avant / après</figcaption></figure>
+<p>Les deux sections sont dessinées à la <strong>même échelle</strong> : mises chacune à la taille de son cadre, elles paraîtraient identiques et l'écart de corde comme l'incidence passeraient inaperçus.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="system-ui, sans-serif">
+<rect width="900" height="300" fill="#ffffff"/>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Les deux sections superposées</text>
+<path d="M28.00,159.54 L37.01,142.59 L47.04,135.53 L57.26,130.16 L67.58,125.70 L77.98,121.86 L88.43,118.48 L98.92,115.46 L109.44,112.75 L120.00,110.30 L130.57,108.07 L141.17,106.06 L151.79,104.23 L162.42,102.58 L173.06,101.08 L183.72,99.73 L194.38,98.52 L205.06,97.44 L215.74,96.49 L226.43,95.65 L237.12,94.93 L247.82,94.32 L258.52,93.81 L269.23,93.40 L279.93,93.09 L290.64,92.87 L301.35,92.74 L312.06,92.70 L322.77,92.74 L333.48,92.87 L344.19,93.07 L354.90,93.35 L365.60,93.71 L376.22,94.14 L386.83,94.61 L397.45,95.14 L408.06,95.72 L418.67,96.35 L429.28,97.03 L439.89,97.75 L450.50,98.52 L461.10,99.33 L471.70,100.19 L482.30,101.08 L492.89,102.02 L503.49,103.00 L514.08,104.02 L524.67,105.08 L535.25,106.17 L545.83,107.30 L556.41,108.47 L566.99,109.68 L577.56,110.92 L588.13,112.20 L598.70,113.51 L609.26,114.85 L619.82,116.23 L630.38,117.65 L640.93,119.09 L651.48,120.58 L662.02,122.09 L672.56,123.64 L683.10,125.22 L693.63,126.84 L704.16,128.48 L714.69,130.16 L725.21,131.88 L735.73,133.63 L746.24,135.41 L756.74,137.23 L767.25,139.08 L777.75,140.96 L788.24,142.88 L798.73,144.84 L809.21,146.83 L819.69,148.85 L830.16,150.92 L840.63,153.02 L851.09,155.15 L861.55,157.33 L872.00,159.54 L872.00,159.54 L861.35,160.37 L850.71,161.18 L840.07,161.98 L829.44,162.78 L818.81,163.57 L808.19,164.35 L797.57,165.12 L786.96,165.89 L776.35,166.65 L765.75,167.41 L755.16,168.16 L744.56,168.91 L733.97,169.65 L723.39,170.39 L712.81,171.12 L702.24,171.85 L691.67,172.57 L681.10,173.29 L670.54,174.01 L659.98,174.72 L649.42,175.43 L638.87,176.14 L628.32,176.84 L617.78,177.53 L607.24,178.23 L596.70,178.91 L586.17,179.59 L575.64,180.27 L565.11,180.94 L554.59,181.60 L544.07,182.26 L533.55,182.91 L523.03,183.55 L512.52,184.18 L502.01,184.80 L491.51,185.41 L481.00,186.02 L470.50,186.60 L460.00,187.18 L449.50,187.74 L439.01,188.29 L428.52,188.83 L418.03,189.34 L407.54,189.84 L397.05,190.31 L386.57,190.77 L376.08,191.20 L365.60,191.61 L355.20,192.01 L344.81,192.39 L334.42,192.76 L324.03,193.11 L313.64,193.45 L303.25,193.77 L292.86,194.07 L282.47,194.35 L272.07,194.60 L261.68,194.81 L251.28,195.00 L240.88,195.14 L230.47,195.24 L220.06,195.30 L209.64,195.30 L199.22,195.25 L188.78,195.12 L178.34,194.93 L167.88,194.65 L157.41,194.28 L146.93,193.81 L136.43,193.21 L125.90,192.47 L115.36,191.57 L104.78,190.47 L94.17,189.14 L83.52,187.50 L72.82,185.47 L62.04,182.90 L51.16,179.47 L40.09,174.41 L28.00,159.54 Z" fill="#c1440e" fill-opacity="0.10" stroke="#c1440e" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="7 4"/>
+<line x1="300.0" y1="282" x2="326.0" y2="282" stroke="#c1440e" stroke-width="2.5" stroke-dasharray="7 4"/>
+<text x="332.0" y="286" font-size="12" fill="#222222">seed</text>
+<path d="M28.00,159.54 L36.81,143.85 L46.73,137.14 L56.87,131.97 L67.12,127.64 L77.45,123.88 L87.84,120.55 L98.27,117.55 L108.74,114.85 L119.24,112.39 L129.77,110.15 L140.32,108.10 L150.89,106.24 L161.47,104.54 L172.07,103.00 L182.69,101.60 L193.31,100.33 L203.95,99.20 L214.59,98.19 L225.24,97.30 L235.90,96.51 L246.56,95.84 L257.23,95.28 L267.89,94.81 L278.57,94.44 L289.24,94.17 L299.91,93.98 L310.59,93.89 L321.26,93.89 L331.94,93.97 L342.61,94.13 L353.28,94.37 L363.95,94.69 L374.52,95.08 L385.09,95.52 L395.66,96.01 L406.23,96.56 L416.79,97.15 L427.36,97.79 L437.92,98.47 L448.48,99.20 L459.03,99.98 L469.59,100.80 L480.14,101.66 L490.69,102.56 L501.24,103.51 L511.78,104.49 L522.32,105.52 L532.86,106.58 L543.39,107.68 L553.92,108.82 L564.45,110.00 L574.97,111.21 L585.49,112.46 L596.01,113.75 L606.52,115.07 L617.03,116.43 L627.53,117.82 L638.03,119.25 L648.53,120.71 L659.02,122.20 L669.51,123.74 L680.00,125.30 L690.48,126.90 L700.95,128.54 L711.42,130.21 L721.89,131.91 L732.35,133.65 L742.81,135.43 L753.26,137.24 L763.70,139.08 L774.14,140.96 L784.58,142.88 L795.01,144.83 L805.44,146.82 L815.86,148.84 L826.27,150.91 L836.68,153.01 L847.08,155.15 L857.48,157.33 L867.86,159.54 L867.86,159.54 L857.26,160.08 L846.66,160.62 L836.06,161.16 L825.47,161.69 L814.89,162.21 L804.31,162.74 L793.74,163.27 L783.18,163.79 L772.61,164.31 L762.06,164.83 L751.51,165.36 L740.96,165.88 L730.42,166.40 L719.89,166.92 L709.36,167.44 L698.83,167.97 L688.31,168.49 L677.79,169.01 L667.28,169.54 L656.77,170.06 L646.27,170.59 L635.77,171.12 L625.27,171.65 L614.78,172.17 L604.29,172.70 L593.81,173.23 L583.33,173.76 L572.85,174.28 L562.38,174.81 L551.91,175.33 L541.44,175.85 L530.98,176.37 L520.52,176.89 L510.06,177.40 L499.61,177.91 L489.16,178.41 L478.71,178.91 L468.27,179.40 L457.83,179.89 L447.39,180.36 L436.95,180.83 L426.51,181.29 L416.08,181.73 L405.65,182.16 L395.22,182.58 L384.80,182.99 L374.37,183.38 L363.95,183.75 L353.62,184.11 L343.29,184.47 L332.97,184.83 L322.64,185.19 L312.32,185.54 L302.00,185.88 L291.68,186.22 L281.35,186.54 L271.03,186.84 L260.70,187.13 L250.37,187.40 L240.03,187.64 L229.69,187.85 L219.35,188.03 L208.99,188.17 L198.63,188.27 L188.26,188.31 L177.88,188.30 L167.48,188.23 L157.07,188.08 L146.65,187.84 L136.20,187.50 L125.73,187.05 L115.24,186.46 L104.71,185.69 L94.14,184.73 L83.53,183.50 L72.87,181.92 L62.12,179.85 L51.26,177.03 L40.19,172.73 L28.00,159.54 Z" fill="#1f4e8c" fill-opacity="0.10" stroke="#1f4e8c" stroke-width="2.2" stroke-linejoin="round"/>
+<line x1="470.0" y1="282" x2="496.0" y2="282" stroke="#1f4e8c" stroke-width="2.5"/>
+<text x="502.0" y="286" font-size="12" fill="#222222">optimisé</text>
+</svg><figcaption>Sections superposées</figcaption></figure>
+<blockquote>Contours du seed non produits : champs du seed indisponibles (maillage purgé) : les contours avant / après demandent de réévaluer le seed avec <code>keep_case_after_run: true</code></blockquote>
+<h2>Pourquoi cette forme est meilleure</h2>
+<ul><li><strong>Cambrure accentuée</strong> (0.0200 → 0.0242). La cambrure décale toute la courbe de portance : un profil cambré porte déjà à incidence nulle. Elle se paie en traînée de forme et en moment de tangage, d'où l'existence d'un optimum plutôt qu'une croissance sans fin.</li>
+<li><strong>Profil aminci</strong> (0.1200 → 0.1097 d'épaisseur relative). Un profil plus fin perturbe moins l'écoulement et traîne moins. La contrepartie est structurelle — moins d'inertie, donc moins de rigidité — et un décrochage plus brutal, le bord d'attaque plus aigu supportant mal les fortes incidences.</li>
+<li><strong>Corde portée à 298.5 mm</strong> (depuis 300.0). Elle agit par deux voies : le nombre de Reynolds augmente, ce qui abaisse légèrement le coefficient de frottement, et la surface de référence change — elle est recalculée à chaque itération, sans quoi la comparaison des coefficients n'aurait aucun sens.</li>
+<li><strong>Le compromis chiffré</strong> : la portance gagne +29 % <em>et</em> la traînée baisse de 8 %. Les deux termes s'améliorent à la fois — cas favorable, qui tient ici à ce que la surface de référence suit la corde.</li></ul>
+<h2>Déroulé de l'optimisation</h2>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
+<rect width="760" height="420" fill="#ffffff"/>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Finesse au fil des itérations</text>
+<line x1="78.0" y1="46" x2="78.0" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="78.0" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">0</text>
+<line x1="197.3" y1="46" x2="197.3" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="197.3" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">2.00</text>
+<line x1="316.5" y1="46" x2="316.5" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="316.5" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">4.00</text>
+<line x1="435.8" y1="46" x2="435.8" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="435.8" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">6.00</text>
+<line x1="555.1" y1="46" x2="555.1" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="555.1" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">8.00</text>
+<line x1="674.4" y1="46" x2="674.4" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="674.4" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">10.0</text>
+<line x1="78" y1="332.4" x2="734" y2="332.4" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="336.4" text-anchor="end" font-size="11" fill="#5a5a5a">-2.00</text>
+<line x1="78" y1="254.5" x2="734" y2="254.5" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="258.5" text-anchor="end" font-size="11" fill="#5a5a5a">0</text>
+<line x1="78" y1="176.7" x2="734" y2="176.7" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="180.7" text-anchor="end" font-size="11" fill="#5a5a5a">2.00</text>
+<line x1="78" y1="98.8" x2="734" y2="98.8" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="102.8" text-anchor="end" font-size="11" fill="#5a5a5a">4.00</text>
+<rect x="78" y="46" width="656" height="316" fill="none" stroke="#5a5a5a" stroke-width="1.2"/>
+<path d="M78.0,120.4 L137.6,120.4 L197.3,101.7 L256.9,122.3 L316.5,103.8 L376.2,101.7 L435.8,111.2 L495.5,340.2 L555.1,81.1 L614.7,91.9 L674.4,80.2 L734.0,67.8" fill="none" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="78.0" cy="120.4" r="3" fill="#1f4e8c"/>
+<circle cx="137.6" cy="120.4" r="3" fill="#1f4e8c"/>
+<circle cx="197.3" cy="101.7" r="3" fill="#1f4e8c"/>
+<circle cx="256.9" cy="122.3" r="3" fill="#1f4e8c"/>
+<circle cx="316.5" cy="103.8" r="3" fill="#1f4e8c"/>
+<circle cx="376.2" cy="101.7" r="3" fill="#1f4e8c"/>
+<circle cx="435.8" cy="111.2" r="3" fill="#1f4e8c"/>
+<circle cx="495.5" cy="340.2" r="3" fill="#1f4e8c"/>
+<circle cx="555.1" cy="81.1" r="3" fill="#1f4e8c"/>
+<circle cx="614.7" cy="91.9" r="3" fill="#1f4e8c"/>
+<circle cx="674.4" cy="80.2" r="3" fill="#1f4e8c"/>
+<circle cx="734.0" cy="67.8" r="3" fill="#1f4e8c"/>
+<circle cx="734.0" cy="67.8" r="5.5" fill="none" stroke="#1f4e8c" stroke-width="2.5"/>
+<rect x="82" y="45" width="75" height="25" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
+<line x1="88" y1="56" x2="110" y2="56" stroke="#1f4e8c" stroke-width="2.5"/>
+<text x="116" y="60" font-size="12" fill="#222222">Cl/Cd</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
+<text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cl / Cd</text>
+</svg><figcaption>Finesse au fil des itérations</figcaption></figure>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
+<rect width="760" height="420" fill="#ffffff"/>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Cd et Cl au fil des itérations</text>
+<line x1="78.0" y1="46" x2="78.0" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="78.0" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">0</text>
+<line x1="197.3" y1="46" x2="197.3" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="197.3" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">2.00</text>
+<line x1="316.5" y1="46" x2="316.5" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="316.5" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">4.00</text>
+<line x1="435.8" y1="46" x2="435.8" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="435.8" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">6.00</text>
+<line x1="555.1" y1="46" x2="555.1" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="555.1" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">8.00</text>
+<line x1="674.4" y1="46" x2="674.4" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="674.4" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">10.0</text>
+<line x1="78" y1="328.0" x2="734" y2="328.0" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="332.0" text-anchor="end" font-size="11" fill="#5a5a5a">-0.100</text>
+<line x1="78" y1="248.0" x2="734" y2="248.0" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="252.0" text-anchor="end" font-size="11" fill="#5a5a5a">0</text>
+<line x1="78" y1="168.1" x2="734" y2="168.1" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="172.1" text-anchor="end" font-size="11" fill="#5a5a5a">0.100</text>
+<line x1="78" y1="88.1" x2="734" y2="88.1" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="92.1" text-anchor="end" font-size="11" fill="#5a5a5a">0.200</text>
+<line x1="78" y1="248.0" x2="734" y2="248.0" stroke="#5a5a5a" stroke-width="1.2" stroke-dasharray="4 3"/>
+<rect x="78" y="46" width="656" height="316" fill="none" stroke="#5a5a5a" stroke-width="1.2"/>
+<path d="M78.0,207.4 L137.6,207.4 L197.3,207.5 L256.9,207.4 L316.5,207.5 L376.2,207.5 L435.8,204.8 L495.5,206.1 L555.1,207.6 L614.7,204.9 L674.4,207.8 L734.0,210.4" fill="none" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="78.0" cy="207.4" r="3" fill="#1f4e8c"/>
+<circle cx="137.6" cy="207.4" r="3" fill="#1f4e8c"/>
+<circle cx="197.3" cy="207.5" r="3" fill="#1f4e8c"/>
+<circle cx="256.9" cy="207.4" r="3" fill="#1f4e8c"/>
+<circle cx="316.5" cy="207.5" r="3" fill="#1f4e8c"/>
+<circle cx="376.2" cy="207.5" r="3" fill="#1f4e8c"/>
+<circle cx="435.8" cy="204.8" r="3" fill="#1f4e8c"/>
+<circle cx="495.5" cy="206.1" r="3" fill="#1f4e8c"/>
+<circle cx="555.1" cy="207.6" r="3" fill="#1f4e8c"/>
+<circle cx="614.7" cy="204.9" r="3" fill="#1f4e8c"/>
+<circle cx="674.4" cy="207.8" r="3" fill="#1f4e8c"/>
+<circle cx="734.0" cy="210.4" r="3" fill="#1f4e8c"/>
+<path d="M78.0,108.1 L137.6,108.1 L197.3,88.9 L256.9,110.0 L316.5,91.0 L376.2,88.9 L435.8,88.9 L495.5,340.2 L555.1,67.8 L614.7,67.8 L674.4,67.8 L734.0,67.8" fill="none" stroke="#c1440e" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="78.0" cy="108.1" r="3" fill="#c1440e"/>
+<circle cx="137.6" cy="108.1" r="3" fill="#c1440e"/>
+<circle cx="197.3" cy="88.9" r="3" fill="#c1440e"/>
+<circle cx="256.9" cy="110.0" r="3" fill="#c1440e"/>
+<circle cx="316.5" cy="91.0" r="3" fill="#c1440e"/>
+<circle cx="376.2" cy="88.9" r="3" fill="#c1440e"/>
+<circle cx="435.8" cy="88.9" r="3" fill="#c1440e"/>
+<circle cx="495.5" cy="340.2" r="3" fill="#c1440e"/>
+<circle cx="555.1" cy="67.8" r="3" fill="#c1440e"/>
+<circle cx="614.7" cy="67.8" r="3" fill="#c1440e"/>
+<circle cx="674.4" cy="67.8" r="3" fill="#c1440e"/>
+<circle cx="734.0" cy="67.8" r="3" fill="#c1440e"/>
+<rect x="82" y="45" width="55" height="42" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
+<line x1="88" y1="56" x2="110" y2="56" stroke="#1f4e8c" stroke-width="2.5"/>
+<text x="116" y="60" font-size="12" fill="#222222">Cd</text>
+<line x1="88" y1="73" x2="110" y2="73" stroke="#c1440e" stroke-width="2.5"/>
+<text x="116" y="77" font-size="12" fill="#222222">Cl</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
+<text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">coefficient</text>
+</svg><figcaption>Cd et Cl au fil des itérations</figcaption></figure>
+<table>
+<tr><th>itération</th><th>Cd</th><th>Cl</th><th>Cl/Cd</th><th>statut</th></tr>
+<tr><td>0</td><td>0.05081</td><td>0.17500</td><td>3.44</td><td>OK</td></tr>
+<tr><td>1</td><td>0.05081</td><td>0.17500</td><td>3.44</td><td>OK</td></tr>
+<tr><td>2</td><td>0.05071</td><td>0.19900</td><td>3.92</td><td>OK</td></tr>
+<tr><td>3</td><td>0.05082</td><td>0.17260</td><td>3.40</td><td>OK</td></tr>
+<tr><td>4</td><td>0.05072</td><td>0.19636</td><td>3.87</td><td>OK</td></tr>
+<tr><td>5</td><td>0.05071</td><td>0.19900</td><td>3.92</td><td>OK</td></tr>
+<tr><td>6</td><td>0.05407</td><td>0.19900</td><td>3.68</td><td>OK</td></tr>
+<tr><td>7</td><td>0.05240</td><td>-0.11531</td><td>-2.20</td><td>OK</td></tr>
+<tr><td>8</td><td>0.05060</td><td>0.22540</td><td>4.45</td><td>OK</td></tr>
+<tr><td>9</td><td>0.05396</td><td>0.22540</td><td>4.18</td><td>OK</td></tr>
+<tr><td>10</td><td>0.05033</td><td>0.22540</td><td>4.48</td><td>OK</td></tr>
+<tr><td>11 ⭐</td><td>0.04699</td><td>0.22540</td><td>4.80</td><td>OK</td></tr>
+</table>
+<h2>L'écoulement</h2>
+<blockquote>Visuels CFD non produits : case OpenFOAM absent du dossier exporté</blockquote>
+<h2>Ce que valent ces chiffres</h2>
+<p>Le modèle de turbulence <code>kOmegaSST</code> suppose la couche limite turbulente dès le bord d'attaque. À Re ≈ 4 × 10⁵, une bonne part de l'extrados est encore laminaire : <strong>la traînée est surestimée</strong>, d'un facteur qui peut approcher 2. Ces valeurs classent correctement des formes entre elles — ce qu'exige une optimisation — mais ne constituent pas une prédiction de traînée absolue. Pour un chiffre publiable, il faut un modèle avec transition laminaire-turbulent, ou une soufflerie.</p>
+<h2>Contenu du dossier</h2>
+<table>
+<tr><th>fichier</th><th>quoi</th></tr>
+<tr><td><code>geometry.stl</code></td><td>la géométrie, <strong>en mètres</strong>, telle que simulée</td></tr>
+<tr><td><code>profile_section.csv</code></td><td>section 2D en millimètres</td></tr>
+<tr><td><code>profile_section.dat</code></td><td>même section au format profil (XFOIL, XFLR5)</td></tr>
+<tr><td><code>design_params.yaml</code></td><td>les paramètres exacts, rejouables</td></tr>
+<tr><td><code>results.json</code></td><td>les coefficients</td></tr>
+<tr><td><code>report.html</code></td><td>ce rapport, autonome, pour un navigateur</td></tr>
+<tr><td><code>figures/</code></td><td>courbes et images</td></tr>
+<tr><td><code>logs/</code></td><td>journaux de chaque étape</td></tr>
+</table>
+<h3>Pas de fichier STEP</h3>
+<p>Cette géométrie a été produite par le calculateur interne, qui écrit directement un STL : sans noyau CAO, il ne peut pas générer de STEP. Deux façons d'en obtenir un :</p>
+<ol><li><strong>Depuis Fusion 360</strong> — copier <code>design_params.yaml</code> dans <code>configs/</code>, ouvrir le modèle, lancer <code>fusion/parametric_driver.py</code> (<em>Utilities → ADD-INS → Scripts and Add-Ins</em>). Le driver reconstruit exactement cette forme et exporte STEP <strong>et</strong> STL.</li>
+<li><strong>En repartant de la section</strong> — importer <code>profile_section.csv</code> comme nuage de points en CAO, y passer une spline, extruder sur l'envergure. C'est la voie à préférer pour de la conception : on récupère une géométrie propre et paramétrable, là où une conversion de STL ne donnerait qu'un solide facetté de plusieurs centaines de faces.</li></ol>
+<h2>Ouvrir les fichiers</h2>
+<pre>
+# la géométrie (STL en mètres)
+paraview geometry.stl
+
+# reprendre l'optimisation depuis ce design
+cp design_params.yaml configs/design_params.yaml
+python3 scripts/run_loop.py --max-iterations 20 \
+    --cfd-settings configs/cfd_settings_fast.yaml
+</pre>
+<hr/>
+<p>Exporté le 20/08/2026 à 13:37 UTC par <code>scripts/export_best.py</code>.</p>
+</body></html>
