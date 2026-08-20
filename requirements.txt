@@ -5,10 +5,6 @@
 
 # Configuration & validation (Phase 0)
 PyYAML==6.0.2            # lecture/écriture design_params.yaml & cfd_settings.yaml
-python-dotenv==1.0.1     # chargement du .env
-
-# Post-processing CFD (Phase 2)
-numpy==2.1.3             # lecture des forceCoeffs, moyennes de convergence
 
 # Agent / orchestrateur LLM (Phase 4)
 anthropic==0.39.0        # client API Claude
@@ -17,8 +13,18 @@ anthropic==0.39.0        # client API Claude
 pytest==8.3.3
 
 # ─────────────────────────────────────────────────────────────
-# NOTE : le driver Fusion 360 (fusion/parametric_driver.py) s'exécute
-# dans l'interpréteur Python embarqué de Fusion (module `adsk`) et
-# n'utilise AUCUNE de ces dépendances hors PyYAML (vendorisé si besoin).
+# CE QUI N'EST VOLONTAIREMENT PAS LÀ
+#
+# numpy : le post-traitement ne fait que des moyennes et des écarts-types
+#   sur quelques milliers de points. La bibliothèque standard suffit, et
+#   chaque dépendance en moins est une installation qui ne peut pas casser.
+#
+# python-dotenv : `pipeline.utils.load_env()` fait la même chose en vingt
+#   lignes. Le driver tourne dans l'interpréteur embarqué de Fusion, où
+#   l'on ne peut rien installer : moins il dépend de paquets externes,
+#   mieux il se porte.
+#
+# Le driver Fusion n'utilise d'ailleurs AUCUNE de ces dépendances — il
+# retombe sur un lecteur YAML minimal si PyYAML est absent.
 # OpenFOAM est une dépendance système, pas une dépendance pip.
 # ─────────────────────────────────────────────────────────────
