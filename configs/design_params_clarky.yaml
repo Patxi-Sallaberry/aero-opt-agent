@@ -1,9 +1,9 @@
-iteration: 1
+iteration: 0
 design_id: CLARK_Y_AIRFOIL
 parameterization: cst
 parameters:
   cst_upper_0:
-    value: 0.116455383
+    value: 0.12939487
     min: 0.08043163
     max: 0.1783581
     max_delta_pct: 10.0

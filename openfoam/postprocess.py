@@ -232,6 +232,30 @@ DEFAULT_MESH_LIMITS = {
     "max_aspect_ratio": 1000.0,
 }
 
+_SKEW_FACES_RE = re.compile(
+    r"([0-9]+)\s+highly\s+skew\s+faces?\s+detected", re.IGNORECASE
+)
+_FACES_RE = re.compile(r"^\s*faces:\s+(\d+)", re.MULTILINE)
+_FAILED_LINE_RE = re.compile(r"^\s*\*\*\*(.*)$", re.MULTILINE)
+
+# Un défaut de skewness peut être TOLÉRÉ s'il est à la fois local et modéré.
+#
+# Le cas qui a imposé cette nuance : un Clark Y, dont le bord de fuite est
+# épaissi de 0,0012 corde. Aucun des deux préréglages ne place assez de
+# cellules en travers d'un intervalle aussi mince, et snappyHexMesh y écrase
+# quelques cellules — TROIS faces sur 258 814, soit un millième de pour cent.
+# Refuser le maillage entier pour cela arrêtait la boucle dès l'itération zéro,
+# alors que le solveur converge sans peine et que l'écriture d'OpenFOAM
+# elle-même est prudente : ces faces « PEUVENT dégrader la qualité ».
+#
+# Les deux conditions comptent. Un maillage dont un dixième des faces est
+# gauchi est franchement mauvais, même modérément ; un maillage dont trois
+# faces sont à 30 de skewness a une cellule retournée quelque part. On exige
+# donc que le défaut soit à la fois rare ET contenu.
+SKEW_TOLERATED_FRACTION = 1e-4   # un dix-millième des faces
+SKEW_TOLERATED_COUNT = 20        # et jamais plus de vingt faces
+SKEW_HARD_CEILING = 10.0         # au delà, la cellule est dégénérée
+
 
 def _search_float(pattern: re.Pattern[str], text: str) -> float | None:
     match = pattern.search(text)
@@ -277,18 +301,40 @@ def read_check_mesh(
 
     text = log_path.read_text(encoding="utf-8", errors="replace")
     cells_match = _CELLS_RE.search(text)
+    faces_match = _FACES_RE.search(text)
+    skew_faces = _SKEW_FACES_RE.search(text)
     info: dict[str, Any] = {
         "mesh_checked": True,
         "n_cells": int(cells_match.group(1)) if cells_match else None,
+        "n_faces": int(faces_match.group(1)) if faces_match else None,
+        "n_skew_faces": int(skew_faces.group(1)) if skew_faces else None,
         "max_non_orthogonality": _search_float(_NON_ORTHO_RE, text),
         "max_skewness": _search_float(_SKEWNESS_RE, text),
         "max_aspect_ratio": _search_float(_ASPECT_RE, text),
     }
 
+    tolerated = _skewness_is_local(info, thresholds["max_skewness"])
+    info["skewness_tolerated"] = tolerated
+
     problems: list[str] = []
+    warnings: list[str] = []
+
     failed = _FAILED_CHECKS_RE.search(text)
     if failed:
-        problems.append(f"checkMesh signale {failed.group(1)} contrôle(s) en échec")
+        # Quand le SEUL contrôle en échec est celui de la skewness et que le
+        # défaut est négligeable, on ne rejette pas le maillage — mais on le
+        # dit. Passer sous silence un contrôle en échec serait exactement le
+        # genre de silence que le reste du système s'interdit.
+        if tolerated and _only_skewness_failed(text):
+            warnings.append(
+                f"{info['n_skew_faces']} face(s) gauchie(s) sur "
+                f"{info['n_faces']} (skewness {info['max_skewness']:g}) — "
+                f"défaut local, toléré"
+            )
+        else:
+            problems.append(
+                f"checkMesh signale {failed.group(1)} contrôle(s) en échec"
+            )
     elif "Mesh OK" not in text:
         problems.append("verdict de checkMesh illisible dans le journal")
 
@@ -299,14 +345,20 @@ def read_check_mesh(
     ):
         value = info[key]
         limit = thresholds[key]
-        if value is not None and value > limit:
-            problems.append(f"{label} {value:g} au dessus du seuil {limit:g}")
+        if value is None or value <= limit:
+            continue
+        if key == "max_skewness" and tolerated:
+            continue
+        problems.append(f"{label} {value:g} au dessus du seuil {limit:g}")
 
     info["mesh_ok"] = not problems
     info["mesh_problems"] = problems
-    info["mesh_message"] = (
-        "checkMesh : maillage valide ("
-        + ", ".join(
+    info["mesh_warnings"] = warnings
+
+    if problems:
+        info["mesh_message"] = "checkMesh : " + " | ".join(problems)
+    else:
+        measures = ", ".join(
             f"{label} {info[key]:g}"
             for key, label in (
                 ("max_non_orthogonality", "non-ortho"),
@@ -315,11 +367,38 @@ def read_check_mesh(
             )
             if info[key] is not None
         )
-        + ")"
-        if not problems
-        else "checkMesh : " + " | ".join(problems)
-    )
+        info["mesh_message"] = (
+            f"checkMesh : maillage valide ({measures})"
+            + (f" — {warnings[0]}" if warnings else "")
+        )
     return info
+
+
+def _skewness_is_local(info: Mapping[str, Any], limit: float) -> bool:
+    """Le défaut de skewness est-il assez rare ET assez contenu pour passer ?"""
+    value = info.get("max_skewness")
+    count = info.get("n_skew_faces")
+    total = info.get("n_faces")
+    if value is None or value <= limit:
+        return False  # rien à tolérer
+    if count is None or total is None or total <= 0:
+        return False  # sans l'étendue, on ne peut pas juger : on refuse
+    if value > SKEW_HARD_CEILING:
+        return False
+    return count <= SKEW_TOLERATED_COUNT and count / total <= SKEW_TOLERATED_FRACTION
+
+
+def _only_skewness_failed(text: str) -> bool:
+    """Les lignes `***` de checkMesh ne concernent-elles QUE la skewness ?
+
+    checkMesh préfixe de trois astérisques chaque contrôle en échec. Si une
+    cellule à volume négatif ou une face ouverte s'y trouve aussi, le maillage
+    est cassé pour de bon et la tolérance sur la skewness n'a pas à s'appliquer.
+    """
+    lignes = [m.group(1).strip() for m in _FAILED_LINE_RE.finditer(text)]
+    if not lignes:
+        return False
+    return all("skew" in ligne.lower() for ligne in lignes)
 
 
 def read_solver_convergence(log_dir: Path, solver: str) -> dict[str, Any]:

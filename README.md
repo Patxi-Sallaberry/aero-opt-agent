@@ -234,7 +234,7 @@ agent/
 scripts/
   run_loop.py                    boucle d'optimisation
 data/iterations/                 archives (non versionné)
-tests/                           431 tests
+tests/                           700 tests
 ```
 
 ---
@@ -260,6 +260,27 @@ Trois familles de règles, appliquées par `pipeline/utils.py` :
    budget redevient symétrique — ce qu'une règle de sécurité doit être.
 
 Entre deux itérations, seule `value` peut changer.
+
+### Deux paramétrisations dans le même contrat
+
+Le champ facultatif `parameterization` vaut `naca` (défaut, v1.0) ou `cst`
+(v1.5). Il ne fait pas foi à lui seul : la paramétrisation est **reconnue aux
+paramètres présents**, et confrontée à celle qui est déclarée. Un fichier
+écrit à la main dont l'en-tête ment sur son contenu est refusé sur-le-champ,
+plutôt que de produire une forme silencieusement fausse trois étapes plus loin.
+
+| | `naca` | `cst` |
+|---|---|---|
+| Paramètres de forme | `thickness`, `camber` | `cst_upper_0…N`, `cst_lower_0…N` |
+| Paramètres physiques | `chord`, `span`, `aoa` | identiques |
+| Épaisseur et cambrure | données en entrée | **mesurées** sur la forme reconstruite |
+
+Le bloc facultatif `provenance` porte ce qui décrit la forme sans être une
+variable d'optimisation : le fichier d'origine, l'ordre CST, l'incidence
+retirée à l'ingestion, et les **ordonnées de bord de fuite**. Ces dernières y
+vivent parce que le contrat exige `min < max` — une grandeur figée n'a pas sa
+place dans `parameters` — et sans elles un profil à bord de fuite ouvert serait
+reconstruit fermé.
 
 ```bash
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
