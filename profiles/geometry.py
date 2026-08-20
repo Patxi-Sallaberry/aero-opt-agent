@@ -146,6 +146,58 @@ def cst_contour(
     }
 
 
+#: Épaisseur minimale exigée d'un profil reconstruit, en fraction de corde.
+#: Un demi pour mille : en deçà, la forme n'est plus maillable — snappyHexMesh
+#: n'a plus de place entre les deux surfaces — et n'est de toute façon plus une
+#: forme qu'on voudrait fabriquer.
+MIN_RELATIVE_THICKNESS = 5e-4
+
+
+def check_shape(
+    upper_coefficients: Sequence[float],
+    lower_coefficients: Sequence[float],
+    trailing_edges: tuple[float, float] = (0.0, 0.0),
+    minimum: float = MIN_RELATIVE_THICKNESS,
+    stations: int = 200,
+) -> str | None:
+    """Vérifie que les coefficients décrivent encore un profil. None si oui.
+
+    Indispensable dès lors qu'un optimiseur fait varier les coefficients UN À
+    UN. Rien dans la formulation CST n'empêche l'intrados de passer au dessus
+    de l'extrados : c'est une somme de polynômes, pas un solide, et une seule
+    coordonnée poussée trop loin suffit à retourner la forme quelque part au
+    milieu de la corde.
+
+    Sans ce contrôle, la chaîne écrirait un STL aux facettes croisées.
+    snappyHexMesh, lui, ne refuserait pas franchement — il produirait un
+    maillage aberrant, le solveur convergerait vers des coefficients
+    plausibles, et l'optimiseur poursuivrait une forme qui n'existe pas.
+    """
+    profile = cst_profile(upper_coefficients, lower_coefficients, trailing_edges)
+    worst, worst_at = float("inf"), 0.0
+    # Le nez et le bord de fuite ont une épaisseur nulle par construction : les
+    # inclure ferait échouer tout profil. On juge l'intérieur de la corde.
+    for psi in cosine_stations(stations):
+        if not 0.01 <= psi <= 0.99:
+            continue
+        thickness = profile.thickness(psi)
+        if thickness < worst:
+            worst, worst_at = thickness, psi
+
+    if worst >= minimum:
+        return None
+    if worst < 0.0:
+        return (
+            f"les deux surfaces se croisent à {worst_at:.1%} de corde "
+            f"(épaisseur {worst:+.2e}) : les coefficients ne décrivent plus un "
+            f"profil mais une forme retournée"
+        )
+    return (
+        f"épaisseur de {worst:.2e} corde à {worst_at:.1%}, sous le minimum de "
+        f"{minimum:.0e} : la forme est trop fine pour être maillée"
+    )
+
+
 def cst_measures(
     upper_coefficients: Sequence[float],
     lower_coefficients: Sequence[float],

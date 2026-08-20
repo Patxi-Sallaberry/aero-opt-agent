@@ -953,6 +953,7 @@ def _cst_plan(
         from profiles.geometry import (  # type: ignore[import-not-found]
             CST_PROFILE_POINTS,
             ContourError,
+            check_shape,
             collect_coefficients,
             cst_contour,
             cst_measures,
@@ -993,6 +994,15 @@ def _cst_plan(
     try:
         upper_coefficients = collect_coefficients(values, CST_PREFIXES[0])
         lower_coefficients = collect_coefficients(values, CST_PREFIXES[1])
+
+        # Contrôlé AVANT d'écrire quoi que ce soit : un optimiseur qui fait
+        # varier les coefficients un à un peut retourner la forme, et il vaut
+        # mieux une itération franchement en échec qu'un STL aux facettes
+        # croisées dont tout l'aval s'accommoderait.
+        defect = check_shape(upper_coefficients, lower_coefficients, trailing_edges)
+        if defect:
+            raise DriverError(STATUS_REBUILD_FAILED, defect)
+
         profile = cst_contour(
             upper_coefficients, lower_coefficients, chord_cm,
             trailing_edges, aoa_rad,

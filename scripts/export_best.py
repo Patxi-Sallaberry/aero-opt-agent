@@ -121,7 +121,11 @@ def write_profile_section(design: Mapping[str, Any], output: Path) -> dict:
     aérodynamiques. L'incidence est déjà appliquée : c'est la section
     réellement simulée.
     """
-    plan = profile_from_parameters(design["parameters"])
+    plan = profile_from_parameters(
+        design["parameters"],
+        design.get("parameterization"),
+        design.get("provenance"),
+    )
     upper = [(x * 10.0, y * 10.0) for x, y in plan["profile"]["upper"]]  # cm -> mm
     lower = [(x * 10.0, y * 10.0) for x, y in plan["profile"]["lower"]]
 
@@ -602,6 +606,43 @@ def render_paraview(
 # ─────────────────────────────────────────────────────────────────────────────
 # Lecture physique
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def shape_values(design: Mapping[str, Any]) -> dict[str, float]:
+    """Valeurs des paramètres, complétées des grandeurs de forme mesurées.
+
+    La lecture physique raisonne en épaisseur et en cambrure, pas en
+    coefficients de Bernstein — et elle a raison : « le profil s'est aminci de
+    12 % à 9,4 % » se comprend, « A₃ est passé de 0,151 à 0,138 » ne dit rien
+    à personne.
+
+    Sur un profil NACA ces deux grandeurs sont des paramètres d'entrée et se
+    lisent directement. Sur un profil CST elles n'existent nulle part : il faut
+    les MESURER sur la forme reconstruite. Sans cela, tout le commentaire
+    physique disparaîtrait du rapport dès qu'on optimise un profil issu d'un
+    fichier — c'est-à-dire dans le cas même que la v1.5 rend possible.
+    """
+    parameters = design.get("parameters") or {}
+    values = {
+        name: float(spec["value"])
+        for name, spec in parameters.items()
+        if isinstance(spec, Mapping) and "value" in spec
+    }
+    if "thickness" in values and "camber" in values:
+        return values
+
+    try:
+        plan = profile_from_parameters(
+            parameters,
+            design.get("parameterization"),
+            design.get("provenance"),
+        )
+    except Exception:
+        return values
+
+    values.setdefault("thickness", float(plan["thickness"]))
+    values.setdefault("camber", float(plan["camber"]))
+    return values
 
 
 def explain_physics(
@@ -1464,8 +1505,8 @@ def export_best(
         compared_results = results
 
     notes = explain_physics(
-        {n: float(s["value"]) for n, s in (initial_design or design)["parameters"].items()},
-        {n: float(s["value"]) for n, s in design["parameters"].items()},
+        shape_values(initial_design or design),
+        shape_values(design),
         first_results, compared_results, cp,
     )
 

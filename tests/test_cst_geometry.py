@@ -26,7 +26,7 @@ import pytest
 
 from fusion import parametric_driver as driver
 from geometry import get_backend
-from profiles.cst import fit_profile
+from profiles.cst import DEFAULT_ORDER, fit_profile
 from profiles.geometry import (
     ContourError,
     collect_coefficients,
@@ -309,7 +309,7 @@ def test_le_backend_interne_ecrit_un_stl_depuis_des_coefficients(tmp_path):
 def test_le_compte_rendu_annonce_la_parametrisation(tmp_path):
     geometry, _, _ = build_geometry(tmp_path)
     assert geometry.geometry["parameterization"] == "cst"
-    assert geometry.geometry["cst_order"] == 7
+    assert geometry.geometry["cst_order"] == DEFAULT_ORDER
 
 
 def test_le_backend_rend_le_contour_ordonne_en_metres(tmp_path):

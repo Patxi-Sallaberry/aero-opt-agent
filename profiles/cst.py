@@ -51,11 +51,24 @@ Point = tuple[float, float]
 CLASS_ROUND_NOSE = 0.5
 CLASS_SHARP_TAIL = 1.0
 
-#: Ordre par défaut. L'ordre n donne n+1 coefficients par surface ; 7 en donne
-#: donc 8, soit 16 pour le profil — dans la fourchette de 6 à 12 par surface
-#: que recommande le document, et un compromis éprouvé entre fidélité et
-#: nombre de variables à optimiser.
-DEFAULT_ORDER = 7
+#: Ordre par défaut. L'ordre n donne n+1 coefficients par surface ; 11 en donne
+#: donc 12, soit 24 pour le profil — le haut de la fourchette de 6 à 12 par
+#: surface que recommande le document.
+#:
+#: Cette valeur a d'abord été fixée à 7, calibrée sur des NACA à quatre
+#: chiffres. C'était une erreur de méthode : un NACA est une famille à TROIS
+#: paramètres, que huit coefficients épousent trivialement. Confronté à de
+#: vrais profils — Clark Y, E387, S1223 tirés de la base UIUC —, l'ordre 7
+#: échoue à la porte de reconstruction sur les trois.
+#:
+#: L'ordre 11 a été retenu par validation croisée : on ajuste sur un point sur
+#: deux et l'on mesure l'écart sur les points retenus. Jusqu'à environ cinq
+#: points par coefficient, l'erreur hors échantillon suit celle d'ajustement —
+#: l'ordre capte de la forme. En deçà, les deux divergent : sur l'E387, l'ordre
+#: 13 affiche 8,6 × 10⁻⁴ sur ses propres points et 1,12 × 10⁻³ sur ceux qu'il
+#: n'a pas vus. Il épouse alors le bruit du fichier, et l'amélioration affichée
+#: est un mirage.
+DEFAULT_ORDER = 11
 
 #: Régularisation de Tikhonov, relative à la trace du système normal. Elle ne
 #: déforme pas l'ajustement de façon perceptible, mais empêche le système de
@@ -393,6 +406,8 @@ class ReconstructionError:
     upper_max: float
     lower_max: float
     max_vertical_error: float = 0.0
+    n_points: int = 0
+    errors: list[float] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
@@ -404,7 +419,18 @@ class ReconstructionError:
             "upper_max": self.upper_max,
             "lower_max": self.lower_max,
             "max_vertical_error": self.max_vertical_error,
+            "n_points": self.n_points,
         }
+
+    def outliers(self, threshold: float) -> int:
+        """Nombre de points au delà d'un seuil.
+
+        Distingue un ajustement qui rate la forme partout d'un ajustement bon
+        partout sauf en un point — deux situations que le seul écart maximal
+        confond, et qui n'appellent pas la même réaction : la première est un
+        modèle inadapté, la seconde le plus souvent un fichier bruité.
+        """
+        return sum(1 for value in self.errors if value > threshold)
 
 
 def _distance_to_segment(point: Point, start: Point, end: Point) -> float:
@@ -484,4 +510,6 @@ def reconstruction_error(
         upper_max=upper_max,
         lower_max=lower_max,
         max_vertical_error=vertical_max,
+        n_points=len(values),
+        errors=values,
     )

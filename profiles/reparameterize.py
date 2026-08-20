@@ -36,6 +36,9 @@ from profiles.cst import (  # noqa: E402
     DEFAULT_ORDER,
     CSTProfile,
     ReconstructionError,
+    bernstein,
+    class_function,
+    cosine_stations,
     fit_profile,
     reconstruction_error,
 )
@@ -63,18 +66,80 @@ MAX_ERROR_WARN = 3e-4
 MEAN_ERROR_REJECT = 1e-4
 MEAN_ERROR_WARN = 6e-5
 
-#: Amplitude minimale accordée à un coefficient pour l'optimisation. Sans ce
-#: plancher, un coefficient proche de zéro serait borné dans un intervalle
-#: quasi nul et l'optimiseur ne pourrait plus y toucher.
-COEFFICIENT_FLOOR = 0.02
+#: Déplacement maximal que l'optimiseur peut imprimer à une surface en faisant
+#: varier UN coefficient, en fraction de corde. C'est de là que se déduisent
+#: les bornes, et non de la valeur du coefficient lui-même.
+#:
+#: La distinction est essentielle. Sur un profil réel bien ajusté, les
+#: coefficients ne sont pas tous du même ordre : le Clark Y à l'ordre 11 en a
+#: qui valent 0,13 et d'autres 3,27, la forme tenant par compensation entre
+#: grands termes. Des bornes proportionnelles — « ±50 % de sa valeur » —
+#: donneraient au premier une marge de ±0,065 et au second de ±1,63, soit près
+#: de 65 % de corde de déplacement : la première sonde de l'optimiseur
+#: détruirait le profil.
+#:
+#: L'effet géométrique d'une variation δ du coefficient i vaut exactement
+#: max_ψ [C(ψ)·Bᵢ(ψ)] · δ. On inverse donc la relation : chaque coefficient
+#: reçoit la marge qui lui donne la MÊME autorité géométrique que les autres.
+COEFFICIENT_SHAPE_BUDGET = 0.015
 
-#: Demi-amplitude des bornes, en proportion de l'échelle du coefficient.
-COEFFICIENT_SPAN = 0.5
+#: Les coefficients des DEUX extrémités reçoivent moins d'autorité que ceux du
+#: milieu, pour la même raison de fond : il y a moins de place.
+#:
+#: A₀ gouverne le rayon de bord d'attaque (r = A₀²/2) — un nez qui s'aiguise
+#: fait décrocher brutalement, un nez qui s'arrondit trop cesse d'être un
+#: profil. Le dernier coefficient gouverne l'angle de bord de fuite, là où les
+#: deux surfaces se rejoignent : l'épaisseur y tend vers zéro, et une autorité
+#: nominale suffit à faire passer l'intrados au dessus de l'extrados. Mesuré :
+#: avec le budget courant, ce sont les deux SEULES bornes sur quarante-huit
+#: qui produisaient un profil invalide.
+EDGE_SHAPE_BUDGET = 0.006
 
-#: A₀ gouverne le rayon de bord d'attaque (r = A₀²/2). On lui laisse une marge
-#: plus étroite : un nez qui s'aiguise fait décrocher brutalement, et un nez
-#: qui s'arrondit trop cesse d'être un profil.
-LEADING_COEFFICIENT_SPAN = 0.25
+#: Plancher d'amplitude, en unités de coefficient. Sans lui, un coefficient
+#: dont l'autorité géométrique serait énorme se retrouverait enfermé dans un
+#: intervalle si étroit que l'optimiseur ne pourrait plus y toucher.
+COEFFICIENT_FLOOR = 0.01
+
+#: Ordres explorés quand celui qu'on a demandé ne franchit pas la porte.
+CANDIDATE_ORDERS = (5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+
+#: Points par coefficient exigés au minimum. Un ajustement à moins de trois
+#: points par inconnue épouse le bruit du fichier autant que sa forme, et le
+#: gain affiché sur l'écart de reconstruction est alors trompeur : la courbe
+#: passe mieux par LES POINTS sans mieux décrire LE PROFIL. C'est ce garde-fou
+#: qui empêche de « résoudre » un fichier grossier en montant l'ordre.
+MIN_POINTS_PER_COEFFICIENT = 3.0
+
+
+def suggest_order(
+    upper: list[tuple[float, float]],
+    lower: list[tuple[float, float]],
+    max_reject: float = MAX_ERROR_REJECT,
+    candidates: tuple[int, ...] = CANDIDATE_ORDERS,
+) -> int | None:
+    """Ordre le plus bas qui franchirait la porte, ou None s'il n'y en a pas.
+
+    Un refus sans suite est un cul-de-sac : l'utilisateur sait que son profil
+    est rejeté, pas quoi faire. L'ajustement étant linéaire, l'essai coûte
+    quelques millisecondes — autant le faire et rendre le refus actionnable.
+
+    L'exploration s'arrête là où le nombre de points ne justifie plus le nombre
+    d'inconnues. Proposer un ordre 15 sur un fichier de trente points par
+    surface reviendrait à conseiller de surajuster.
+    """
+    for order in sorted(candidates):
+        limit = min(len(upper), len(lower)) / (order + 1)
+        if limit < MIN_POINTS_PER_COEFFICIENT:
+            return None
+        try:
+            fitted = fit_profile(upper, lower, order)
+        except ValueError:
+            continue
+        error = reconstruction_error(fitted, upper, lower)
+        accepted, _, _ = check_reconstruction(error, max_reject=max_reject)
+        if accepted:
+            return order
+    return None
 
 STATUS_OK = "OK"
 STATUS_INGESTION_FAILED = "INGESTION_ECHOUEE"
@@ -133,12 +198,23 @@ def check_reconstruction(
     warnings: list[str] = []
 
     if error.max_error > max_reject:
+        beyond = error.outliers(max_reject)
+        localized = (
+            f" — {beyond} point sur {error.n_points} dépasse le seuil, le reste "
+            f"de la forme est bien décrit ; un fichier trop grossier près du "
+            f"bord d'attaque produit exactement cette signature"
+            if beyond == 1 and error.n_points
+            else f" — {beyond} points sur {error.n_points} dépassent le seuil"
+            if error.n_points
+            else ""
+        )
         errors.append(
             f"écart maximal de {error.max_error:.2e} corde "
             f"({error.max_error * 100:.4f} % c) à {error.max_error_position:.1%} "
             f"de corde sur l'{error.max_error_surface}, au delà du seuil de "
             f"{max_reject:.0e} : la forme reconstruite n'est pas celle du "
             f"fichier, et optimiser depuis là porterait sur autre chose"
+            + localized
         )
     elif error.max_error > max_warn:
         warnings.append(
@@ -164,17 +240,26 @@ def check_reconstruction(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _coefficient_bounds(
-    value: float, span: float = COEFFICIENT_SPAN
-) -> tuple[float, float]:
-    """Bornes autour d'un coefficient ajusté.
+def coefficient_authority(order: int, index: int, stations: int = 400) -> float:
+    """max_ψ [C(ψ)·Bᵢ(ψ)] — déplacement de surface par unité de coefficient.
 
-    L'échelle est plafonnée par le bas : un coefficient nul enfermé dans des
-    bornes nulles serait gelé, et l'optimiseur perdrait une variable sans le
-    savoir.
+    Mesure ce qu'un coefficient PEUT faire à la forme, indépendamment de ce
+    qu'il vaut. Les coefficients du milieu de corde ont une autorité élevée,
+    ceux des extrémités une autorité faible — la fonction de classe s'y annule.
     """
-    scale = max(abs(value), COEFFICIENT_FLOOR)
-    return value - span * scale, value + span * scale
+    return max(
+        class_function(psi) * bernstein(order, index, psi)
+        for psi in cosine_stations(stations)
+    )
+
+
+def _coefficient_bounds(
+    value: float, order: int, index: int, budget: float = COEFFICIENT_SHAPE_BUDGET
+) -> tuple[float, float]:
+    """Bornes donnant au coefficient une autorité géométrique de `budget`."""
+    authority = coefficient_authority(order, index)
+    span = max(budget / authority, COEFFICIENT_FLOOR) if authority > 0 else COEFFICIENT_FLOOR
+    return value - span, value + span
 
 
 def build_design_params(
@@ -199,11 +284,11 @@ def build_design_params(
 
     for label, surface in (("upper", fitted.upper), ("lower", fitted.lower)):
         for index, coefficient in enumerate(surface.coefficients):
-            # A₀ tient le rayon de bord d'attaque : sa marge est plus étroite.
-            span_factor = (
-                LEADING_COEFFICIENT_SPAN if index == 0 else COEFFICIENT_SPAN
+            edge = index in (0, surface.order)
+            budget = EDGE_SHAPE_BUDGET if edge else COEFFICIENT_SHAPE_BUDGET
+            low, high = _coefficient_bounds(
+                coefficient, surface.order, index, budget
             )
-            low, high = _coefficient_bounds(coefficient, span_factor)
             parameters[f"cst_{label}_{index}"] = {
                 "value": round(coefficient, 8),
                 "min": round(low, 8),
@@ -316,9 +401,19 @@ def reparameterize(
     warnings.extend(gate_warnings)
 
     if not accepted and strict:
+        better = suggest_order(profile.upper, profile.lower, max_reject)
+        remedy = (
+            f" — l'ordre {better} franchirait la porte : relancer avec "
+            f"--order {better}"
+            if better is not None and better != order
+            else " — aucun ordre raisonnable ne franchit la porte sur ce "
+                 "fichier : il est trop grossièrement échantillonné pour la "
+                 "précision demandée. Fournir un fichier plus dense, ou "
+                 "assouplir le seuil avec --max-error en connaissance de cause"
+        )
         return ReparameterizationResult(
             False, STATUS_GATE_REJECTED,
-            "reconstruction refusée : " + " | ".join(gate_errors),
+            "reconstruction refusée : " + " | ".join(gate_errors) + remedy,
             profile=profile, fitted=fitted, error=error, warnings=warnings,
         )
     if not accepted:

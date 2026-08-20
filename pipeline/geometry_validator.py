@@ -88,6 +88,43 @@ def fingerprint(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _thickness_ratio(
+    design: Mapping[str, Any], params: Mapping[str, Any]
+) -> float | None:
+    """Épaisseur relative du profil, quelle que soit sa paramétrisation.
+
+    En NACA elle est donnée : c'est un paramètre d'entrée. En CST elle est
+    mesurée sur la forme reconstruite — les coefficients ne la portent pas
+    explicitement. Sans cette seconde voie, la contrainte d'épaisseur minimale
+    serait silencieusement abandonnée dès qu'on optimise un profil issu d'un
+    fichier, c'est-à-dire précisément là où l'optimiseur peut le plus l'amincir.
+    """
+    if "thickness" in params:
+        return float(params["thickness"]["value"])
+
+    try:
+        from profiles.geometry import collect_coefficients, cst_measures
+
+        values = {
+            name: float(spec["value"])
+            for name, spec in params.items()
+            if str(name).startswith(("cst_upper_", "cst_lower_"))
+        }
+        if not values:
+            return None
+        provenance = design.get("provenance") or {}
+        return cst_measures(
+            collect_coefficients(values, "cst_upper_"),
+            collect_coefficients(values, "cst_lower_"),
+            (
+                float(provenance.get("trailing_edge_upper", 0.0) or 0.0),
+                float(provenance.get("trailing_edge_lower", 0.0) or 0.0),
+            ),
+        )["thickness"]
+    except Exception:
+        return None
+
+
 def _check_thickness(
     bbox: Mapping[str, float], design: Mapping[str, Any], report: dict
 ) -> list[str]:
@@ -109,8 +146,10 @@ def _check_thickness(
         # L'unité de la corde est lue, jamais supposée : un modèle décrit en
         # centimètres ou en pouces donnerait sinon un verdict absurde.
         chord_mm = _length_m(params["chord"], "chord") * 1000.0
-        ratio = float(params["thickness"]["value"])
+        ratio = _thickness_ratio(design, params)
     except (KeyError, TypeError, ValueError, CaseBuildError):
+        return problems
+    if ratio is None:
         return problems
 
     thickness_mm = ratio * chord_mm

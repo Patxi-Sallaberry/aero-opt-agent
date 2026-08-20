@@ -469,7 +469,11 @@ def expected_bounding_box(design: Mapping[str, Any]) -> dict[str, float] | None:
         return None
 
     try:
-        plan = profile_from_parameters(design["parameters"])
+        plan = profile_from_parameters(
+            design["parameters"],
+            design.get("parameterization"),
+            design.get("provenance"),
+        )
     except Exception:
         return None
 
