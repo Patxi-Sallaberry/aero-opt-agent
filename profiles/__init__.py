@@ -16,6 +16,16 @@ l'image de `GeometryBackend.generate`. Un fichier douteux ne doit pas
 interrompre une boucle d'optimisation.
 """
 
+from profiles.cst import (  # noqa: F401
+    DEFAULT_ORDER,
+    CSTProfile,
+    CSTSurface,
+    ReconstructionError,
+    cosine_stations,
+    fit_profile,
+    fit_surface,
+    reconstruction_error,
+)
 from profiles.loader import (  # noqa: F401
     FORMAT_CSV,
     FORMAT_LEDNICER,
@@ -26,10 +36,28 @@ from profiles.loader import (  # noqa: F401
     load_profile,
 )
 from profiles.profile import Profile, ProfileTransform  # noqa: F401
+from profiles.reparameterize import (  # noqa: F401
+    ReparameterizationResult,
+    build_design_params,
+    check_reconstruction,
+    reparameterize,
+)
 from profiles.validation import ValidationReport, validate_profile  # noqa: F401
 
 __all__ = [
+    "DEFAULT_ORDER",
+    "CSTProfile",
+    "CSTSurface",
     "FORMAT_CSV",
+    "ReconstructionError",
+    "ReparameterizationResult",
+    "build_design_params",
+    "check_reconstruction",
+    "cosine_stations",
+    "fit_profile",
+    "fit_surface",
+    "reconstruction_error",
+    "reparameterize",
     "FORMAT_LEDNICER",
     "FORMAT_SELIG",
     "FORMAT_UNKNOWN",

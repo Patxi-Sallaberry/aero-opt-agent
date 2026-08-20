@@ -302,12 +302,44 @@ def normalize(
         ry = px * sin_a + py * cos_a
         return rx / chord, ry / chord
 
+    normalized_upper = [apply(p) for p in upper]
+    normalized_lower = [apply(p) for p in lower]
+
     transform = ProfileTransform(
         translation=(nose[0], nose[1]),
         rotation_deg=math.degrees(angle),
         scale=chord,
     )
-    return [apply(p) for p in upper], [apply(p) for p in lower], transform
+    return normalized_upper, normalized_lower, transform
+
+
+def drop_nose_fold(
+    upper: list[Point], lower: list[Point]
+) -> tuple[list[Point], list[Point], str | None]:
+    """Écarte les points passés DERRIÈRE le bord d'attaque.
+
+    Sur un profil cambré, la surface contourne le nez et quelques points s'y
+    retrouvent à une abscisse légèrement négative — de l'ordre de 10⁻⁵ de
+    corde, invisible à l'œil. C'est un micro-repli : la surface cesse d'y être
+    une fonction de l'abscisse, ce que la validation refuse par ailleurs.
+
+    Il faut les écarter, et pas seulement pour la forme. Une paramétrisation
+    CST impose ζ(0) = 0 et n'est pas définie pour ψ < 0 : ces points seraient
+    structurellement inatteignables, avec une erreur de reconstruction de
+    l'ordre de 3 × 10⁻³ de corde qu'AUCUN ordre ne réduirait — le genre de
+    plafond qui fait conclure à tort que la méthode ne convient pas.
+    """
+    def keep(surface: list[Point]) -> list[Point]:
+        return [surface[0]] + [p for p in surface[1:] if p[0] > 0.0]
+
+    kept_upper, kept_lower = keep(upper), keep(lower)
+    removed = (len(upper) - len(kept_upper)) + (len(lower) - len(kept_lower))
+    if not removed:
+        return upper, lower, None
+    return kept_upper, kept_lower, (
+        f"{removed} point(s) écarté(s) en amont du bord d'attaque : la surface "
+        f"y contourne le nez et cesse d'être une fonction de l'abscisse"
+    )
 
 
 def close_leading_edge(
@@ -472,6 +504,10 @@ def load_profile(
         upper, lower, transform = normalize(upper, lower)
     except ValueError as exc:
         return IngestionResult(False, STATUS_DEGENERATE, message=str(exc))
+
+    upper, lower, note = drop_nose_fold(upper, lower)
+    if note:
+        warnings.append(note)
 
     upper, lower, note = close_trailing_edge(upper, lower, close_te_below)
     if note:

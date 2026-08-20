@@ -45,6 +45,24 @@ TOP_LEVEL_KEYS: tuple[str, ...] = (
     "objectives",
 )
 
+# Clés racine FACULTATIVES, introduites par la v1.5. Un fichier v1.0 qui ne les
+# porte pas reste valide : leur absence vaut « paramétrisation NACA », qui est
+# ce que la v1.0 sait faire.
+OPTIONAL_TOP_LEVEL_KEYS: tuple[str, ...] = (
+    # Comment les paramètres décrivent la forme. La géométrie doit le savoir
+    # pour reconstruire : des coefficients CST et des paramètres NACA ne se
+    # lisent pas de la même façon.
+    "parameterization",
+    # D'où vient ce design : fichier d'origine, ordre de l'ajustement,
+    # incidence retirée. Purement informatif, mais c'est ce qui permet de
+    # remonter d'un résultat à ce qui l'a produit.
+    "provenance",
+)
+
+#: Paramétrisations reconnues. `naca` est celle de la v1.0.
+PARAMETERIZATIONS: tuple[str, ...] = ("naca", "cst")
+DEFAULT_PARAMETERIZATION = "naca"
+
 PARAMETER_KEYS: tuple[str, ...] = (
     "value",
     "min",
@@ -324,10 +342,26 @@ def _validate_structure(data: Mapping[str, Any], report: ValidationReport) -> No
     missing = [k for k in TOP_LEVEL_KEYS if k not in data]
     if missing:
         report.errors.append(f"clé(s) racine obligatoire(s) manquante(s) : {missing}")
-    unknown = [k for k in data if k not in TOP_LEVEL_KEYS]
+    allowed = TOP_LEVEL_KEYS + OPTIONAL_TOP_LEVEL_KEYS
+    unknown = [k for k in data if k not in allowed]
     if unknown:
         report.errors.append(
-            f"clé(s) racine inconnue(s) : {unknown} — attendu {list(TOP_LEVEL_KEYS)}"
+            f"clé(s) racine inconnue(s) : {unknown} — attendu {list(allowed)}"
+        )
+
+    # parameterization (facultatif)
+    if "parameterization" in data:
+        kind = data["parameterization"]
+        if not isinstance(kind, str) or kind not in PARAMETERIZATIONS:
+            report.errors.append(
+                f"parameterization : {kind!r} inconnu — attendu l'un de "
+                f"{list(PARAMETERIZATIONS)}"
+            )
+
+    if "provenance" in data and not isinstance(data["provenance"], dict):
+        report.errors.append(
+            f"provenance : mapping attendu, obtenu "
+            f"{type(data['provenance']).__name__}"
         )
 
     # iteration
