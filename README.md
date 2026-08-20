@@ -1,13 +1,50 @@
 # aero-opt-agent — Optimisation Aérodynamique Agentique
 
-**Optimisation automatique de forme aérodynamique : géométrie paramétrique →
-CFD OpenFOAM → nouveaux paramètres, en boucle, sans intervention.**
+**v1.5 « Universal 2D » — optimisation automatique de forme aérodynamique :
+n'importe quel profil 2D → CFD OpenFOAM → nouveaux paramètres, en boucle, sans
+intervention.**
 
-Vous décrivez un profil d'aile par quelques paramètres — corde, épaisseur,
-cambrure, incidence — et un objectif. Le système construit la géométrie, la
-maille, lance le calcul, lit les coefficients aérodynamiques, propose une forme
-meilleure, et recommence. À la fin, il vous rend un dossier avec la géométrie
-optimisée, les champs CFD et un rapport illustré.
+Vous donnez un profil — un fichier de coordonnées téléchargé, un modèle Fusion
+paramétrique, ou quatre chiffres NACA — et un objectif. Le système le
+re-paramétrise, construit la géométrie, la maille, lance le calcul, lit les
+coefficients aérodynamiques, propose une forme meilleure, et recommence. À la
+fin il vous rend un dossier avec la géométrie optimisée, les champs CFD, un
+rapport illustré, et de quoi reprendre le design dans Fusion 360.
+
+## Optimiser n'importe quel profil, en trois commandes
+
+```bash
+# 1. récupérer un profil — ici le Clark Y de la base UIUC
+curl -o clarky.dat "http://airfoiltools.com/airfoil/seligdatfile?airfoil=clarky-il"
+
+# 2. le re-paramétriser en coefficients CST optimisables
+python3 -m profiles.reparameterize clarky.dat \
+    --chord 300 --span 80 --aoa 3 -o configs/design_params.yaml
+
+# 3. optimiser
+python3 scripts/run_loop.py --max-iterations 20 \
+    --cfd-settings configs/cfd_settings_fast.yaml
+```
+
+Le dossier `results/run_*/best_design/` apparaît tout seul à la fin, avec son
+`report.html` et son `FUSION_RETURN.md`.
+
+## Ce que la v1.5 ajoute à la v1.0
+
+La v1.0 optimisait une famille de profils NACA à quatre chiffres — trois
+paramètres de forme. La v1.5 accepte **une forme quelconque** et la décrit par
+vingt-quatre coefficients CST, sans rien perdre de ce qui précède.
+
+| | v1.0 | v1.5 |
+|---|---|---|
+| Entrée | 4 chiffres NACA | + fichiers `.dat` / `.csv` (Selig, Lednicer, CSV) |
+| Description de la forme | épaisseur, cambrure | + 24 coefficients de Kulfan |
+| Producteurs de géométrie | interne, Fusion | les deux, derrière une interface commune |
+| Fidélité contrôlée | emprise du STL | + porte de reconstruction, aller-retour STL |
+| Retour en CAO | section CSV | + `FUSION_RETURN.md` et script Fusion généré |
+
+**La v1.0 n'a pas été modifiée** : elle vit sur sa propre branche, figée au tag
+`v1.0-stable`.
 
 ## Résultat obtenu
 
@@ -52,7 +89,7 @@ cp .env.example .env        # puis renseigner FOAM_BASHRC
 Vérifier que tout répond :
 
 ```bash
-python3 -m pytest tests/ -q                       # 506 tests, ~15 s
+python3 -m pytest tests/ -q                       # 700 tests, ~40 s
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
@@ -88,8 +125,11 @@ valeurs de départ, bornes, et objectif (`maximize_Cl_Cd`, `minimize_Cd` ou
 results/run_AAAAMMJJ_HHMMSS/best_design/
 ├── report.html            ← ouvrez celui-ci
 ├── README.md              le même rapport, en Markdown
+├── FUSION_RETURN.md       comment reprendre le design en CAO
+├── rebuild_in_fusion.py   script Fusion qui retrace le profil
 ├── geometry.stl           la géométrie optimisée, en mètres
-├── profile_section.csv    la section, pour la reprendre en CAO
+├── profile_section.csv    la section telle que simulée
+├── profile_chord.dat      le profil redressé, pour XFOIL / XFLR5
 ├── design_params.yaml     les paramètres exacts, rejouables
 ├── results.json           les coefficients
 ├── figures/               courbes et images CFD
@@ -111,10 +151,13 @@ python3 scripts/run_loop.py --export-best   # (re)générer le dossier
 
 ---
 
-La spécification qui fait loi est
-[`MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md`](MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md).
-En cas de divergence, c'est elle qui gagne. Les écarts assumés sont listés
-en fin de document.
+Deux spécifications font loi : celle de la v1.0,
+[`MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md`](MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md),
+et celle de la v1.5,
+[`MASTER_DOCUMENTATION_2D_GENERALIZATION.md`](MASTER_DOCUMENTATION_2D_GENERALIZATION.md).
+En cas de
+divergence, ce sont elles qui gagnent. Les écarts assumés sont listés en fin de
+document.
 
 ---
 
@@ -159,10 +202,15 @@ configs/
   design_params.yaml          ← SEUL fichier modifié par l'agent
   cfd_settings.yaml              conditions CFD (réglage fin)
   cfd_settings_fast.yaml         préréglage d'exploration, ~60 s/itération
+examples/profiles/               profils d'exemple (NACA, Clark Y, E387, S1223)
 profiles/
   loader.py                      lecture Selig / Lednicer / CSV
   profile.py                     profil normalisé + mesures géométriques
   validation.py                  contrôles de validité
+  cst.py                         paramétrisation de Kulfan + ajustement
+  reparameterize.py              fichier → coefficients → design_params.yaml
+  geometry.py                    coefficients → contour + contrôle de forme
+  roundtrip.py                   STL relu → écart au profil d'origine
 geometry/
   base.py                        interface GeometryBackend + registre
   internal_backend.py            producteur interne (toujours disponible)
@@ -301,6 +349,117 @@ réels.
 Rien ne lève : le chargement comme la validation rendent un compte rendu, à
 l'image de `GeometryBackend.generate`. Un fichier douteux ne doit pas
 interrompre une boucle.
+
+---
+
+## Re-paramétrisation CST
+
+Un fichier de points n'est pas optimisable : deux cents coordonnées libres
+donnent deux cents variables, et rien n'empêche la forme de devenir une scie.
+Il faut d'abord la décrire par un petit nombre de nombres qui gardent un sens.
+
+```bash
+python3 -m profiles.reparameterize examples/profiles/clarky.dat \
+    --chord 300 --span 80 --aoa 3 -o configs/design_params.yaml
+```
+
+```
+Profil            : CLARK Y AIRFOIL
+Ajustement CST    : ordre 11, 24 coefficients (12 par surface)
+
+                      original      reconstruit      écart
+  Épaisseur max       0.117055      0.117149     +9.40e-05
+  Cambrure max        0.034310      0.034383     +7.30e-05
+  Rayon de nez        0.013195      0.012017     -1.18e-03
+
+Écarts au profil d'origine (distance géométrique, en corde)
+  maximal         : 3.251e-04 (0.0325 % c) à 3.0% sur l'extrados
+  moyen           : 7.595e-05
+
+Porte de reconstruction : FRANCHIE (seuil 5e-04 corde)
+```
+
+### La méthode
+
+Chaque surface s'écrit `ζ(ψ) = C(ψ)·S(ψ) + ψ·Δζ_bf`, où `C(ψ) = √ψ·(1−ψ)` est
+la **fonction de classe** et `S` une somme de polynômes de Bernstein. Trois
+propriétés en découlent, et ce sont elles qui rendent l'optimisation sûre :
+
+- **la forme est lisse par construction** — une somme de Bernstein ne peut pas
+  onduler entre les points, là où une spline libre le fait au premier pas de
+  trop ;
+- **la physique est dans la formulation** — l'exposant `0.5` impose un nez en
+  racine carrée, l'exposant `1` un bord de fuite pointu. Ces comportements ne
+  peuvent pas être perdus en cours d'optimisation ;
+- **l'ajustement est linéaire** — pas de point de départ, pas de tirage
+  aléatoire. Deux ajustements sur les mêmes points donnent le même résultat au
+  bit près.
+
+### La porte de reconstruction
+
+Le fichier n'est accepté que si la forme reconstruite reste à moins de
+**5 × 10⁻⁴ de corde** du fichier d'origine (écart maximal) et **10⁻⁴** en
+moyenne. Sans cette porte, une optimisation peut se dérouler parfaitement
+pendant des heures sur une forme qui n'est pas celle qu'on a fournie — et rien
+dans les résultats ne le signalerait, puisque toute la chaîne en aval
+fonctionne.
+
+L'écart est une **distance géométrique**, pas un écart vertical. Au bord
+d'attaque la pente de la surface dépasse 6 : un écart vertical y vaut plusieurs
+fois la distance réelle, et ferait refuser un ajustement parfaitement bon.
+
+Un refus dit quoi faire :
+
+```
+reconstruction refusée : écart maximal de 1.09e-03 corde à 4.0% sur l'extrados
+[...] — 12 points sur 122 dépassent le seuil
+— l'ordre 11 franchirait la porte : relancer avec --order 11
+```
+
+### Choisir l'ordre
+
+L'ordre par défaut est **11**, soit 24 coefficients. Il a été retenu par
+validation croisée sur des profils réels de la base UIUC — ajustement sur un
+point sur deux, mesure sur les points retenus. L'erreur hors échantillon suit
+celle d'ajustement jusqu'à environ cinq points par coefficient, puis décroche :
+sur l'E387, l'ordre 13 affiche 8,6 × 10⁻⁴ sur ses propres points et
+1,12 × 10⁻³ sur ceux qu'il n'a pas vus. Il épouse alors le bruit du fichier.
+
+C'est aussi pourquoi un fichier grossier ne se « répare » pas en montant
+l'ordre : les 61 points de l'E387 sont refusés à tous les ordres raisonnables,
+et le message conseille un fichier plus dense plutôt qu'un surajustement.
+
+### Des bornes qui ont un sens géométrique
+
+Sur un profil réel, les coefficients ne sont pas du même ordre : le Clark Y en
+a qui valent 0,13 et d'autres 3,27, la forme tenant par compensation entre
+grands termes. Des bornes proportionnelles — « ±50 % de sa valeur » —
+donneraient au second une marge de ±1,63, soit **65 % de corde de
+déplacement** : la première sonde de l'optimiseur détruirait le profil.
+
+L'effet géométrique d'une variation `δ` du coefficient `i` vaut exactement
+`max_ψ [C(ψ)·Bᵢ(ψ)] · δ`. La relation est donc inversée : chaque coefficient
+reçoit la marge qui lui donne la **même autorité géométrique** que les autres —
+1,5 % de corde, et 0,6 % pour les deux coefficients d'extrémité, qui tiennent
+le rayon de nez et l'angle de bord de fuite.
+
+Vérifié : sur quarante-huit bornes poussées à l'extrême, aucune ne produit un
+profil invalide.
+
+### Aller-retour
+
+La porte juge l'ajustement. Elle ne dit rien de ce qui est **écrit sur le
+disque** : entre les coefficients et le STL se glissent une mise à l'échelle,
+une conversion d'unités, une rotation d'incidence et une triangulation.
+
+```bash
+python3 -m profiles.roundtrip results/run_*/best_design/geometry.stl \
+    clarky.dat --chord 300 --aoa 3
+```
+
+L'outil relit le fichier, en extrait la section et la mesure contre le profil
+d'origine — sans faire confiance à ce qui a servi à l'écrire. C'est le seul
+contrôle qui attraperait une confusion d'unités.
 
 ---
 
@@ -648,9 +807,12 @@ Le dossier contient :
 | `report.html` | le même, **autonome** — SVG intégrés, images en base64 |
 | `geometry.stl` | la géométrie, en mètres |
 | `geometry.step` | si la CAO en a produit un |
-| `profile_section.csv` / `.dat` | la section, pour reprendre la forme en CAO |
+| `profile_section.csv` / `.dat` | la section telle que simulée, incidence comprise |
+| `profile_chord.dat` | le profil **redressé**, corde unitaire — pour XFOIL / XFLR5 |
 | `design_params.yaml` | les paramètres exacts, rejouables |
 | `results.json` | les coefficients |
+| `FUSION_RETURN.md` | comment reprendre ce design en CAO |
+| `rebuild_in_fusion.py` | script Fusion qui retrace le profil et l'extrude |
 | `figures/` | courbes SVG et images CFD |
 | `cfd/` | le case OpenFOAM, avec `best_design.foam` pour ParaView |
 | `logs/` | les journaux de chaque étape |
@@ -669,6 +831,54 @@ sort quand même, avec ses courbes et la raison de l'absence des images.
 
 L'export ne peut pas faire échouer une optimisation réussie : en cas de
 problème, les résultats restent archivés et la commande se relance à la main.
+
+---
+
+## Reprendre le design dans Fusion 360
+
+Une optimisation qui ne rend qu'un STL est un cul-de-sac de conception. Un STL
+est un solide facetté de plusieurs centaines de faces planes : on peut
+l'imprimer, on ne peut ni y poser un congé propre, ni en changer une cote.
+
+Chaque export écrit donc un **`FUSION_RETURN.md`** qui détaille trois voies, et
+le `report.html` en porte une section dédiée.
+
+| voie | ce qu'on obtient | quand la choisir |
+|---|---|---|
+| **Rejouer les paramètres** | modèle natif, historique CAO complet | dès qu'un modèle de départ existe |
+| **Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans intervention | sans modèle de départ |
+| **Importer `profile_section.csv`** | esquisse tracée à la main | pour garder la main, ou une autre CAO |
+
+```bash
+# voie 1 — le driver reconstruit la forme et exporte STEP et STL
+cp results/run_*/best_design/design_params.yaml configs/design_params.yaml
+# puis, dans Fusion : Utilities → ADD-INS → Scripts → fusion/parametric_driver.py
+
+# voie 2 — script autonome, coordonnées incluses
+# Utilities → ADD-INS → Scripts → + → rebuild_in_fusion.py → Run
+```
+
+Le driver accepte les deux paramétrisations : sur un fichier `cst`, il
+reconstruit la forme depuis les coefficients de Kulfan. Son tracé ne manipule
+que des points, la voie Fusion n'a donc besoin d'aucun code particulier.
+
+Le script généré trace **une spline par surface** plutôt qu'une seule sur tout
+le contour : au bord d'attaque la courbe rebrousse, et une spline unique y
+placerait un point d'inflexion au lieu d'un nez — soit exactement la zone qui
+décide du décrochage.
+
+Deux pièges que le document nomme explicitement :
+
+- **l'incidence est déjà dans les coordonnées** de `profile_section` ; un
+  montage aval qui l'applique lui-même la compterait deux fois. C'est à cela
+  que sert `profile_chord.dat` ;
+- **ne pas convertir le STL en solide**, pour la raison dite plus haut.
+
+La reprise est vérifiable, pas seulement décrite :
+
+```bash
+python3 -m profiles.roundtrip export_fusion.stl profile_section.dat --chord 300
+```
 
 ---
 
@@ -695,7 +905,7 @@ ses paramètres n'est rattachable à rien.
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q          # 506 tests, ~15 s
+python3 -m pytest tests/ -q          # 700 tests, ~40 s
 ```
 
 Ce qui est couvert sans dépendance externe : validation du contrat, unités et
@@ -741,19 +951,52 @@ tournent réellement, sur un document qui reproduit celui du premier run réel.
 
 ## Adapter à votre géométrie
 
-Le profil reconstruit est un NACA 4 chiffres, décrit par `naca4_profile()` dans
-`fusion/parametric_driver.py`. Pour une autre forme, deux voies :
+Trois voies, de la plus simple à la plus intrusive :
 
-1. **Passer par Fusion** — modélisez ce que vous voulez, exposez des User
+1. **Partir d'un fichier de points** — c'est ce que la v1.5 a ajouté, et cela
+   couvre tout profil publié ou dessiné ailleurs. Voir
+   [Re-paramétrisation CST](#re-paramétrisation-cst).
+2. **Passer par Fusion** — modélisez ce que vous voulez, exposez des User
    Parameters, et lancez le driver depuis Fusion en mode `parameters`. Le
    système ne fait alors que piloter vos cotes.
-2. **Remplacer la fonction de profil** — si votre forme se décrit
-   analytiquement, `naca4_profile()` est le seul endroit à changer ; tout le
-   reste (validation, maillage, CFD, boucle, rapport) est indépendant de la
-   forme.
+3. **Ajouter une paramétrisation** — `profile_from_parameters()` dans
+   `fusion/parametric_driver.py` reconnaît la paramétrisation à ses paramètres
+   et rend un « plan » ; tout l'aval (validation, maillage, CFD, boucle,
+   rapport) est indépendant de la forme.
 
-Dans les deux cas, `configs/design_params.yaml` doit lister les paramètres avec
-leurs bornes, et les noms doivent correspondre exactement.
+Dans tous les cas, `design_params.yaml` doit lister les paramètres avec leurs
+bornes, et les noms doivent correspondre exactement.
+
+---
+
+## Vers la 3D (v2.0)
+
+La v1.5 est délibérément restée en 2D, mais son architecture a été construite
+pour que le passage à la 3D soit une addition et non une réécriture. Trois
+points préparent le terrain :
+
+**L'interface `GeometryBackend` ne suppose rien de la dimension.** Elle rend un
+`GeometryResult` avec un STL et un compte rendu ; un producteur qui empile
+plusieurs sections vrillées le remplirait de la même façon. Un troisième
+backend s'enregistre avec un décorateur, sans toucher au reste — un test le
+vérifie sur un backend fictif.
+
+**La paramétrisation est reconnue, pas supposée.** Le champ `parameterization`
+et la détection par les noms de paramètres laissent la place à une valeur
+`cst3d` sans casser les fichiers existants. Un profil 3D se décrit
+naturellement comme plusieurs jeux de coefficients CST le long de l'envergure,
+plus une loi de vrillage et d'effilement.
+
+**Ce qui est déjà générique le reste.** Le dimensionnement du case OpenFOAM se
+déduit de l'emprise, pas d'une hypothèse 2D ; la porte de reconstruction, le
+contrôle d'aller-retour et les bornes à autorité géométrique se transposent
+station par station.
+
+Ce qui devra changer, en revanche : les plans de symétrie du case quasi-2D
+laisseront place à un vrai domaine 3D, le coût CFD par itération montera d'un
+ordre de grandeur, et la recherche par motif sur vingt-quatre variables devra
+probablement céder la place à une méthode qui exploite les gradients — c'est
+là, et pas dans la géométrie, que se trouve le vrai obstacle.
 
 ## Licence
 

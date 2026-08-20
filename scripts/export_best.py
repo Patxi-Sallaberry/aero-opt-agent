@@ -113,6 +113,43 @@ def run_folder(root: Path = RESULTS_ROOT, when: datetime | None = None) -> Path:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _write_chordwise_dat(
+    design: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    output: Path,
+    upper: list[tuple[float, float]],
+    lower: list[tuple[float, float]],
+) -> Path:
+    """Écrit le profil redressé et normalisé, au format profil standard.
+
+    On défait la rotation d'incidence et l'on ramène la corde à un. Le fichier
+    obtenu est directement comparable à celui dont on est parti, et
+    directement utilisable dans un outil qui pilote lui-même l'incidence.
+    """
+    import math as _math
+
+    angle = _math.radians(float(plan.get("aoa_deg", 0.0)))
+    cos_a, sin_a = _math.cos(angle), _math.sin(angle)
+    chord_mm = float(plan["chord_cm"]) * 10.0 or 1.0
+
+    def straighten(point: tuple[float, float]) -> tuple[float, float]:
+        x, y = point
+        return (
+            (x * cos_a - y * sin_a) / chord_mm,
+            (x * sin_a + y * cos_a) / chord_mm,
+        )
+
+    straight_upper = [straighten(p) for p in upper]
+    straight_lower = [straighten(p) for p in lower]
+
+    lines = [f"{design.get('design_id', 'wing')} (corde unitaire, incidence nulle)"]
+    lines += [f"{x:12.6f}{y:12.6f}" for x, y in reversed(straight_upper)]
+    lines += [f"{x:12.6f}{y:12.6f}" for x, y in straight_lower[1:]]
+    target = output / "profile_chord.dat"
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
+
+
 def write_profile_section(design: Mapping[str, Any], output: Path) -> dict:
     """Écrit les coordonnées de la section, en millimètres.
 
@@ -142,6 +179,13 @@ def write_profile_section(design: Mapping[str, Any], output: Path) -> dict:
     (output / "profile_section.dat").write_text(
         "\n".join(dat_lines) + "\n", encoding="utf-8"
     )
+
+    # Troisième forme : le profil REDRESSÉ, en corde unitaire. C'est la
+    # convention des fichiers de profil publiés, et c'est ce qu'attendent XFOIL
+    # ou XFLR5 pour balayer l'incidence — leur donner une section déjà inclinée
+    # de 3° ferait compter cette incidence deux fois, et tout le polaire serait
+    # décalé sans que rien ne le signale.
+    _write_chordwise_dat(design, plan, output, upper, lower)
 
     return {
         "upper": upper,
@@ -1110,38 +1154,72 @@ def build_report(
     if has_step:
         lines.append("| `geometry.step` | la même, en CAO |")
     lines.append("| `profile_section.csv` | section 2D en millimètres |")
-    lines.append("| `profile_section.dat` | même section au format profil (XFOIL, XFLR5) |")
+    lines.append("| `profile_section.dat` | même section au format profil |")
+    lines.append(
+        "| `profile_chord.dat` | profil **redressé**, corde unitaire — "
+        "pour XFOIL / XFLR5 |"
+    )
     lines.append("| `design_params.yaml` | les paramètres exacts, rejouables |")
     lines.append("| `results.json` | les coefficients |")
     lines.append("| `report.html` | ce rapport, autonome, pour un navigateur |")
+    lines.append("| `FUSION_RETURN.md` | comment reprendre ce design en CAO |")
+    lines.append("| `rebuild_in_fusion.py` | script Fusion qui retrace le profil |")
     lines.append("| `figures/` | courbes et images |")
     if has_case:
         lines.append("| `cfd/` | case OpenFOAM : maillage et champs finaux |")
     lines.append("| `logs/` | journaux de chaque étape |")
     lines.append("")
 
+    # ── Retour vers Fusion (§5 du document maître) ────────────────────────
+    lines.append("## Continuer ce design dans Fusion 360")
+    lines.append("")
+    lines.append(
+        "Une optimisation qui ne rend qu'un STL est un cul-de-sac de "
+        "conception : un solide facetté de plusieurs centaines de faces ne se "
+        "laisse ni congédier proprement, ni recoter. Trois voies ramènent "
+        "cette forme dans une CAO éditable, détaillées dans "
+        "**`FUSION_RETURN.md`**."
+    )
+    lines.append("")
+    lines.append("| voie | ce qu'on obtient | quand la choisir |")
+    lines.append("|---|---|---|")
+    lines.append(
+        "| **1. Rejouer les paramètres** | modèle natif, historique complet | "
+        "dès qu'un modèle de départ existe — c'est la seule voie réellement "
+        "paramétrique |"
+    )
+    lines.append(
+        "| **2. Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans "
+        "intervention | sans modèle de départ ; rien à localiser ni à "
+        "convertir |"
+    )
+    lines.append(
+        "| **3. Importer `profile_section.csv`** | esquisse tracée à la main | "
+        "pour garder la main, ou travailler dans une autre CAO |"
+    )
+    lines.append("")
+    lines.append(
+        "```bash\n"
+        "# voie 1 : rejouer les paramètres dans Fusion\n"
+        "cp design_params.yaml <projet>/configs/design_params.yaml\n"
+        "# puis Utilities → ADD-INS → Scripts → fusion/parametric_driver.py\n"
+        "\n"
+        "# voie 2 : script autonome\n"
+        "# Utilities → ADD-INS → Scripts → + → rebuild_in_fusion.py → Run\n"
+        "```"
+    )
+    lines.append("")
+    lines.append(
+        "**L'incidence est déjà dans les coordonnées** de la section "
+        "exportée : c'est la géométrie réellement simulée. Si le montage aval "
+        "applique lui-même une incidence, elle serait comptée deux fois."
+    )
+    lines.append("")
     if not has_step:
-        lines.append("### Pas de fichier STEP")
-        lines.append("")
         lines.append(
-            "Cette géométrie a été produite par le calculateur interne, qui "
-            "écrit directement un STL : sans noyau CAO, il ne peut pas générer "
-            "de STEP. Deux façons d'en obtenir un :"
-        )
-        lines.append("")
-        lines.append(
-            "1. **Depuis Fusion 360** — copier `design_params.yaml` dans "
-            "`configs/`, ouvrir le modèle, lancer `fusion/parametric_driver.py` "
-            "(*Utilities → ADD-INS → Scripts and Add-Ins*). Le driver "
-            "reconstruit exactement cette forme et exporte STEP **et** STL."
-        )
-        lines.append(
-            "2. **En repartant de la section** — importer "
-            "`profile_section.csv` comme nuage de points en CAO, y passer une "
-            "spline, extruder sur l'envergure. C'est la voie à préférer pour "
-            "de la conception : on récupère une géométrie propre et "
-            "paramétrable, là où une conversion de STL ne donnerait qu'un "
-            "solide facetté de plusieurs centaines de faces."
+            "Il n'y a pas de fichier STEP dans ce dossier : la géométrie a été "
+            "produite par le calculateur interne, qui écrit directement un STL "
+            "sans passer par un noyau CAO. Les voies 1 et 2 en produisent un."
         )
         lines.append("")
 
@@ -1509,6 +1587,21 @@ def export_best(
         shape_values(design),
         first_results, compared_results, cp,
     )
+
+    # Le chemin de retour vers Fusion est écrit AVANT le rapport : celui-ci y
+    # renvoie, et un lien vers un fichier absent serait pire que pas de lien.
+    from scripts.fusion_return import write_fusion_return
+
+    backend_used = str(
+        (record.get("geometry") or {}).get("backend")
+        or record.get("geometry_backend")
+        or "internal"
+    )
+    profile_source = (design.get("provenance") or {}).get("source")
+    for written in write_fusion_return(
+        output, design, section, has_step, backend_used, profile_source
+    ):
+        copied.append(written.name)
 
     report = build_report(
         design, initial_design, record, results, fast_results, history, section,

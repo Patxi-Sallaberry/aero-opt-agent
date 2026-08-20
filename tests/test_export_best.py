@@ -306,9 +306,42 @@ def test_rapport_complet(serie, config, tmp_path):
         False, True, serie / "iter_0000", None,
     )
     for attendu in ("# Design optimisé", "## Performances", "## Paramètres",
-                    "## Déroulé de l'optimisation", "Pas de fichier STEP",
+                    "## Déroulé de l'optimisation",
+                    "## Continuer ce design dans Fusion 360",
+                    "FUSION_RETURN.md", "rebuild_in_fusion.py",
+                    "pas de fichier STEP dans ce dossier",
                     "## Ce que valent ces chiffres", "Une note"):
         assert attendu in report
+
+
+def test_le_rapport_tait_l_absence_de_step_quand_il_y_en_a_un(serie, config, tmp_path):
+    """Annoncer un STEP manquant alors qu'il est là ferait douter du reste."""
+    design = load_yaml(config)
+    section = eb.write_profile_section(design, tmp_path)
+    report = eb.build_report(
+        design, design, eb.best_iteration(serie),
+        {"Cd": 0.02, "Cl": 0.7, "Cl_Cd": 35.0}, None, mp.history(serie),
+        section, {}, [], [], True, True, serie / "iter_0000", None,
+    )
+    assert "## Continuer ce design dans Fusion 360" in report
+    assert "pas de fichier STEP dans ce dossier" not in report
+
+
+def test_le_profil_est_aussi_exporte_redresse(config, tmp_path):
+    """XFOIL pilote lui-même l'incidence : lui en donner une la compterait deux fois."""
+    design = load_yaml(config)
+    eb.write_profile_section(design, tmp_path)
+    redresse = tmp_path / "profile_chord.dat"
+    assert redresse.is_file()
+
+    points = [
+        tuple(float(v) for v in line.split())
+        for line in redresse.read_text(encoding="utf-8").splitlines()[1:]
+        if line.strip()
+    ]
+    xs = [x for x, _ in points]
+    assert min(xs) == pytest.approx(0.0, abs=1e-6)
+    assert max(xs) == pytest.approx(1.0, abs=1e-6)
 
 
 def test_les_barres_verticales_ne_cassent_pas_le_tableau(serie, config, tmp_path):
