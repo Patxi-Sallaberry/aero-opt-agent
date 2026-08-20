@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -29,6 +30,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes du contrat
@@ -71,6 +74,37 @@ TOL = 1e-9
 # l'amplitude (max - min). Indispensable pour les paramètres qui traversent
 # zéro, par exemple aoa_deg.
 ZERO_EPS = 1e-9
+
+
+def load_env(path: str | Path | None = None) -> dict[str, str]:
+    """Charge `.env` dans l'environnement, sans écraser ce qui est déjà défini.
+
+    Appelé par les points d'entrée. Sans cela, `.env` serait un fichier
+    documenté que rien ne lit — les chemins Fusion, `FOAM_BASHRC` et la clé
+    d'API resteraient sans effet, et le diagnostic serait déroutant.
+
+    Une variable déjà présente dans l'environnement gagne : elle vient d'un
+    appel explicite, qui doit primer sur un fichier de configuration.
+    """
+    target = Path(path) if path else REPO_ROOT / ".env"
+    if not target.is_file():
+        return {}
+
+    loaded: dict[str, str] = {}
+    try:
+        for raw in target.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("'\"")
+            if key and key not in os.environ:
+                os.environ[key] = value
+                loaded[key] = value
+    except OSError:
+        return {}
+    return loaded
 
 
 class ConfigValidationError(Exception):

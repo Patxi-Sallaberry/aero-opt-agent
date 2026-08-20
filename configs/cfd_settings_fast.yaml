@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────
+# cfd_settings_fast.yaml — préréglage d'exploration.
+#
+# Même montage que cfd_settings.yaml, calibré pour ~60 s par itération
+# au lieu d'un quart d'heure. À utiliser pour les boucles longues :
+#
+#   python3 scripts/run_loop.py --cfd-settings configs/cfd_settings_fast.yaml
+#
+# CE QUI EST SACRIFIÉ, ET POURQUOI C'EST ACCEPTABLE
+#
+# Maillage plus grossier, pas de couches limites, 500 itérations au lieu
+# de 2000. Les coefficients absolus sont donc moins justes — la traînée
+# est surestimée, davantage encore qu'avec le réglage fin.
+#
+# Mais une optimisation ne compare pas des valeurs à la réalité : elle
+# CLASSE des formes entre elles. Un biais systématique, identique d'une
+# itération à l'autre, ne change pas ce classement. Ce préréglage sert
+# donc à explorer ; le réglage complet sert à qualifier la forme retenue.
+#
+# Toujours revalider le meilleur design avec configs/cfd_settings.yaml
+# avant d'en tirer un chiffre.
+# ─────────────────────────────────────────────────────────────
+
+case:
+  name: "external_aero_fast"
+  template_dir: "openfoam/templates/external_aero"
+  solver: "simpleFoam"
+  turbulence_model: "kOmegaSST"
+  wing_patch: "wing"
+
+flow:
+  velocity_ms: 20.0
+  direction: [1.0, 0.0, 0.0]
+  lift_direction: [0.0, 1.0, 0.0]
+  pitch_axis: [0.0, 0.0, 1.0]
+  rho_kg_m3: 1.225
+  nu_m2_s: 1.5e-5
+  turbulent_intensity: 0.05
+  turbulent_length_scale_m: 0.01
+
+reference:
+  mode: "from_design"
+  area_m2: 0.024
+  length_m: 0.30
+  center_of_rotation_chord_fraction: 0.25
+
+domain:
+  upstream_factor: 5.0
+  downstream_factor: 12.0
+  vertical_factor: 5.0
+  spanwise_treatment: "symmetry"
+  spanwise_fraction: 0.5
+  spanwise_margin_factor: 3.0
+
+mesh:
+  base_cell_per_chord: 6.0          # 8.0 en réglage fin
+  surface_refinement_level: [2, 3]  # [3, 4] en réglage fin
+  feature_refinement_level: 3
+  feature_angle_deg: 150
+  refinement_box:
+    upstream: 0.5
+    downstream: 3.0
+    vertical: 1.0
+    level: 2
+  max_local_cells: 2000000
+  max_global_cells: 8000000
+  boundary_layers:
+    # Désactivées : l'ajout de couches est l'étape la plus lente ET la moins
+    # déterministe de snappyHexMesh. Sans elles, la loi de paroi de Spalding
+    # reste valable — c'est précisément pourquoi le template l'utilise.
+    enabled: false
+    n_layers: 5
+    expansion_ratio: 1.2
+    final_layer_thickness: 0.4
+    min_thickness: 0.02
+  check_mesh:
+    enabled: true
+    fail_on_error: true
+    max_non_orthogonality: 75.0
+    max_skewness: 4.0
+    max_aspect_ratio: 1000.0
+
+solver_control:
+  start_time: 0
+  end_time: 500                     # 2000 en réglage fin
+  write_interval: 500
+  purge_write: 1
+  max_wall_time_s: 900              # une itération qui s'éternise est perdue
+
+convergence:
+  residual_p: 1.0e-4
+  residual_U: 1.0e-5
+  residual_k: 1.0e-5
+  residual_omega: 1.0e-5
+  averaging_window: 120
+  coeff_stability_tol: 0.02
+
+force_coeffs:
+  write_interval: 1
+  outputs: ["Cd", "Cl", "Cl_Cd"]
+
+geometry_check:
+  enabled: true
+  tolerance_pct: 5.0
+
+execution:
+  n_processors: 8
+  decomposition_method: "scotch"
+  keep_case_after_run: true

@@ -2,92 +2,109 @@
 
 **Fusion 360 + OpenFOAM + Orchestrateur LLM** — version **Core First v1.0**.
 
-Le système prend un design CAO paramétrique Fusion 360, fait varier ses User
-Parameters, simule l'écoulement sous OpenFOAM, et laisse un agent LLM proposer
-les paramètres de l'itération suivante — dans les bornes, sans jamais toucher au
-code du pipeline.
+Le système part d'un design paramétrique, en produit la géométrie, la simule
+sous OpenFOAM, lit les coefficients aérodynamiques, et propose les paramètres de
+l'itération suivante. En boucle, sans intervention.
 
 La spécification qui fait loi est
 [`MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md`](MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md).
-Ce README ne la remplace pas : en cas de divergence, le Master Document gagne.
+En cas de divergence, c'est elle qui gagne. Les écarts assumés sont listés
+en fin de document.
 
 ---
 
-## Etat d'avancement
-
-| Phase | Contenu | Statut |
-|-------|---------|--------|
-| 0 | Fondations : structure, Git, configs, validation de `design_params.yaml` | **Terminée** |
-| 1 | Geometry — `fusion/parametric_driver.py` | **Terminée** (validation sur seed réel en attente) |
-| 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | **Terminée et validée sur solveur réel** |
-| 3 | Master Pipeline — enchaînement, validation, archivage | À faire |
-| 4 | Agent + boucle d'optimisation | À faire |
-| 5 | Durcissement, messages d'erreur, tests sur design réel | À faire |
-
----
-
-## Règle d'or
-
-> L'agent LLM ne touche **jamais** au code du pipeline.
-> Il n'édite **que** `configs/design_params.yaml`.
-
-Tout le reste — paramètres CFD, templates OpenFOAM, code Python — appartient au
-concepteur. La validation de `pipeline/utils.py` fait respecter cette frontière :
-une proposition d'agent qui desserre une borne, change une unité ou ajoute un
-paramètre est rejetée.
-
----
-
-## Installation
+## Démarrage
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 
-cp .env.example .env      # puis remplir les clés / chemins
-```
-
-OpenFOAM est une dépendance **système** (non pip) ; Fusion 360 exécute le
-driver dans son propre interpréteur Python embarqué.
-
-```bash
 # OpenFOAM (ESI) — fournit simpleFoam, snappyHexMesh, checkMesh
 curl -s https://dl.openfoam.com/add-debian-repo.sh | sudo bash
 sudo apt-get install openfoam2506-default
+
+cp .env.example .env        # puis renseigner FOAM_BASHRC
 ```
 
-Puis renseigner `FOAM_BASHRC` dans `.env`. En WSL ou en conteneur on est root,
-et OpenMPI refuse alors de démarrer : `run_cfd.sh` lève cette protection
-lui-même et le signale dans le journal.
+Une itération :
+
+```bash
+python3 pipeline/master_pipeline.py
+```
+
+Une optimisation complète :
+
+```bash
+python3 scripts/run_loop.py --max-iterations 20 \
+    --cfd-settings configs/cfd_settings_fast.yaml
+```
+
+C'est tout. La boucle produit la géométrie, maille, calcule, lit les résultats,
+propose de nouveaux paramètres et recommence — jusqu'au budget d'itérations, à
+la stagnation, ou à une série d'échecs.
 
 ---
 
-## Structure du dépôt
+## Ce que fait une itération
 
 ```
-.
-├── configs/
-│   ├── design_params.yaml     ← SEUL fichier modifié par l'agent
-│   └── cfd_settings.yaml         conditions CFD, jamais touchées par l'agent
-├── fusion/
-│   ├── seed_design.f3d           fourni par l'utilisateur (non versionné)
-│   └── parametric_driver.py      paramètres → recalcul → STEP  Phase 1 ✔
-├── openfoam/
-│   ├── templates/external_aero/  case de base            Phase 2 ✔
-│   ├── case_builder.py           YAML → case dimensionné Phase 2 ✔
-│   ├── run_cfd.sh                orchestration           Phase 2 ✔
-│   └── postprocess.py            → results.json          Phase 2 ✔
-├── pipeline/
-│   ├── master_pipeline.py        point d'entrée unique   Phase 3
-│   ├── geometry_validator.py                             Phase 3
-│   └── utils.py                  chargement + validation Phase 0 ✔
-├── agent/
-│   ├── orchestrator.py           boucle principale       Phase 4
-│   └── prompts/system_prompt.md                          Phase 4
-├── data/iterations/              iter_0001/, iter_0002/… (non versionné)
-├── tests/
-└── scripts/run_loop.py                                   Phase 4
+design_params.yaml
+        │
+        ▼
+  ① validation du contrat        pipeline/utils.py
+        │
+        ▼
+  ② géométrie                    fusion/parametric_driver.py
+        │                        (Fusion 360, ou producteur interne)
+        ▼
+  ③ contrôle de la géométrie     pipeline/geometry_validator.py
+        │
+        ▼
+  ④ maillage + CFD               openfoam/run_cfd.sh
+        │                        blockMesh → snappyHexMesh → checkMesh → simpleFoam
+        ▼
+  ⑤ coefficients                 openfoam/postprocess.py → results.json
+        │
+        ▼
+  ⑥ archivage                    data/iterations/iter_XXXX/
+        │
+        ▼
+  ⑦ proposition                  agent/orchestrator.py → design_params.yaml
+```
+
+L'orchestrateur n'écrit **que** `configs/design_params.yaml`. C'est la règle
+d'or du Master Document, et la validation la fait respecter : une proposition
+qui desserre une borne, change une unité ou ajoute un paramètre est rejetée
+avant d'atteindre le disque.
+
+---
+
+## Structure
+
+```
+configs/
+  design_params.yaml          ← SEUL fichier modifié par l'agent
+  cfd_settings.yaml              conditions CFD (réglage fin)
+  cfd_settings_fast.yaml         préréglage d'exploration, ~60 s/itération
+fusion/
+  seed_design.f3d                modèle Fusion (non versionné)
+  parametric_driver.py           géométrie : Fusion ou production interne
+openfoam/
+  templates/external_aero/       case OpenFOAM paramétré
+  case_builder.py                YAML → case dimensionné
+  run_cfd.sh                     orchestration du calcul
+  postprocess.py                 → results.json
+pipeline/
+  utils.py                       chargement + validation du contrat
+  geometry_validator.py          contrôle de la géométrie exportée
+  master_pipeline.py             point d'entrée d'une itération
+agent/
+  prompts/system_prompt.md       instructions de l'agent
+  orchestrator.py                proposition des paramètres
+scripts/
+  run_loop.py                    boucle d'optimisation
+data/iterations/                 archives (non versionné)
+tests/                           431 tests
 ```
 
 ---
@@ -97,233 +114,285 @@ lui-même et le signale dans le journal.
 Trois familles de règles, appliquées par `pipeline/utils.py` :
 
 1. **Structure** — clés obligatoires, types stricts, aucune clé inconnue.
-   Chaque paramètre porte exactement `value`, `min`, `max`, `max_delta_pct`, `unit`.
-2. **Bornes** — `min < max` et `min <= value <= max`.
-3. **max_delta_pct** — une nouvelle `value` ne peut s'écarter de la dernière
-   itération **réussie** de plus de `max_delta_pct` %. Quand la valeur
-   précédente est nulle (le delta relatif n'a alors aucun sens — cas d'un angle
-   d'incidence à 0°), le budget retombe sur `max_delta_pct` % de l'amplitude
-   `max - min`.
+2. **Bornes** — `min < max` et `min ≤ value ≤ max`.
+3. **max_delta_pct** — l'écart avec la dernière itération **réussie** ne dépasse
+   pas ce pourcentage. Quand la valeur précédente est nulle — une incidence à
+   0°, cas réel de ce projet — le budget retombe sur `max_delta_pct` % de
+   l'amplitude `max - min`, faute de quoi le paramètre serait figé à jamais.
 
-Entre deux itérations, seule `value` peut changer : `min`, `max`,
-`max_delta_pct` et `unit` sont figés, l'ensemble des paramètres aussi, et
-`iteration` doit croître strictement.
-
-### Valider une configuration
+Entre deux itérations, seule `value` peut changer.
 
 ```bash
-# Structure + bornes
-python3 pipeline/utils.py configs/design_params.yaml
-
-# + règle max_delta_pct contre la dernière itération réussie
-python3 pipeline/utils.py configs/design_params.yaml \
-    --previous data/iterations/iter_0003/design_params.yaml
-
-# Intervalle réellement admissible à la prochaine itération, par paramètre
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
-Codes de retour : `0` valide, `1` contrat violé, `2` fichier illisible ou absent.
-Toutes les violations sont listées en une seule passe, pour que l'agent corrige
-d'un coup.
-
-### Depuis Python
-
-```python
-from pipeline.utils import load_design_params, validate_design_params, allowed_range
-
-cfg = load_design_params("configs/design_params.yaml")   # lève si invalide
-
-report = validate_design_params(proposal, previous=last_successful)
-if not report.ok:
-    print(report.format())        # feedback à renvoyer à l'agent
 ```
+chord:     [279, 321] mm          thickness: [0.1104, 0.1296]
+camber:    [0.018, 0.022]         span:      [79.2, 80.8] mm
+aoa:       [-1.68, 1.68] deg
+```
+
+`span` est **tenu fixe à dessein** : le calcul est quasi-2D, l'envergure n'y a
+aucun effet sur Cd et Cl. La laisser varier ferait dépenser des itérations pour
+un gain nul. Pour la rendre influente, passer `domain.spanwise_treatment` à
+`full_3d` puis rouvrir ses bornes.
 
 ---
 
-## Le driver Fusion (`fusion/parametric_driver.py`)
+## Géométrie
 
-Il applique les valeurs du YAML au design Fusion, obtient la géométrie
-correspondante, et exporte `data/iterations/iter_XXXX/geometry.step`.
+### Deux producteurs
 
-### Deux stratégies de géométrie
+| Producteur | Ce qu'il fait | Quand |
+|------------|---------------|-------|
+| `fusion` | Met à jour les User Parameters, reconstruit la géométrie, exporte STEP + STL | Le script tourne **dans** Fusion 360 |
+| `internal` | Calcule le profil et écrit le STL en mètres, sans Fusion | Partout ailleurs — c'est ce qui rend la boucle autonome |
 
-| Mode | Ce qu'il fait | Quand |
-|------|---------------|-------|
-| `rebuild` (défaut) | Met à jour les User Parameters, **puis reconstruit** la géométrie : profil NACA 4 chiffres retracé à la corde, l'épaisseur et la cambrure demandées, tourné de l'incidence, extrudé sur l'envergure. | Modèle dont les cotes ne sont pas réellement pilotées par ses paramètres — **le cas du seed livré**. |
-| `parameters` | Met à jour les User Parameters et laisse Fusion recalculer. | Modèle réellement paramétrique. |
+`auto` (défaut) choisit Fusion si son API est importable, le producteur interne
+sinon. **L'API Fusion n'a pas de mode headless** : sans le producteur interne,
+chaque itération attendrait qu'un humain clique sur *Run*. Les deux chemins
+partagent la même fonction de profil, donc la même forme ; le mode interne ne
+produit simplement pas de STEP, faute de noyau CAO.
 
-Le seed (`fusion/seed_design.f3d`, généré par un script NACA) crée bien ses
-5 User Parameters, mais trace son profil par une spline passant par des points
-calculés en dur et l'extrude sur une longueur brute. **Modifier ses paramètres
-n'y déplace pas un point** : sans `rebuild`, chaque itération exporterait un
-STEP identique et l'agent optimiserait dans le vide, sans la moindre erreur
-pour le signaler.
+### Deux stratégies, dans Fusion
 
-Choix du mode : `--geometry-mode`, ou `FUSION_GEOMETRY_MODE` dans `.env`.
+`rebuild` (défaut) met à jour les User Parameters **puis reconstruit** la
+géométrie. `parameters` se contente du recalcul, et n'a de sens que si le modèle
+est réellement piloté par ses cotes.
 
-La forme du profil (famille NACA, position de cambrure `p = 0.4`, 80 points par
-surface) est fixée dans `parametric_driver.py` : c'est une décision de
-conception, ni de l'agent, ni de la CFD.
+Le seed livré exige `rebuild` : son générateur crée bien les 5 User Parameters,
+mais trace son profil par une spline passant par des points calculés en dur et
+l'extrude sur une longueur brute. **Modifier ses paramètres n'y déplace pas un
+point** — sans `rebuild`, chaque itération exporterait une géométrie identique
+et l'agent optimiserait dans le vide, sans la moindre erreur pour le signaler.
 
-### Dans Fusion 360
+### Lancer le driver dans Fusion
 
-1. Ouvrir le modèle paramétrique (ou déposer le seed en `fusion/seed_design.f3d`).
-2. **Utilities > ADD-INS > Scripts and Add-Ins > Scripts > (+)** et pointer ce
-   fichier, puis **Run**.
+1. Ouvrir le modèle (ou déposer le seed en `fusion/seed_design.f3d`).
+2. *Utilities → ADD-INS → Scripts and Add-Ins → Scripts → (+)*, pointer
+   `fusion/parametric_driver.py`, puis **Run**.
 
-Le document actif est utilisé en priorité ; à défaut, le seed `.f3d` est importé
-dans un nouveau document. `FUSION_FORCE_SEED_IMPORT=1` force toujours le seed.
+Hors Fusion, `--dry-run` valide la configuration et calcule la géométrie prévue
+sans rien écrire.
 
-Les noms de `parameters` dans `design_params.yaml` doivent correspondre
-**exactement** aux User Parameters Fusion (*Modify > Change Parameters*). Sinon
-le driver s'arrête sans rien modifier et liste les noms disponibles.
+### Unités
 
-### Hors Fusion — mode simulation
-
-Sans le module `adsk`, le driver valide la configuration, construit les
-expressions et calcule les chemins, sans appeler aucune API :
-
-```bash
-python3 fusion/parametric_driver.py --dry-run
-```
-
-Codes de retour : `0` succès, `1` échec, `3` mode simulation (aucun STEP produit).
-
-### Statut retourné
-
-Le driver ne lève jamais : il retourne un dict et écrit le même contenu dans
-`data/iterations/iter_XXXX/fusion_status.json` (avec le journal
-`fusion_driver.log`). C'est le canal de retour vers le master pipeline, qui
-s'exécute dans un autre processus que Fusion.
-
-`status` vaut `OK`, `DRY_RUN`, ou l'une des causes d'échec : `CONFIG_ERROR`,
-`SEED_MISSING`, `SEED_IMPORT_FAILED`, `NO_DESIGN`, `PARAM_NOT_FOUND`,
-`PARAM_SET_FAILED`, `RECOMPUTE_FAILED`, `REBUILD_FAILED`, `GEOMETRY_EMPTY`,
-`EXPORT_FAILED`, `FUSION_UNAVAILABLE`, `UNEXPECTED_ERROR`.
-
-En mode `rebuild`, le statut porte aussi `geometry` : corde et envergure en cm,
-ratios appliqués, incidence, et l'emprise de la géométrie produite.
+L'unité d'écriture d'un STL n'est garantie par personne. Plutôt que de la
+supposer, `case_builder.py` la **mesure** : il compare l'étendue du fichier à la
+géométrie demandée et, si l'écart correspond à un facteur usuel, remet le STL à
+l'échelle en le signalant. Si l'écart ne s'explique par aucun facteur d'unité,
+ce n'est pas un problème d'unité mais de géométrie, et l'itération est refusée.
 
 ---
 
-## La chaîne CFD (`openfoam/`)
+## CFD
 
 ```bash
 openfoam/run_cfd.sh --iteration-dir data/iterations/iter_0000
-openfoam/run_cfd.sh --iteration-dir ... --dry-run     # construit le case sans calculer
+openfoam/run_cfd.sh --iteration-dir ... --dry-run     # construit le case seul
 openfoam/run_cfd.sh --iteration-dir ... --mesh-only   # s'arrête après checkMesh
 ```
 
-Enchaînement : `case_builder.py` → `blockMesh` → `surfaceFeatureExtract` →
-`snappyHexMesh` → `checkMesh` (obligatoire) → `simpleFoam` → `postprocess.py`.
+### Le case est dimensionné, pas recopié
 
-### Ce que le case emprunte à chaque itération
+`case_builder.py` déduit de `design_params.yaml` : la taille du domaine et des
+mailles (en multiples de corde), `k` et `omega` (depuis l'intensité turbulente),
+le point `locationInMesh`, et surtout **`Aref` et `lRef`, recalculés à chaque
+itération**. Figer la surface de référence pendant que la corde varie ferait
+bouger les Cd et Cl alors que seule la normalisation aurait changé — l'agent
+optimiserait un artefact de calcul.
 
-`case_builder.py` ne recopie pas des constantes : il **dimensionne** le case à
-partir de `design_params.yaml`. Domaine et taille de maille en multiples de
-corde, `k` et `omega` depuis l'intensité turbulente, et surtout :
+### Repère
 
-- **`Aref` et `lRef` sont recalculés à chaque itération** (corde × envergure du
-  domaine, et corde). Figer la surface de référence pendant que la corde varie
-  ferait bouger les Cd/Cl alors que seule la normalisation aurait changé.
-- **La boîte englobante du STL est comparée à la géométrie demandée.** C'est le
-  garde-fou qui détecte qu'une itération a exporté une géométrie inchangée ou
-  mal mise à l'échelle — avant de dépenser une heure de calcul.
+```
++X = corde, du bord d'attaque vers le bord de fuite
++Y = épaisseur, et portance
++Z = envergure
+```
 
-### Envergure et quasi-2D
-
-Par défaut (`domain.spanwise_treatment: symmetry`), le domaine occupe une
-tranche **intérieure** à l'aile, bornée par deux plans de symétrie que la
-géométrie traverse : pas de bout d'aile, donc pas de tourbillon marginal. C'est
-le modèle correct pour un tronçon de profil.
-
-**Conséquence : `span` n'a alors aucun effet aérodynamique.** Le fixer plutôt
-que le laisser à l'agent, ou passer en `full_3d` — au prix d'un maillage bien
-plus lourd, et avec un allongement de 0,27 qui n'a plus grand-chose d'une aile.
-
-### `results.json`
-
-Écrit dans **tous** les cas, succès comme échec — c'est le seul canal de retour
-vers le pipeline et l'agent. En cas d'échec, `Cd`/`Cl`/`Cl_Cd` valent `null` et
-jamais `0.0` : un zéro se propagerait dans la boucle comme une mesure légitime.
-
-`converged` résume les deux conditions qui rendent un point exploitable : un
-maillage validé par checkMesh et des coefficients stabilisés (écart-type relatif
-sur la fenêtre de moyenne sous `coeff_stability_tol`).
-
-### Version d'OpenFOAM
-
-Le template vise **`simpleFoam`** : OpenFOAM.com (ESI, v2212+) ou OpenFOAM.org
-jusqu'à v10. Les versions OpenFOAM.org ≥ 11 ont remplacé `simpleFoam` par
-`foamRun -solver incompressibleFluid` — `run_cfd.sh` le détecte et le dit.
-Définir `FOAM_BASHRC` dans `.env`.
-
-### Géométrie et unités
-
-snappyHexMesh ne lit pas le STEP. Le driver Fusion exporte donc **`geometry.stl`
-en plus du `geometry.step`** — gmsh n'est plus dans le chemin critique, il ne
-sert que de secours si l'export STL a échoué.
-
-L'unité d'écriture d'un STL n'est garantie par personne. Plutôt que de la
-supposer, `case_builder.py` la **mesure** : il compare l'étendue du fichier à
-la géométrie demandée et, si l'écart correspond à un facteur usuel (mm, cm),
-remet le STL à l'échelle et le signale. Si l'écart ne s'explique par aucun
-facteur d'unité, ce n'est pas un problème d'unité mais de géométrie, et
-l'itération est refusée.
+L'incidence est portée par la **géométrie** — le profil est tourné à la
+construction — et non par la direction de l'écoulement. Celui-ci reste aligné
+sur +X d'une itération à l'autre, donc les directions de portance et de traînée
+ne bougent jamais.
 
 ### Qualité de maillage
 
-`run_cfd.sh` lance `checkMesh` **sans** `-allGeometry` : ce mode signale les
-cellules concaves, que tout maillage snappyHexMesh avec couches limites
-produit, et que le solveur encaisse sans difficulté — il ferait échouer
-pratiquement toutes les itérations.
-
-Le verdict utile vient de la comparaison aux seuils de `cfd_settings.yaml`
-(`mesh.check_mesh`) : non-orthogonalité, skewness, aspect ratio. Un maillage
-peut être « Mesh OK » pour OpenFOAM tout en étant trop dégradé pour qu'on
-fasse confiance aux coefficients.
+`checkMesh` est lancé **sans** `-allGeometry` : ce mode signale les cellules
+concaves, que tout maillage snappyHexMesh avec couches limites produit et que le
+solveur encaisse sans difficulté — il ferait échouer presque toutes les
+itérations. Le verdict utile vient de la comparaison aux seuils de
+`cfd_settings.yaml` : non-orthogonalité, skewness, aspect ratio.
 
 Ces seuils tiennent compte d'un fait mesuré : **snappyHexMesh n'est pas
-déterministe en parallèle**. Trois maillages successifs de la même géométrie
-ont donné 54,5 / 68,5 / 69,1 de non-orthogonalité maximale. Un seuil trop
-serré ferait donc échouer une itération au hasard, et l'optimisation ne serait
-plus reproductible.
+déterministe en parallèle**. Trois maillages successifs de la même géométrie ont
+donné 54,5 / 68,5 / 69,1 de non-orthogonalité maximale. Un seuil trop serré
+ferait échouer une itération au hasard, et l'optimisation ne serait plus
+reproductible — d'où 75.
+
+### `results.json`
+
+Écrit dans **tous** les cas, succès comme échec : c'est le seul canal de retour
+vers le pipeline et l'agent. En cas d'échec, `Cd`/`Cl`/`Cl_Cd` valent `null` et
+jamais `0.0` — un zéro se propagerait dans la boucle comme une mesure légitime.
+
+`converged` résume les deux conditions qui rendent un point exploitable : un
+maillage validé et des coefficients stabilisés.
+
+### Deux préréglages
+
+| | `cfd_settings.yaml` | `cfd_settings_fast.yaml` |
+|---|---|---|
+| Durée | ~15 min | ~60 s |
+| Maillage | 8 mailles/corde, niveaux 3-4, couches limites | 6 mailles/corde, niveaux 2-3, sans couches |
+| Itérations | 2000 | 500 |
+| Usage | qualifier une forme | explorer |
+
+Une optimisation ne compare pas des valeurs à la réalité, elle **classe des
+formes**. Un biais systématique ne change pas ce classement, donc le préréglage
+rapide convient à l'exploration. Revalider le meilleur design avec le réglage
+fin avant d'en tirer un chiffre.
 
 ### Résultat de référence
 
-Chaîne validée de bout en bout sur OpenFOAM v2506, NACA 2412 à incidence nulle,
-Re = 4 × 10⁵ :
+OpenFOAM v2506, NACA 2412 à incidence nulle, Re = 4 × 10⁵, réglage fin :
 
 | | |
 |---|---|
 | Cellules | 168 312 |
 | checkMesh | non-ortho 54,5 · skewness 2,6 · aspect ratio 14,5 |
-| **Cl** | **0,2275** (théorie NACA 2412 à α = 0° : ≈ 0,25) |
+| **Cl** | **0,2275** — théorie NACA 2412 à α = 0° : ≈ 0,25 |
 | **Cd** | **0,0170** |
-| Cl/Cd | 13,4 |
-| Stabilité | écart-type relatif 4 × 10⁻⁵ sur les 200 dernières itérations |
+| Stabilité | écart-type relatif 4 × 10⁻⁵ sur 200 itérations |
 
-Le Cl est juste. Le **Cd est surestimé d'un facteur ≈ 2** par rapport aux
-mesures en soufflerie : `kOmegaSST` suppose la couche limite turbulente dès le
-bord d'attaque, ce qui est faux à Re = 4 × 10⁵ où une bonne partie de
-l'extrados est encore laminaire. Pour de l'optimisation — qui compare des
-formes entre elles — ce biais systématique est acceptable ; pour une valeur
-absolue de traînée, il ne l'est pas.
+Le Cl est juste. Le **Cd est surestimé d'un facteur ≈ 2** : `kOmegaSST` suppose
+la couche limite turbulente dès le bord d'attaque, ce qui est faux à
+Re = 4 × 10⁵ où une bonne partie de l'extrados reste laminaire. Acceptable pour
+comparer des formes, pas pour annoncer une traînée absolue.
+
+---
+
+## L'agent
+
+```bash
+python3 agent/orchestrator.py --dry-run --explain
+```
+
+### Deux stratégies
+
+`llm` — Claude lit l'historique et raisonne sur la forme (`ANTHROPIC_API_KEY`
+requise). Une proposition refusée par la validation lui est renvoyée **avec le
+message d'erreur**, qui nomme le paramètre fautif et donne l'intervalle
+admissible ; trois tentatives, puis abandon.
+
+`local` — recherche par motif déterministe, sans clé ni réseau.
+
+`auto` (défaut) interroge l'agent et retombe sur la recherche locale s'il est
+indisponible. Ce repli n'est pas un pis-aller : sans lui, une clé absente ou une
+coupure réseau arrêterait une optimisation de plusieurs heures.
+
+### Ce que fait la recherche locale
+
+Depuis le meilleur point connu, elle sonde un paramètre dans une direction. Si
+ça paye, elle **poursuit dans la même direction** — une recherche linéaire, sans
+quoi un paramètre n'avancerait que d'un pas toutes les 2n itérations. Sinon elle
+essaie l'autre sens, puis le paramètre suivant ; quand tout a été sondé sans
+gain, le pas est divisé par deux.
+
+Deux raffinements qui viennent de l'observation :
+
+- **On ne se téléporte pas au meilleur point.** Le budget `max_delta_pct` se
+  mesure depuis la dernière itération *réussie*, pas depuis la meilleure. Quand
+  les deux diffèrent, la recherche s'en rapproche autant que le contrat
+  l'autorise.
+- **Un paramètre sans effet mesuré est abandonné.** Deux essais qui ne changent
+  rien à l'objectif suffisent : chaque évaluation coûte plusieurs minutes.
+
+Sur un modèle CFD analytique à optimum connu, la recherche améliore l'objectif
+de **+657 %** en 25 itérations.
+
+---
+
+## La boucle
+
+```bash
+python3 scripts/run_loop.py --max-iterations 20 --strategy auto \
+    --cfd-settings configs/cfd_settings_fast.yaml
+```
+
+Elle est faite pour tourner sans surveillance :
+
+- **elle ne s'arrête pas sur un échec** — l'itération ratée est archivée, la
+  stratégie resserre le pas, la suivante repart de la meilleure forme connue.
+  Seuls des échecs consécutifs, signe d'un problème de fond, l'interrompent ;
+- **elle est reprenable** — tout l'état vit dans `data/iterations/` ;
+- **elle s'arrête d'elle-même** sur stagnation, plutôt que de brûler le budget
+  sur du bruit numérique ;
+- **Ctrl-C** termine l'itération en cours puis sort proprement — couper au
+  milieu d'un run OpenFOAM laisserait une archive que la reprise lirait mal.
+
+Bilan écrit dans `data/iterations/optimization_summary.json`.
+
+---
+
+## Archivage
+
+Chaque itération, **réussie ou non**, laisse dans `data/iterations/iter_XXXX/` :
+
+```
+design_params.yaml     la configuration EXACTE ayant produit ce résultat
+geometry.stl / .step   la géométrie
+results.json           les coefficients, ou la cause de l'échec
+iteration.json         le compte rendu du pipeline
+fusion_status.json     le compte rendu du driver
+logs/                  un journal par étape
+cfd/                   le case OpenFOAM complet
+```
+
+La copie de la configuration est indispensable : le fichier de travail aura
+déjà été réécrit par l'agent à l'itération suivante, et un résultat archivé sans
+ses paramètres n'est rattachable à rien.
 
 ---
 
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -v
+python3 -m pytest tests/ -q          # 431 tests, ~8 s
 ```
+
+Ce qui est couvert sans dépendance externe : validation du contrat, unités et
+expressions Fusion, lecture des STL, dimensionnement du case, rendu des
+templates, lecture des coefficients dans les deux conventions OpenFOAM,
+détection d'une géométrie inchangée, enchaînement du pipeline, convergence de la
+recherche sur un modèle analytique, et lecture des réponses de l'agent.
+
+Le driver Fusion est exécuté contre une **émulation de l'API `adsk`**
+(`tests/fake_adsk.py`) : `run()`, la reconstruction, la purge et les exports
+tournent réellement, sur un document qui reproduit celui du premier run réel.
+
+> **Limite assumée.** Un faux valide la logique du driver, pas la lecture de
+> l'API Fusion. Un bug de la Phase 1 — `evaluateExpression` rend des unités
+> internes — est passé au travers de 206 tests parce que la doublure encodait la
+> même erreur de compréhension que le code. Seul un run dans Fusion tranche ce
+> genre de question.
 
 ---
 
-## À fournir par l'utilisateur
+## Écarts assumés au Master Document
 
-- `fusion/seed_design.f3d` — le modèle Fusion 360 paramétrique de départ, dont
-  les User Parameters portent exactement les noms listés dans
-  `configs/design_params.yaml`.
-- `ANTHROPIC_API_KEY` dans `.env` (nécessaire à partir de la Phase 4).
+| Écart | Pourquoi |
+|---|---|
+| `openfoam/case_builder.py`, fichier hors structure | Le case se **déduit** des paramètres (domaine, mailles, k, omega, Aref). Faire ce calcul en bash sur du YAML aurait été la partie la plus fragile du système. |
+| Producteur de géométrie interne | L'API Fusion n'a pas de mode headless. Sans lui, aucune boucle autonome n'est possible. Fusion reste la référence dès qu'il est disponible. |
+| Stratégie locale en repli de l'agent | Une optimisation de plusieurs heures ne peut pas dépendre d'une clé d'API ou du réseau. |
+| `configs/cfd_settings_fast.yaml` | Le réglage fin coûte 15 min par itération, soit 5 h pour 20 itérations. |
+| Mode `rebuild` par défaut | Le seed livré n'est pas réellement piloté par ses paramètres (voir plus haut). |
+
+---
+
+## À fournir
+
+- `fusion/seed_design.f3d` — le modèle Fusion, si l'on veut passer par la CAO
+  plutôt que par le producteur interne.
+- `ANTHROPIC_API_KEY` dans `.env` — pour la stratégie LLM. Sans elle, la boucle
+  tourne en recherche locale.

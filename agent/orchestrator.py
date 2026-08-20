@@ -38,6 +38,7 @@ if str(REPO_ROOT) not in sys.path:
 from pipeline import master_pipeline as mp  # noqa: E402
 from pipeline.utils import (  # noqa: E402
     allowed_range,
+    load_env,
     load_yaml,
     max_abs_delta,
     save_design_params,
@@ -712,6 +713,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--propose", action="store_true", help="(implicite)")
     args = parser.parse_args(argv)
+    load_env()
 
     try:
         result = propose(

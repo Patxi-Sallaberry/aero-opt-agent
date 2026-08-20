@@ -50,6 +50,7 @@ from fusion import parametric_driver as driver  # noqa: E402
 from pipeline.geometry_validator import GeometryError, validate_geometry  # noqa: E402
 from pipeline.utils import (  # noqa: E402
     ConfigValidationError,
+    load_env,
     load_yaml,
     validate_design_params,
 )
@@ -442,6 +443,7 @@ def main(argv: list[str] | None = None) -> int:
         "--quiet", action="store_true", help="n'affiche que la ligne de résumé"
     )
     args = parser.parse_args(argv)
+    load_env()
 
     iterations_root = args.iterations_dir or os.environ.get("ITERATIONS_DIR") or str(
         DEFAULT_ITERATIONS

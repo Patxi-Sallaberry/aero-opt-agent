@@ -394,3 +394,44 @@ def test_cli_retourne_2_sur_fichier_absent(tmp_path, capsys):
     from pipeline.utils import main
 
     assert main([str(tmp_path / "absent.yaml")]) == 2
+
+
+# ─────────────────────────────────────────────────────────────
+# Chargement du .env
+# ─────────────────────────────────────────────────────────────
+
+
+def test_env_charge(tmp_path, monkeypatch):
+    from pipeline.utils import load_env
+
+    monkeypatch.delenv("FOAM_BASHRC", raising=False)
+    env = tmp_path / ".env"
+    env.write_text(
+        "# commentaire\n"
+        "FOAM_BASHRC=/usr/lib/openfoam/openfoam2506/etc/bashrc\n"
+        "\n"
+        'AGENT_MODEL="claude-opus-5"\n',
+        encoding="utf-8",
+    )
+    loaded = load_env(env)
+    assert loaded["FOAM_BASHRC"].endswith("bashrc")
+    assert loaded["AGENT_MODEL"] == "claude-opus-5"   # guillemets retirés
+
+
+def test_lenvironnement_existant_gagne(tmp_path, monkeypatch):
+    # Une variable passée explicitement prime sur le fichier de configuration.
+    from pipeline.utils import load_env
+
+    monkeypatch.setenv("FOAM_BASHRC", "/chemin/explicite")
+    env = tmp_path / ".env"
+    env.write_text("FOAM_BASHRC=/chemin/du/fichier\n", encoding="utf-8")
+    load_env(env)
+    import os
+
+    assert os.environ["FOAM_BASHRC"] == "/chemin/explicite"
+
+
+def test_env_absent_ne_leve_pas(tmp_path):
+    from pipeline.utils import load_env
+
+    assert load_env(tmp_path / "absent") == {}

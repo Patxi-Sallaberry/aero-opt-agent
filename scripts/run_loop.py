@@ -39,7 +39,7 @@ if str(REPO_ROOT) not in sys.path:
 from agent import orchestrator  # noqa: E402
 from agent.orchestrator import ProposalError  # noqa: E402
 from pipeline import master_pipeline as mp  # noqa: E402
-from pipeline.utils import load_yaml  # noqa: E402
+from pipeline.utils import load_env, load_yaml  # noqa: E402
 
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "design_params.yaml"
 DEFAULT_CFD = REPO_ROOT / "configs" / "cfd_settings.yaml"
@@ -293,6 +293,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stagnation-patience", type=int, default=6)
     parser.add_argument("--json", action="store_true", help="bilan sur stdout")
     args = parser.parse_args(argv)
+
+    loaded = load_env()
+    if loaded:
+        print(f"[loop] .env chargé ({len(loaded)} variables)", file=sys.stderr)
 
     signal.signal(signal.SIGINT, _handle_signal)
 
