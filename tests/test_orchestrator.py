@@ -235,7 +235,7 @@ def test_tous_les_parametres_sont_sondes(config, iterations, monkeypatch):
     evaluate(config, iterations)
 
     touches = set()
-    for i in range(1, 6):
+    for i in range(1, 10):
         result = orch.propose(config, iterations, strategy="local", write=False)
         touches.update(result["changed"])
         # On archive un résultat identique (aucun gain) pour forcer la rotation.
@@ -363,9 +363,9 @@ def test_un_parametre_sonde_une_seule_fois_reste_en_jeu(config):
 
 
 def test_la_boucle_survit_aux_echecs(config, iterations, monkeypatch):
-    # Toute cambrure au dessus de 0.03 fait « échouer le maillage » — alors que
-    # l'optimum, lui, est à 0.05 : la recherche va donc buter dessus.
-    analytic_cfd(monkeypatch, fail_when=lambda p: p["camber"] > 0.03)
+    # Toute incidence non nulle fait « échouer le maillage » — or l'optimum est
+    # à 5 deg : la recherche va donc buter dessus à répétition.
+    analytic_cfd(monkeypatch, fail_when=lambda p: abs(p["aoa"]) > 0.5)
     summary = loop.run_loop(
         config, REAL_CFD, iterations, max_iterations=20, strategy="local",
         geometry_backend="internal", max_consecutive_failures=4,

@@ -234,14 +234,25 @@ def propose_local(
     # NOUVEAU. Sans ce contrôle, une sonde infructueuse est reproposée à
     # l'identique — la boucle s'arrête alors sur « la cible coïncide avec
     # l'itération précédente », en ayant gaspillé son budget.
+    # La rotation des paramètres suit le nombre TOTAL de sondes, pas le nombre
+    # depuis le dernier gain. Sinon chaque amélioration remet le cycle à zéro,
+    # et les paramètres classés en fin de liste ne viennent jamais : sur une
+    # optimisation réelle, la cambrure n'a jamais été re-sondée après que
+    # l'incidence eut trouvé son optimum, alors que les deux sont couplées.
+    # L'exploitation d'une bonne direction reste assurée par la recherche
+    # linéaire ci-dessous.
+    rotation = len(history)
+
     for extra in range((4 * n + 8) * 2):
-        step = attempts + extra
+        step = rotation + extra
         # Deux sens épuisés sur un paramètre avant de passer au suivant :
         # essayer +7 % de corde puis +8 % d'épaisseur avant de seulement tenter
         # -7 % de corde gaspillerait des évaluations.
         index = (step // 2) % n
         direction = 1.0 if step % 2 == 0 else -1.0
-        shrink = 0.5 ** (step // (2 * n))
+        # Le pas, lui, se resserre en fonction des essais infructueux DEPUIS le
+        # meilleur point : c'est ce qui fait converger la recherche.
+        shrink = 0.5 ** (attempts // (2 * n))
         # Un échec signale une forme trop agressive : on resserre franchement.
         shrink *= 0.5 ** failures
 
@@ -470,7 +481,7 @@ def _last_improving_probe(
         return None
     previous = max(earlier, key=lambda p: p["iteration"])
 
-    moved: list[tuple[str, float]] = []
+    moved: list[tuple[float, str, float]] = []
     for name in free:
         spec = parameters.get(name)
         if not isinstance(spec, Mapping):
@@ -480,12 +491,22 @@ def _last_improving_probe(
         if before is None or after is None:
             continue
         delta = after - before
-        if abs(delta) > abs(max_abs_delta(before, spec)) * 1e-3:
-            moved.append((name, 1.0 if delta > 0 else -1.0))
+        budget = abs(max_abs_delta(before, spec)) or 1.0
+        share = abs(delta) / budget
+        if share > 1e-3:
+            moved.append((share, name, 1.0 if delta > 0 else -1.0))
 
-    # Une seule direction identifiable : sinon on ne saurait pas à quoi
-    # attribuer le gain.
-    return moved[0] if len(moved) == 1 else None
+    if not moved:
+        return None
+    moved.sort(reverse=True)
+
+    # Le mouvement dominant emporte l'attribution. Exiger un seul paramètre
+    # modifié serait trop strict : une proposition ramène aussi les autres vers
+    # le meilleur point, donc plusieurs valeurs bougent souvent en même temps,
+    # et l'exploitation d'une direction payante ne se déclencherait jamais.
+    if len(moved) > 1 and moved[0][0] < moved[1][0] * 2.0:
+        return None
+    return moved[0][1], moved[0][2]
 
 
 def _last_point(
