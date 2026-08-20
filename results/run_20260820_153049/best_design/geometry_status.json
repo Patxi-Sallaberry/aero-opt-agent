@@ -1,0 +1,63 @@
+{
+  "success": true,
+  "status": "OK",
+  "iteration": 4,
+  "design_id": "wing_v01",
+  "config_path": "/tmp/pytest-of-root/pytest-53/test_rapport_montre_les_echecs0/design_params.yaml",
+  "step_path": null,
+  "stl_path": "/tmp/pytest-of-root/pytest-53/test_rapport_montre_les_echecs0/iterations/iter_0004/geometry.stl",
+  "geometry_backend": "internal",
+  "geometry_mode": "rebuild",
+  "geometry": {
+    "chord_cm": 30.0,
+    "span_cm": 8.0,
+    "thickness": 0.12,
+    "camber": 0.02,
+    "aoa_deg": 0.8400000000000001,
+    "n_points": 80,
+    "camber_position": 0.4,
+    "bbox_cm": {
+      "x_min": 0.0,
+      "x_max": 29.996775986976523,
+      "y_min": -1.3764098774248505,
+      "y_max": 2.2328294232697896
+    },
+    "bodies": 1,
+    "purged_entities": 0,
+    "stl_units": "m"
+  },
+  "applied_parameters": {
+    "chord": {
+      "expression": "300 mm",
+      "requested_value": 300.0,
+      "unit": "mm"
+    },
+    "thickness": {
+      "expression": "0.12",
+      "requested_value": 0.12,
+      "unit": "unitless"
+    },
+    "camber": {
+      "expression": "0.02",
+      "requested_value": 0.02,
+      "unit": "unitless"
+    },
+    "span": {
+      "expression": "80 mm",
+      "requested_value": 80.0,
+      "unit": "mm"
+    },
+    "aoa": {
+      "expression": "0.84 deg",
+      "requested_value": 0.84,
+      "unit": "deg"
+    }
+  },
+  "error_message": null,
+  "error_details": null,
+  "warnings": [
+    "géométrie produite sans Fusion (mode interne) : pas de STEP, pas d'historique CAO. La forme est celle de design_params.yaml."
+  ],
+  "fusion_available": false,
+  "timestamp": "2026-08-20T13:30:49+00:00"
+}

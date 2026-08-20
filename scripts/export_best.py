@@ -435,10 +435,112 @@ def build_figures(
     return produced
 
 
+def build_comparison_figures(
+    output: Path,
+    before_section: Mapping[str, Any],
+    after_section: Mapping[str, Any],
+    before_results: Mapping[str, Any],
+    after_results: Mapping[str, Any],
+    before_cp: Mapping[str, list[tuple[float, float]]] | None,
+    after_cp: Mapping[str, list[tuple[float, float]]] | None,
+    regime: str,
+) -> dict[str, str]:
+    """Figures « avant / après » : sections, performances, distribution de Cp."""
+    figures = output / "figures"
+    figures.mkdir(parents=True, exist_ok=True)
+    produced: dict[str, str] = {}
+
+    def write(name: str, svg: str) -> None:
+        (figures / name).write_text(svg, encoding="utf-8")
+        produced[name.rsplit(".", 1)[0]] = f"figures/{name}"
+
+    before_panel = {
+        **before_section,
+        "label": "Seed (départ)",
+        "caption": (
+            f"corde {before_section['chord_mm']:.0f} mm · "
+            f"incidence {before_section['aoa_deg']:.2f}° · "
+            f"épaisseur {before_section['thickness']:.3f}"
+        ),
+    }
+    after_panel = {
+        **after_section,
+        "label": "Design optimisé",
+        "caption": (
+            f"corde {after_section['chord_mm']:.0f} mm · "
+            f"incidence {after_section['aoa_deg']:.2f}° · "
+            f"épaisseur {after_section['thickness']:.3f}"
+        ),
+    }
+
+    write(
+        "comparison_sections.svg",
+        plots.airfoil_comparison(
+            before_panel, after_panel, title="Section : avant / après",
+        ),
+    )
+    write(
+        "comparison_overlay.svg",
+        plots.airfoil_overlay(
+            {**before_panel, "label": "seed"},
+            {**after_panel, "label": "optimisé"},
+            title="Les deux sections superposées",
+        ),
+    )
+
+    groups = [
+        {"label": "Portance (Cl)", "before": before_results.get("Cl"),
+         "after": after_results.get("Cl"), "better": "higher", "format": ".4f"},
+        {"label": "Traînée (Cd)", "before": before_results.get("Cd"),
+         "after": after_results.get("Cd"), "better": "lower", "format": ".5f"},
+        {"label": "Finesse (Cl/Cd)", "before": before_results.get("Cl_Cd"),
+         "after": after_results.get("Cl_Cd"), "better": "higher", "format": ".2f"},
+    ]
+    write(
+        "comparison_performance.svg",
+        plots.comparison_bars(
+            groups, title=f"Performances — {regime}",
+            before_label="seed", after_label="optimisé",
+        ),
+    )
+
+    if before_cp and after_cp:
+        write(
+            "comparison_cp.svg",
+            plots.chart(
+                [
+                    {"points": before_cp["upper"], "label": "seed — extrados",
+                     "color": plots.COLORS[1], "dashed": True},
+                    {"points": before_cp["lower"], "label": "seed — intrados",
+                     "color": plots.COLORS[4], "dashed": True},
+                    {"points": after_cp["upper"], "label": "optimisé — extrados",
+                     "color": plots.COLORS[0]},
+                    {"points": after_cp["lower"], "label": "optimisé — intrados",
+                     "color": plots.COLORS[2]},
+                ],
+                title="Distribution de pression : avant / après",
+                x_label="x / corde", y_label="Cp",
+                invert_y=True, y_zero_line=True,
+            ),
+        )
+    return produced
+
+
 def render_paraview(
-    case_dir: Path, output: Path, u_inf: float, rho: float, timeout_s: int = 900
+    case_dir: Path,
+    output: Path,
+    u_inf: float,
+    rho: float,
+    timeout_s: int = 900,
+    prefix: str = "",
 ) -> tuple[list[str], str | None]:
-    """Lance ParaView en lot. Retourne (images, message d'échec éventuel)."""
+    """Lance ParaView en lot. Retourne (images, message d'échec éventuel).
+
+    `prefix` renomme les images produites : le champ de pression du seed et
+    celui du design optimisé cohabitent alors dans le même dossier, avec la
+    MÊME échelle de couleurs — sans quoi les comparer visuellement n'aurait
+    aucun sens.
+    """
     figures = output / "figures"
     figures.mkdir(parents=True, exist_ok=True)
 
@@ -470,11 +572,18 @@ def render_paraview(
     except OSError as exc:
         return [], f"lancement de ParaView impossible : {exc}"
 
-    produced = [
-        name for name in ("pressure_field.png", "velocity_field.png",
-                          "streamlines.png")
-        if (figures / name).is_file()
-    ]
+    produced: list[str] = []
+    for name in ("pressure_field.png", "velocity_field.png", "streamlines.png"):
+        source = figures / name
+        if not source.is_file():
+            continue
+        if prefix:
+            target = figures / f"{prefix}{name}"
+            source.replace(target)
+            produced.append(target.name)
+        else:
+            produced.append(name)
+
     if not produced:
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
         return [], "ParaView n'a produit aucune image : " + " ".join(tail)[:300]
@@ -634,6 +743,97 @@ def _cell(text: Any) -> str:
     return str(text).replace("|", "∕").replace("\n", " ")
 
 
+def _comparison_section(
+    comparison: Mapping[str, Any], figures: Mapping[str, str]
+) -> list[str]:
+    """La section « avant / après », faite pour se lire d'un coup d'œil."""
+    lines: list[str] = ["## Avant / après", ""]
+    regime = comparison.get("regime", "")
+    before = comparison["before"]
+    after = comparison["after"]
+
+    lines.append(
+        f"Le seed de départ face au design retenu, tous deux mesurés "
+        f"**dans le même régime CFD** ({regime}) — comparer un maillage fin à "
+        f"un maillage d'exploration gonflerait le gain sans qu'il soit réel."
+    )
+    lines.append("")
+
+    if "comparison_performance" in figures:
+        lines.append(f"![Performances avant / après]({figures['comparison_performance']})")
+        lines.append("")
+
+    lines.append("| | seed | optimisé | écart |")
+    lines.append("|---|---|---|---|")
+    for label, key, spec, better in (
+        ("Portance Cl", "Cl", ".4f", "higher"),
+        ("Traînée Cd", "Cd", ".5f", "lower"),
+        ("Finesse Cl/Cd", "Cl_Cd", ".2f", "higher"),
+    ):
+        b, a = before.get(key), after.get(key)
+        if not all(isinstance(v, (int, float)) for v in (b, a)):
+            continue
+        change = (a - b) / abs(b) * 100 if b else 0.0
+        improved = (a > b) if better == "higher" else (a < b)
+        lines.append(
+            f"| **{label}** | {format(b, spec)} | **{format(a, spec)}** "
+            f"| {change:+.1f} % {'✓' if improved else '✗'} |"
+        )
+    lines.append("")
+
+    if "comparison_sections" in figures:
+        lines.append(f"![Sections avant / après]({figures['comparison_sections']})")
+        lines.append("")
+        lines.append(
+            "Les deux sections sont dessinées à la **même échelle** : mises "
+            "chacune à la taille de son cadre, elles paraîtraient identiques et "
+            "l'écart de corde comme l'incidence passeraient inaperçus."
+        )
+        lines.append("")
+    if "comparison_overlay" in figures:
+        lines.append(f"![Sections superposées]({figures['comparison_overlay']})")
+        lines.append("")
+
+    if "comparison_cp" in figures:
+        lines.append("### La pression, avant et après")
+        lines.append("")
+        lines.append(f"![Cp avant / après]({figures['comparison_cp']})")
+        lines.append("")
+        lines.append(
+            "L'aire comprise entre la courbe d'extrados et celle d'intrados "
+            "*est* la portance. Le design optimisé creuse davantage sa "
+            "dépression d'extrados et l'étale sur la corde : c'est là que se "
+            "gagne le supplément de portance."
+        )
+        lines.append("")
+
+    seed_images = list(comparison.get("images", []))
+    if seed_images:
+        lines.append("### Les champs, côte à côte")
+        lines.append("")
+        for name in ("pressure_field.png", "streamlines.png"):
+            seed_name = f"seed_{name}"
+            if seed_name not in seed_images:
+                continue
+            lines.append("<!-- side-by-side -->")
+            lines.append(f"![Seed — {name.split('.')[0]}](figures/{seed_name})")
+            lines.append(f"![Optimisé — {name.split('.')[0]}](figures/{name})")
+            lines.append("<!-- /side-by-side -->")
+            lines.append("")
+        lines.append(
+            "Même échelle de couleurs des deux côtés — c'est la condition pour "
+            "que la comparaison veuille dire quelque chose. La dépression "
+            "d'extrados, en bleu, est nettement plus marquée et plus étendue "
+            "après optimisation."
+        )
+        lines.append("")
+    elif comparison.get("visuals_error"):
+        lines.append(f"> Contours du seed non produits : {comparison['visuals_error']}")
+        lines.append("")
+
+    return lines
+
+
 def build_report(
     design: Mapping[str, Any],
     initial_design: Mapping[str, Any] | None,
@@ -649,6 +849,7 @@ def build_report(
     has_case: bool,
     source: Path,
     visuals_error: str | None,
+    comparison: Mapping[str, Any] | None = None,
 ) -> str:
     parameters = design["parameters"]
     initial = (initial_design or {}).get("parameters", {})
@@ -738,7 +939,10 @@ def build_report(
         )
     lines.append("")
 
-    if "profile_shape" in figures:
+    # ── Avant / après ─────────────────────────────────────────────────────
+    if comparison:
+        lines.extend(_comparison_section(comparison, figures))
+    elif "profile_shape" in figures:
         lines.append(f"![Section du profil]({figures['profile_shape']})")
         lines.append("")
 
@@ -955,8 +1159,21 @@ def markdown_to_html(markdown: str, output: Path, title: str) -> str:
     html: list[str] = []
     in_table = False
     in_code = False
+    in_row = False
 
     for line in markdown.splitlines():
+        # Les marqueurs de côte à côte sont des commentaires Markdown : ils
+        # disparaissent chez un lecteur qui ne les connaît pas, et les images
+        # s'y empilent simplement au lieu de se juxtaposer.
+        if line.strip() == "<!-- side-by-side -->":
+            html.append('<div class="side-by-side">')
+            in_row = True
+            continue
+        if line.strip() == "<!-- /side-by-side -->":
+            html.append("</div>")
+            in_row = False
+            continue
+
         if line.startswith("```"):
             html.append("</pre>" if in_code else "<pre>")
             in_code = not in_code
@@ -1041,6 +1258,10 @@ def markdown_to_html(markdown: str, output: Path, title: str) -> str:
   figure svg, figure img {{ max-width: 100%; height: auto;
                             border: 1px solid #e4e4e4; border-radius: 4px; }}
   figcaption {{ font-size: .85rem; color: #666; margin-top: .5rem; }}
+  .side-by-side {{ display: flex; gap: 1rem; align-items: flex-start;
+                   flex-wrap: wrap; margin: 1.6rem 0; }}
+  .side-by-side figure {{ flex: 1 1 380px; margin: 0; }}
+  .side-by-side figcaption {{ font-weight: 600; color: #444; }}
   blockquote {{ border-left: 4px solid #c1440e; margin: 1.2rem 0;
                 padding: .3rem 1rem; background: #fdf6f3; color: #444; }}
   li {{ margin: .45rem 0; }}
@@ -1065,6 +1286,40 @@ def _inline(text: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def resolve_baseline(
+    iterations_root: Path,
+    history: Sequence[Mapping[str, Any]],
+    baseline_dir: Path | None,
+    qualified: bool,
+) -> tuple[Path | None, str]:
+    """Choisit la référence « avant » et dit dans quel régime elle est mesurée.
+
+    Comparer le seed mesuré en exploration au design optimisé mesuré au réglage
+    fin gonflerait artificiellement le gain : deux régimes différents ne se
+    comparent pas. Trois cas :
+
+    - `baseline_dir` fourni : c'est au concepteur d'avoir aligné les régimes,
+      on le suit ;
+    - sinon, la première itération réussie de la série, et la comparaison se
+      fait alors sur les chiffres D'EXPLORATION des deux côtés, y compris pour
+      le design optimisé ;
+    - rien d'exploitable : pas de comparaison.
+    """
+    if baseline_dir is not None:
+        path = Path(baseline_dir)
+        if not (path / "results.json").is_file():
+            raise ExportError(f"référence sans results.json : {path}")
+        return path, "réglage fin"
+
+    first = next((r for r in history if r.get("success")), None)
+    if first is None:
+        return None, ""
+    path = iteration_dir(iterations_root, first["iteration"])
+    if not (path / "results.json").is_file():
+        return None, ""
+    return path, ("exploration" if qualified else "même régime")
+
+
 def export_best(
     iterations_root: Path,
     output: Path | None = None,
@@ -1072,6 +1327,8 @@ def export_best(
     include_case: bool = True,
     visuals: bool = True,
     cfd_settings_path: Path | None = None,
+    baseline_dir: Path | None = None,
+    compare: bool = True,
 ) -> dict:
     """Assemble le dossier livrable. Retourne un résumé de ce qui a été produit."""
     iterations_root = Path(iterations_root)
@@ -1169,20 +1426,44 @@ def export_best(
     elif visuals:
         visuals_error = "case OpenFOAM absent du dossier exporté"
 
-    first_results = next(
-        (r for r in history
-         if r.get("success") and isinstance(r.get("Cl"), (int, float))),
-        None,
-    )
+    # ── Comparaison avant / après ────────────────────────────────────────
+    comparison: dict[str, Any] = {}
+    if compare:
+        baseline, regime = resolve_baseline(
+            iterations_root, history, baseline_dir, bool(qualified_dir)
+        )
+        if baseline is not None:
+            comparison = _build_comparison(
+                output, baseline, regime, design, section, results, fast_results,
+                u_inf, rho, visuals, cfd_settings_path,
+            )
+        figures.update(comparison.get("figures", {}))
+
+    # Les coefficients cités dans la lecture physique doivent venir du MÊME
+    # régime des deux côtés. Sans cela, on compare un Cd d'exploration à un Cd
+    # de réglage fin, et l'on peut annoncer une traînée en baisse là où elle
+    # augmente — c'est arrivé.
+    if comparison:
+        first_results = comparison["before"]
+        compared_results = comparison["after"]
+    else:
+        first_results = next(
+            (r for r in history
+             if r.get("success") and isinstance(r.get("Cl"), (int, float))),
+            None,
+        )
+        compared_results = results
+
     notes = explain_physics(
         {n: float(s["value"]) for n, s in (initial_design or design)["parameters"].items()},
         {n: float(s["value"]) for n, s in design["parameters"].items()},
-        first_results, results, cp,
+        first_results, compared_results, cp,
     )
 
     report = build_report(
         design, initial_design, record, results, fast_results, history, section,
         figures, images, notes, has_step, has_case, source, visuals_error,
+        comparison=comparison or None,
     )
     (output / "README.md").write_text(report, encoding="utf-8")
     (output / "report.html").write_text(
@@ -1207,10 +1488,109 @@ def export_best(
         "has_step": has_step,
         "has_case": has_case,
         "figures": sorted(figures.values()),
-        "images": images,
+        "images": images + list(comparison.get("images", [])),
         "visuals_error": visuals_error,
+        "comparison": {
+            "baseline": comparison.get("baseline"),
+            "regime": comparison.get("regime"),
+            "before": comparison.get("before", {}).get("Cl_Cd"),
+            "after": comparison.get("after", {}).get("Cl_Cd"),
+            "visuals_error": comparison.get("visuals_error"),
+        } if comparison else None,
         "files": copied,
         "size_bytes": sum(p.stat().st_size for p in output.rglob("*") if p.is_file()),
+    }
+
+
+def _build_comparison(
+    output: Path,
+    baseline: Path,
+    regime: str,
+    design: Mapping[str, Any],
+    section: Mapping[str, Any],
+    results: Mapping[str, Any],
+    fast_results: Mapping[str, Any] | None,
+    u_inf: float,
+    rho: float,
+    visuals: bool,
+    cfd_settings_path: Path | None,
+) -> dict:
+    """Assemble tout ce qui oppose le seed au design optimisé."""
+    baseline_design = load_yaml(baseline / "design_params.yaml")
+    baseline_results = json.loads(
+        (baseline / "results.json").read_text(encoding="utf-8")
+    )
+
+    comparison_dir = output / "comparison"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(baseline / "results.json", comparison_dir / "seed_results.json")
+    shutil.copyfile(
+        baseline / "design_params.yaml", comparison_dir / "seed_design_params.yaml"
+    )
+    if (baseline / "geometry.stl").is_file():
+        shutil.copyfile(baseline / "geometry.stl", comparison_dir / "seed_geometry.stl")
+
+    baseline_section = write_profile_section(baseline_design, comparison_dir)
+
+    # Les deux côtés doivent être mesurés dans le MÊME régime. Quand le design
+    # optimisé a été requalifié au réglage fin alors que la référence vient de
+    # l'exploration, ce sont les chiffres d'exploration des deux côtés qui
+    # servent à la comparaison — sinon le gain affiché mélangerait deux
+    # maillages et deux durées de calcul.
+    after_results = results
+    if regime == "exploration" and fast_results:
+        after_results = fast_results
+
+    baseline_cp = None
+    after_cp = None
+    baseline_case = baseline / "cfd"
+    if (baseline_case / "constant" / "polyMesh").is_dir():
+        samples = sample_wing_pressure(baseline_case)
+        if samples:
+            baseline_cp = cp_distribution(samples, baseline_section, u_inf)
+        samples_after = sample_wing_pressure(output / "cfd")
+        if samples_after:
+            after_cp = cp_distribution(samples_after, section, u_inf)
+
+    figures = build_comparison_figures(
+        output, baseline_section, section, baseline_results, after_results,
+        baseline_cp, after_cp, regime,
+    )
+
+    images: list[str] = []
+    visuals_error: str | None = None
+    if visuals and (baseline_case / "constant" / "polyMesh").is_dir():
+        images, visuals_error = render_paraview(
+            baseline_case, output, u_inf, rho, prefix="seed_"
+        )
+    elif visuals:
+        visuals_error = (
+            "champs du seed indisponibles (maillage purgé) : les contours "
+            "avant / après demandent de réévaluer le seed avec "
+            "`keep_case_after_run: true`"
+        )
+
+    return {
+        "baseline": str(baseline),
+        "regime": regime,
+        "figures": figures,
+        "images": images,
+        "visuals_error": visuals_error,
+        "before": {
+            "Cd": baseline_results.get("Cd"),
+            "Cl": baseline_results.get("Cl"),
+            "Cl_Cd": baseline_results.get("Cl_Cd"),
+            "parameters": {
+                n: float(s["value"])
+                for n, s in baseline_design["parameters"].items()
+            },
+        },
+        "after": {
+            "Cd": after_results.get("Cd"),
+            "Cl": after_results.get("Cl"),
+            "Cl_Cd": after_results.get("Cl_Cd"),
+        },
+        "sections": {"before": baseline_section, "after": section},
     }
 
 
@@ -1256,6 +1636,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--cfd-settings", default=None)
     parser.add_argument(
+        "--baseline-dir", default=None,
+        help="itération servant de référence « avant » ; à aligner sur le même "
+             "régime CFD que le design retenu (défaut : première itération "
+             "réussie de la série)",
+    )
+    parser.add_argument(
+        "--no-comparison", action="store_true",
+        help="n'assemble pas la comparaison avant / après",
+    )
+    parser.add_argument(
         "--no-case", action="store_true",
         help="n'inclut pas le case OpenFOAM (maillage et champs)",
     )
@@ -1273,6 +1663,8 @@ def main(argv: list[str] | None = None) -> int:
             include_case=not args.no_case,
             visuals=not args.no_visuals,
             cfd_settings_path=Path(args.cfd_settings) if args.cfd_settings else None,
+            baseline_dir=Path(args.baseline_dir) if args.baseline_dir else None,
+            compare=not args.no_comparison,
         )
     except ExportError as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)

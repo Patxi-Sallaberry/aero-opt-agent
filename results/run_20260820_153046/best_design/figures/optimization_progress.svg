@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
+<rect width="760" height="420" fill="#ffffff"/>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Finesse au fil des itérations</text>
+<line x1="78.0" y1="46" x2="78.0" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="78.0" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">0</text>
+<line x1="223.8" y1="46" x2="223.8" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="223.8" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">2.00</text>
+<line x1="369.6" y1="46" x2="369.6" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="369.6" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">4.00</text>
+<line x1="515.3" y1="46" x2="515.3" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="515.3" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">6.00</text>
+<line x1="661.1" y1="46" x2="661.1" y2="362" stroke="#dcdcdc" stroke-width="1"/>
+<text x="661.1" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">8.00</text>
+<line x1="78" y1="332.0" x2="734" y2="332.0" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="336.0" text-anchor="end" font-size="11" fill="#5a5a5a">-2.00</text>
+<line x1="78" y1="250.1" x2="734" y2="250.1" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="254.1" text-anchor="end" font-size="11" fill="#5a5a5a">0</text>
+<line x1="78" y1="168.3" x2="734" y2="168.3" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="172.3" text-anchor="end" font-size="11" fill="#5a5a5a">2.00</text>
+<line x1="78" y1="86.4" x2="734" y2="86.4" stroke="#dcdcdc" stroke-width="1"/>
+<text x="70" y="90.4" text-anchor="end" font-size="11" fill="#5a5a5a">4.00</text>
+<rect x="78" y="46" width="656" height="316" fill="none" stroke="#5a5a5a" stroke-width="1.2"/>
+<path d="M78.0,109.2 L150.9,109.2 L223.8,89.5 L296.7,111.1 L369.6,91.7 L442.4,89.5 L515.3,99.5 L588.2,340.2 L661.1,67.8 L734.0,79.1" fill="none" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="78.0" cy="109.2" r="3" fill="#1f4e8c"/>
+<circle cx="150.9" cy="109.2" r="3" fill="#1f4e8c"/>
+<circle cx="223.8" cy="89.5" r="3" fill="#1f4e8c"/>
+<circle cx="296.7" cy="111.1" r="3" fill="#1f4e8c"/>
+<circle cx="369.6" cy="91.7" r="3" fill="#1f4e8c"/>
+<circle cx="442.4" cy="89.5" r="3" fill="#1f4e8c"/>
+<circle cx="515.3" cy="99.5" r="3" fill="#1f4e8c"/>
+<circle cx="588.2" cy="340.2" r="3" fill="#1f4e8c"/>
+<circle cx="661.1" cy="67.8" r="3" fill="#1f4e8c"/>
+<circle cx="734.0" cy="79.1" r="3" fill="#1f4e8c"/>
+<circle cx="661.1" cy="67.8" r="5.5" fill="none" stroke="#1f4e8c" stroke-width="2.5"/>
+<line x1="88" y1="56" x2="110" y2="56" stroke="#1f4e8c" stroke-width="2.5"/>
+<text x="116" y="60" font-size="12" fill="#222222">Cl/Cd</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
+<text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cl / Cd</text>
+</svg>

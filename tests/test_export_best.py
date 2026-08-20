@@ -439,6 +439,233 @@ def test_cli_export_serie_vide(tmp_path, capsys):
 
 
 # ─────────────────────────────────────────────────────────────
+# Comparaison avant / après
+# ─────────────────────────────────────────────────────────────
+
+
+def test_reference_par_defaut_est_la_premiere_iteration(serie):
+    baseline, regime = eb.resolve_baseline(serie, mp.history(serie), None, False)
+    assert baseline.name == "iter_0000"
+    assert regime == "même régime"
+
+
+def test_reference_explicite(serie, tmp_path):
+    ref = tmp_path / "ref"
+    ref.mkdir()
+    (ref / "results.json").write_text(json.dumps({"Cd": 0.03, "Cl": 0.25}),
+                                      encoding="utf-8")
+    baseline, regime = eb.resolve_baseline(serie, mp.history(serie), ref, True)
+    assert baseline == ref
+    assert regime == "réglage fin"
+
+
+def test_reference_explicite_sans_resultats(serie, tmp_path):
+    vide = tmp_path / "sans"
+    vide.mkdir()
+    with pytest.raises(eb.ExportError):
+        eb.resolve_baseline(serie, mp.history(serie), vide, True)
+
+
+def test_regime_signale_quand_les_mesures_different(serie):
+    # Design requalifié au réglage fin, référence restée en exploration : la
+    # comparaison doit le dire, sous peine d'annoncer un gain qui mélange deux
+    # maillages.
+    _, regime = eb.resolve_baseline(serie, mp.history(serie), None, True)
+    assert regime == "exploration"
+
+
+def test_la_comparaison_utilise_le_meme_regime_des_deux_cotes(serie, tmp_path):
+    """Le gain ne doit jamais mélanger un maillage fin et un maillage rapide."""
+    best = eb.best_iteration(serie)
+    source = eb.iteration_dir(serie, best["iteration"])
+    qualifie = tmp_path / "qualifie"
+    qualifie.mkdir()
+    for name in ("design_params.yaml", "geometry.stl"):
+        (qualifie / name).write_bytes((source / name).read_bytes())
+    # Chiffres « réglage fin » volontairement très différents.
+    (qualifie / "results.json").write_text(
+        json.dumps({"Cd": 0.011, "Cl": 0.9, "Cl_Cd": 81.8, "mesh_ok": True}),
+        encoding="utf-8",
+    )
+    summary = eb.export_best(serie, tmp_path / "sortie", qualified_dir=qualifie,
+                             visuals=False)
+    comparison = summary["comparison"]
+    assert comparison["regime"] == "exploration"
+    # Le « après » de la comparaison est le chiffre d'EXPLORATION, pas 81.8.
+    assert comparison["after"] != pytest.approx(81.8)
+    # Mais l'en-tête du rapport garde bien la requalification.
+    assert summary["Cl_Cd"] == pytest.approx(81.8)
+
+
+def test_la_lecture_physique_ne_melange_pas_les_regimes(serie, tmp_path):
+    """Non-régression : le rapport a annoncé une traînée en baisse alors qu'au
+    même régime elle augmentait de 51 %. La cause : un Cd d'exploration comparé
+    à un Cd de réglage fin."""
+    best = eb.best_iteration(serie)
+    source = eb.iteration_dir(serie, best["iteration"])
+    qualifie = tmp_path / "qualifie"
+    qualifie.mkdir()
+    for name in ("design_params.yaml", "geometry.stl"):
+        (qualifie / name).write_bytes((source / name).read_bytes())
+    # Au réglage fin, tout est plus bas : comparer ces chiffres à ceux
+    # d'exploration ferait croire à un progrès qui n'existe pas.
+    (qualifie / "results.json").write_text(
+        json.dumps({"Cd": 0.004, "Cl": 0.3, "Cl_Cd": 75.0, "mesh_ok": True}),
+        encoding="utf-8",
+    )
+    eb.export_best(serie, tmp_path / "sortie", qualified_dir=qualifie, visuals=False)
+    report = (tmp_path / "sortie" / "README.md").read_text(encoding="utf-8")
+
+    seed = json.loads(
+        (eb.iteration_dir(serie, 0) / "results.json").read_text(encoding="utf-8")
+    )
+    # Le Cd de reglage fin (0.004) ne doit pas servir de terme de comparaison.
+    if "compromis chiffré" in report:
+        ligne = next(l for l in report.splitlines() if "compromis chiffré" in l)
+        attendu = (float(best["Cd"]) - seed["Cd"]) / abs(seed["Cd"]) * 100
+        assert f"{attendu:+.0f} %" in ligne
+
+
+def test_figures_de_comparaison(serie, tmp_path):
+    summary = eb.export_best(serie, tmp_path / "sortie", visuals=False)
+    figures = tmp_path / "sortie" / "figures"
+    for name in ("comparison_sections.svg", "comparison_overlay.svg",
+                 "comparison_performance.svg"):
+        assert (figures / name).is_file(), name
+    assert summary["comparison"] is not None
+
+
+def test_le_seed_est_archive_dans_comparison(serie, tmp_path):
+    eb.export_best(serie, tmp_path / "sortie", visuals=False)
+    comparison = tmp_path / "sortie" / "comparison"
+    assert (comparison / "seed_results.json").is_file()
+    assert (comparison / "seed_design_params.yaml").is_file()
+    assert (comparison / "profile_section.csv").is_file()
+
+
+def test_le_rapport_contient_la_comparaison(serie, tmp_path):
+    eb.export_best(serie, tmp_path / "sortie", visuals=False)
+    report = (tmp_path / "sortie" / "README.md").read_text(encoding="utf-8")
+    assert "## Avant / après" in report
+    assert "| **Portance Cl** |" in report
+    assert "même régime CFD" in report
+
+
+def test_comparaison_desactivable(serie, tmp_path):
+    summary = eb.export_best(serie, tmp_path / "sortie", visuals=False,
+                             compare=False)
+    assert summary["comparison"] is None
+    assert not (tmp_path / "sortie" / "comparison").exists()
+
+
+# ── Les graphiques de comparaison ────────────────────────────
+
+
+def test_barres_avant_apres():
+    svg = plots.comparison_bars([
+        {"label": "Traînée", "before": 0.031, "after": 0.026, "better": "lower",
+         "format": ".5f"},
+    ])
+    assert svg.startswith("<svg")
+    assert "-16.1 %" in svg
+    assert "mieux" in svg
+
+
+def test_une_trainee_qui_baisse_est_un_gain():
+    """Sans la notion de sens, une barre plus courte se lirait comme une perte."""
+    svg = plots.comparison_bars([
+        {"label": "Cd", "before": 0.031, "after": 0.026, "better": "lower"},
+    ])
+    assert "#2e7d32" in svg          # vert : amélioration
+    assert "moins bien" not in svg
+
+
+def test_une_trainee_qui_monte_est_une_perte():
+    svg = plots.comparison_bars([
+        {"label": "Cd", "before": 0.026, "after": 0.031, "better": "lower"},
+    ])
+    assert "#c1440e" in svg
+    assert "moins bien" in svg
+
+
+def test_une_portance_qui_monte_est_un_gain():
+    svg = plots.comparison_bars([
+        {"label": "Cl", "before": 0.25, "after": 0.77, "better": "higher"},
+    ])
+    assert "#2e7d32" in svg
+    assert "+208.0 %" in svg
+
+
+def test_barres_sans_donnees():
+    assert "aucune donnée" in plots.comparison_bars(
+        [{"label": "x", "before": None, "after": 1.0}]
+    )
+
+
+def test_sections_cote_a_cote_partagent_lechelle(config, tmp_path):
+    """Deux profils de cordes différentes doivent se dessiner à la même échelle,
+    sinon la figure gomme précisément ce qu'elle doit montrer."""
+    petit = eb.write_profile_section(load_yaml(config), tmp_path)
+    grand_design = load_yaml(config)
+    grand_design["parameters"]["chord"]["value"] = 400.0
+    grand = eb.write_profile_section(grand_design, tmp_path)
+
+    svg = plots.airfoil_comparison(
+        {**petit, "label": "seed", "caption": ""},
+        {**grand, "label": "optimisé", "caption": ""},
+    )
+    # Les deux contours sont dans le même SVG, tracés avec un unique facteur :
+    # celui de droite doit couvrir plus de largeur que celui de gauche.
+    chemins = [p.split('"')[0] for p in svg.split('<path d="')[1:]]
+    assert len(chemins) == 2
+
+    def largeur(path: str) -> float:
+        xs = [float(pt.split(",")[0]) for pt in
+              path.replace("M", " ").replace("L", " ").replace("Z", "").split()]
+        return max(xs) - min(xs)
+
+    assert largeur(chemins[1]) > largeur(chemins[0]) * 1.25
+
+
+def test_superposition_des_sections(config, tmp_path):
+    section = eb.write_profile_section(load_yaml(config), tmp_path)
+    svg = plots.airfoil_overlay(
+        {**section, "label": "seed"}, {**section, "label": "optimisé"},
+        title="superposition",
+    )
+    assert svg.count("<path") == 2
+    assert "stroke-dasharray" in svg      # le seed est en pointillés
+
+
+# ── Rendu côte à côte en HTML ────────────────────────────────
+
+
+def test_html_cote_a_cote(tmp_path):
+    figures = tmp_path / "figures"
+    figures.mkdir()
+    for name in ("a.svg", "b.svg"):
+        (figures / name).write_text('<svg xmlns="http://www.w3.org/2000/svg"/>',
+                                    encoding="utf-8")
+    markdown = (
+        "<!-- side-by-side -->\n"
+        "![Avant](figures/a.svg)\n"
+        "![Après](figures/b.svg)\n"
+        "<!-- /side-by-side -->\n"
+    )
+    html = eb.markdown_to_html(markdown, tmp_path, "t")
+    assert '<div class="side-by-side">' in html
+    assert html.count("<figure>") == 2
+    assert ".side-by-side { display: flex" in html.replace("  ", " ")
+
+
+def test_les_marqueurs_disparaissent_du_markdown(tmp_path):
+    """Un lecteur Markdown ignore ces commentaires : les images s'empilent."""
+    html = eb.markdown_to_html("<!-- side-by-side -->\n<!-- /side-by-side -->\n",
+                               tmp_path, "t")
+    assert "side-by-side -->" not in html
+
+
+# ─────────────────────────────────────────────────────────────
 # Branchement automatique en fin de boucle
 # ─────────────────────────────────────────────────────────────
 

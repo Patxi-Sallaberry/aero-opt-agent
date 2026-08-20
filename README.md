@@ -403,6 +403,33 @@ python3 scripts/run_loop.py --no-export           # désactiver
 python3 scripts/run_loop.py --no-visuals          # sans ParaView
 ```
 
+### Avant / après
+
+Le rapport oppose systématiquement le seed au design retenu : sections côte à
+côte **à la même échelle** puis superposées, barres de performance par
+grandeur, distributions de Cp confondues, et champs de pression et lignes de
+courant juxtaposés **avec la même échelle de couleurs**.
+
+Une seule règle gouverne cette section : **les deux côtés doivent être mesurés
+dans le même régime CFD**. Comparer un seed d'exploration à un design
+requalifié au réglage fin gonflerait le gain sans qu'il soit réel — et cela
+peut aller jusqu'à inverser une conclusion : sur le design de référence, la
+traînée paraissait *baisser* de 18 % en mélangeant les régimes, alors qu'à
+régime constant elle **augmente de 51 %**. La finesse gagne quand même 122 %,
+parce que la portance, elle, triple.
+
+```bash
+# la référence par défaut est la première itération de la série ; si le
+# meilleur design a été requalifié, fournir un seed mesuré dans le même régime
+python3 scripts/export_best.py --iterations-dir data/iterations \
+    --qualified-dir data/qualify/iter_0000 \
+    --baseline-dir data/baseline/iter_0000
+```
+
+Sans `--baseline-dir`, la comparaison retombe sur les chiffres d'exploration
+des **deux** côtés et le dit dans le rapport. Le régime employé est toujours
+écrit noir sur blanc.
+
 Le dossier contient :
 
 | | |

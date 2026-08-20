@@ -248,6 +248,291 @@ def _empty_chart(title: str, width: int, height: int) -> str:
     )
 
 
+def airfoil_comparison(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    width: int = 900,
+    height: int = 330,
+    title: str = "",
+) -> str:
+    """Deux sections côte à côte, à la MÊME échelle.
+
+    L'échelle commune n'est pas un détail : mise à la taille de son cadre,
+    chaque section paraîtrait identique, et une corde 15 % plus longue ou une
+    incidence de 5° passeraient inaperçues. C'est précisément ce que la figure
+    doit montrer.
+    """
+    panels = [before, after]
+    all_points = [p for panel in panels for p in panel["upper"] + panel["lower"]]
+    if not all_points:
+        return _empty_chart(title, width, height)
+
+    x_min = min(p[0] for p in all_points)
+    x_max = max(p[0] for p in all_points)
+    y_min = min(p[1] for p in all_points)
+    y_max = max(p[1] for p in all_points)
+    span_x = max(x_max - x_min, 1e-9)
+    span_y = max(y_max - y_min, 1e-9)
+
+    top = 46 if title else 16
+    label_h = 46
+    margin = 22
+    panel_w = (width - 3 * margin) / 2
+    panel_h = height - top - label_h - margin
+    scale = min(panel_w / span_x, panel_h / span_y) * 0.92
+
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="system-ui, sans-serif">',
+        f'<rect width="{width}" height="{height}" fill="{BACKGROUND}"/>',
+    ]
+    if title:
+        out.append(
+            f'<text x="{width / 2}" y="26" text-anchor="middle" font-size="15" '
+            f'font-weight="600" fill="{TEXT}">{_escape(title)}</text>'
+        )
+
+    for index, panel in enumerate(panels):
+        color = COLORS[1] if index == 0 else COLORS[0]
+        left = margin + index * (panel_w + margin)
+        offset_x = left + (panel_w - span_x * scale) / 2
+        offset_y = top + (panel_h - span_y * scale) / 2
+
+        def sx(x: float, _o=offset_x) -> float:
+            return _o + (x - x_min) * scale
+
+        def sy(y: float, _o=offset_y) -> float:
+            return _o + (y_max - y) * scale
+
+        out.append(
+            f'<rect x="{left:.1f}" y="{top}" width="{panel_w:.1f}" '
+            f'height="{panel_h:.1f}" fill="#fbfbfc" stroke="{GRID}" '
+            f'stroke-width="1" rx="4"/>'
+        )
+        upper, lower = panel["upper"], panel["lower"]
+        out.append(
+            f'<line x1="{sx(upper[0][0]):.2f}" y1="{sy(upper[0][1]):.2f}" '
+            f'x2="{sx(upper[-1][0]):.2f}" y2="{sy(upper[-1][1]):.2f}" '
+            f'stroke="{AXIS}" stroke-width="1" stroke-dasharray="5 4"/>'
+        )
+        contour = list(upper) + list(reversed(lower))
+        path = " ".join(
+            f'{"M" if i == 0 else "L"}{sx(x):.2f},{sy(y):.2f}'
+            for i, (x, y) in enumerate(contour)
+        ) + " Z"
+        out.append(
+            f'<path d="{path}" fill="{color}" fill-opacity="0.16" '
+            f'stroke="{color}" stroke-width="2" stroke-linejoin="round"/>'
+        )
+
+        cx = left + panel_w / 2
+        out.append(
+            f'<text x="{cx:.1f}" y="{top + panel_h + 22:.1f}" '
+            f'text-anchor="middle" font-size="13" font-weight="600" '
+            f'fill="{color}">{_escape(panel.get("label", ""))}</text>'
+        )
+        out.append(
+            f'<text x="{cx:.1f}" y="{top + panel_h + 40:.1f}" '
+            f'text-anchor="middle" font-size="11" fill="{AXIS}">'
+            f'{_escape(panel.get("caption", ""))}</text>'
+        )
+
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+def airfoil_overlay(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    width: int = 900,
+    height: int = 300,
+    title: str = "",
+) -> str:
+    """Les deux sections superposées, bords d'attaque confondus.
+
+    Le côte à côte montre chaque forme ; la superposition montre l'ÉCART, qui
+    est ce qu'on cherche à lire.
+    """
+    all_points = [
+        p for panel in (before, after) for p in panel["upper"] + panel["lower"]
+    ]
+    if not all_points:
+        return _empty_chart(title, width, height)
+
+    x_min = min(p[0] for p in all_points)
+    x_max = max(p[0] for p in all_points)
+    y_min = min(p[1] for p in all_points)
+    y_max = max(p[1] for p in all_points)
+    span_x = max(x_max - x_min, 1e-9)
+    span_y = max(y_max - y_min, 1e-9)
+
+    top = 46 if title else 16
+    margin = 28
+    legend_h = 30
+    scale = min(
+        (width - 2 * margin) / span_x,
+        (height - top - margin - legend_h) / span_y,
+    )
+    offset_x = (width - span_x * scale) / 2
+    offset_y = top + (height - top - margin - legend_h - span_y * scale) / 2
+
+    def sx(x: float) -> float:
+        return offset_x + (x - x_min) * scale
+
+    def sy(y: float) -> float:
+        return offset_y + (y_max - y) * scale
+
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="system-ui, sans-serif">',
+        f'<rect width="{width}" height="{height}" fill="{BACKGROUND}"/>',
+    ]
+    if title:
+        out.append(
+            f'<text x="{width / 2}" y="26" text-anchor="middle" font-size="15" '
+            f'font-weight="600" fill="{TEXT}">{_escape(title)}</text>'
+        )
+
+    for index, panel in enumerate((before, after)):
+        color = COLORS[1] if index == 0 else COLORS[0]
+        contour = list(panel["upper"]) + list(reversed(panel["lower"]))
+        path = " ".join(
+            f'{"M" if i == 0 else "L"}{sx(x):.2f},{sy(y):.2f}'
+            for i, (x, y) in enumerate(contour)
+        ) + " Z"
+        dash = ' stroke-dasharray="7 4"' if index == 0 else ""
+        out.append(
+            f'<path d="{path}" fill="{color}" fill-opacity="0.10" '
+            f'stroke="{color}" stroke-width="2.2" stroke-linejoin="round"{dash}/>'
+        )
+        legend_x = width / 2 - 150 + index * 170
+        legend_y = height - 14
+        out.append(
+            f'<line x1="{legend_x}" y1="{legend_y - 4}" x2="{legend_x + 26}" '
+            f'y2="{legend_y - 4}" stroke="{color}" stroke-width="2.5"{dash}/>'
+        )
+        out.append(
+            f'<text x="{legend_x + 32}" y="{legend_y}" font-size="12" '
+            f'fill="{TEXT}">{_escape(panel.get("label", ""))}</text>'
+        )
+
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+def comparison_bars(
+    groups: Sequence[Mapping[str, Any]],
+    width: int = 900,
+    height: int = 300,
+    title: str = "",
+    before_label: str = "avant",
+    after_label: str = "après",
+) -> str:
+    """Barres avant / après, un panneau par grandeur.
+
+    Chaque grandeur a son propre panneau et sa propre échelle : mettre un Cd de
+    0,026 et une finesse de 30 sur un même axe écraserait le premier à zéro.
+
+    La couleur suit l'AMÉLIORATION, pas le sens de variation : pour une
+    traînée, baisser est un gain. Un vert sur une barre plus courte se lit
+    correctement ; un rouge y ferait croire à une régression.
+
+    Chaque groupe porte `label`, `before`, `after`, `better` ("higher" ou
+    "lower"), et un `format` optionnel.
+    """
+    usable = [
+        g for g in groups
+        if isinstance(g.get("before"), (int, float))
+        and isinstance(g.get("after"), (int, float))
+    ]
+    if not usable:
+        return _empty_chart(title, width, height)
+
+    good, bad = "#2e7d32", "#c1440e"
+    top = 46 if title else 16
+    margin = 20
+    panel_w = (width - margin * (len(usable) + 1)) / len(usable)
+    footer = 64
+    panel_h = height - top - footer
+
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="system-ui, sans-serif">',
+        f'<rect width="{width}" height="{height}" fill="{BACKGROUND}"/>',
+    ]
+    if title:
+        out.append(
+            f'<text x="{width / 2}" y="26" text-anchor="middle" font-size="15" '
+            f'font-weight="600" fill="{TEXT}">{_escape(title)}</text>'
+        )
+
+    for index, group in enumerate(usable):
+        before = float(group["before"])
+        after = float(group["after"])
+        spec = group.get("format", ".4g")
+        higher_is_better = group.get("better", "higher") == "higher"
+        improved = (after > before) if higher_is_better else (after < before)
+        color = good if improved else bad
+
+        left = margin + index * (panel_w + margin)
+        top_of_bars = top + 30
+        bars_h = panel_h - 30
+        reference = max(abs(before), abs(after), 1e-12)
+
+        out.append(
+            f'<rect x="{left:.1f}" y="{top}" width="{panel_w:.1f}" '
+            f'height="{panel_h:.1f}" fill="#fbfbfc" stroke="{GRID}" '
+            f'stroke-width="1" rx="4"/>'
+        )
+
+        bar_w = panel_w * 0.26
+        gap = panel_w * 0.14
+        x_before = left + panel_w / 2 - bar_w - gap / 2
+        x_after = left + panel_w / 2 + gap / 2
+
+        for x, value, label, fill in (
+            (x_before, before, before_label, "#9aa5b1"),
+            (x_after, after, after_label, color),
+        ):
+            bar_h = max(2.0, abs(value) / reference * (bars_h - 34))
+            y = top_of_bars + (bars_h - 34) - bar_h
+            out.append(
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
+                f'height="{bar_h:.1f}" fill="{fill}" rx="2"/>'
+            )
+            out.append(
+                f'<text x="{x + bar_w / 2:.1f}" y="{y - 6:.1f}" '
+                f'text-anchor="middle" font-size="12" font-weight="600" '
+                f'fill="{TEXT}">{format(value, spec)}</text>'
+            )
+            out.append(
+                f'<text x="{x + bar_w / 2:.1f}" y="{top_of_bars + bars_h - 14:.1f}" '
+                f'text-anchor="middle" font-size="11" fill="{AXIS}">'
+                f'{_escape(label)}</text>'
+            )
+
+        change = (after - before) / abs(before) * 100 if before else 0.0
+        verdict = "mieux" if improved else "moins bien"
+        out.append(
+            f'<text x="{left + panel_w / 2:.1f}" y="{top + 20:.1f}" '
+            f'text-anchor="middle" font-size="13" font-weight="600" '
+            f'fill="{TEXT}">{_escape(group.get("label", ""))}</text>'
+        )
+        out.append(
+            f'<text x="{left + panel_w / 2:.1f}" y="{height - 34:.1f}" '
+            f'text-anchor="middle" font-size="15" font-weight="700" '
+            f'fill="{color}">{change:+.1f} %</text>'
+        )
+        out.append(
+            f'<text x="{left + panel_w / 2:.1f}" y="{height - 16:.1f}" '
+            f'text-anchor="middle" font-size="11" fill="{AXIS}">'
+            f'{_escape(verdict)}</text>'
+        )
+
+    out.append("</svg>")
+    return "\n".join(out)
+
+
 def airfoil_outline(
     upper: Sequence[tuple[float, float]],
     lower: Sequence[tuple[float, float]],

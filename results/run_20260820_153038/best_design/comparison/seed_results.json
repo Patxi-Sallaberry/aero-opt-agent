@@ -1,0 +1,1 @@
+{"iteration": 0, "success": true, "status": "OK", "Cd": 0.049999999999999996, "Cl": 0.175, "Cl_Cd": 3.5, "mesh_ok": true, "converged": true, "error_message": null, "averaging_window": 200, "Cd_rel_std": 1e-05, "coefficients_stable": true, "mesh": {"n_cells": 168394, "max_non_orthogonality": 47.4, "max_skewness": 2.1}}

@@ -1,0 +1,251 @@
+{
+  "objective": "maximize_Cl_Cd",
+  "iterations_run": 20,
+  "successes": 17,
+  "failures": 3,
+  "best_iteration": 16,
+  "best_objective": 5.789707193880351,
+  "stop_reason": "budget_epuise",
+  "duration_s": 0.8,
+  "timestamp": "2026-08-20T13:30:47+00:00",
+  "history": [
+    {
+      "iteration": 0,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050809999999999994,
+      "Cl": 0.175,
+      "Cl_Cd": 3.444203896870695,
+      "objective": 3.444203896870695,
+      "error_message": null
+    },
+    {
+      "iteration": 1,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050809999999999994,
+      "Cl": 0.175,
+      "Cl_Cd": 3.444203896870695,
+      "objective": 3.444203896870695,
+      "error_message": null
+    },
+    {
+      "iteration": 2,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050705599999999997,
+      "Cl": 0.199,
+      "Cl_Cd": 3.9246158215266167,
+      "objective": 3.9246158215266167,
+      "error_message": null
+    },
+    {
+      "iteration": 3,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050820835999999994,
+      "Cl": 0.17260000000000003,
+      "Cl_Cd": 3.3962448000658636,
+      "objective": 3.3962448000658636,
+      "error_message": null
+    },
+    {
+      "iteration": 4,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.05071673156,
+      "Cl": 0.19636000000000003,
+      "Cl_Cd": 3.8717005997852603,
+      "objective": 3.8717005997852603,
+      "error_message": null
+    },
+    {
+      "iteration": 5,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050705599999999997,
+      "Cl": 0.199,
+      "Cl_Cd": 3.9246158215266167,
+      "objective": 3.9246158215266167,
+      "error_message": null
+    },
+    {
+      "iteration": 6,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.0540656,
+      "Cl": 0.199,
+      "Cl_Cd": 3.68071379953242,
+      "objective": 3.68071379953242,
+      "error_message": null
+    },
+    {
+      "iteration": 7,
+      "success": false,
+      "status": "CFD_FAILED",
+      "Cd": null,
+      "Cl": null,
+      "Cl_Cd": null,
+      "objective": null,
+      "error_message": "maillage invalide"
+    },
+    {
+      "iteration": 8,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050651248999999995,
+      "Cl": 0.2122,
+      "Cl_Cd": 4.189432722577088,
+      "objective": 4.189432722577088,
+      "error_message": null
+    },
+    {
+      "iteration": 9,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.05076790169,
+      "Cl": 0.18447999999999998,
+      "Cl_Cd": 3.6337920981346743,
+      "objective": 3.6337920981346743,
+      "error_message": null
+    },
+    {
+      "iteration": 10,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.0540224820449,
+      "Cl": 0.209428,
+      "Cl_Cd": 3.876682301008254,
+      "objective": 3.876682301008254,
+      "error_message": null
+    },
+    {
+      "iteration": 11,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.050382448999999996,
+      "Cl": 0.2122,
+      "Cl_Cd": 4.211784147293039,
+      "objective": 4.211784147293039,
+      "error_message": null
+    },
+    {
+      "iteration": 12,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.047043953,
+      "Cl": 0.2122,
+      "Cl_Cd": 4.510675367777874,
+      "objective": 4.510675367777874,
+      "error_message": null
+    },
+    {
+      "iteration": 13,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.04397253675,
+      "Cl": 0.2122,
+      "Cl_Cd": 4.825739329218936,
+      "objective": 4.825739329218936,
+      "error_message": null
+    },
+    {
+      "iteration": 14,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.0411468338,
+      "Cl": 0.2122,
+      "Cl_Cd": 5.157140426197264,
+      "objective": 5.157140426197264,
+      "error_message": null
+    },
+    {
+      "iteration": 15,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.0385471871,
+      "Cl": 0.2122,
+      "Cl_Cd": 5.504941241224836,
+      "objective": 5.504941241224836,
+      "error_message": null
+    },
+    {
+      "iteration": 16,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.036651249,
+      "Cl": 0.2122,
+      "Cl_Cd": 5.789707193880351,
+      "objective": 5.789707193880351,
+      "error_message": null
+    },
+    {
+      "iteration": 17,
+      "success": true,
+      "status": "OK",
+      "Cd": 0.03676790169,
+      "Cl": 0.18447999999999998,
+      "Cl_Cd": 5.017419855922161,
+      "objective": 5.017419855922161,
+      "error_message": null
+    },
+    {
+      "iteration": 18,
+      "success": false,
+      "status": "CFD_FAILED",
+      "Cd": null,
+      "Cl": null,
+      "Cl_Cd": null,
+      "objective": null,
+      "error_message": "maillage invalide"
+    },
+    {
+      "iteration": 19,
+      "success": false,
+      "status": "CFD_FAILED",
+      "Cd": null,
+      "Cl": null,
+      "Cl_Cd": null,
+      "objective": null,
+      "error_message": "maillage invalide"
+    }
+  ],
+  "best_parameters": {
+    "chord": {
+      "value": 298.53,
+      "min": 220.0,
+      "max": 420.0,
+      "max_delta_pct": 7.0,
+      "unit": "mm"
+    },
+    "thickness": {
+      "value": 0.08,
+      "min": 0.08,
+      "max": 0.2,
+      "max_delta_pct": 8.0,
+      "unit": "unitless"
+    },
+    "camber": {
+      "value": 0.0231,
+      "min": 0.0,
+      "max": 0.09,
+      "max_delta_pct": 10.0,
+      "unit": "unitless"
+    },
+    "span": {
+      "value": 80.0,
+      "min": 79.0,
+      "max": 81.0,
+      "max_delta_pct": 1.0,
+      "unit": "mm"
+    },
+    "aoa": {
+      "value": 0.0,
+      "min": -2.0,
+      "max": 12.0,
+      "max_delta_pct": 12.0,
+      "unit": "deg"
+    }
+  },
+  "improvement_pct": 68.1
+}
