@@ -287,6 +287,31 @@ la couche limite turbulente dès le bord d'attaque, ce qui est faux à
 Re = 4 × 10⁵ où une bonne partie de l'extrados reste laminaire. Acceptable pour
 comparer des formes, pas pour annoncer une traînée absolue.
 
+### Optimisation de référence
+
+22 itérations en 27 minutes, préréglage rapide, stratégie locale, sans
+intervention :
+
+| | seed | meilleur (itération 21) |
+|---|---|---|
+| chord | 300 mm | 343,5 mm |
+| thickness | 0,120 | 0,113 |
+| camber | 0,020 | 0,020 |
+| aoa | 0° | 5,04° |
+| **Cl/Cd** | **8,13** | **20,45** — **+151 %** |
+
+21 itérations réussies, une écartée par `checkMesh` (skewness 4,03) dont la
+stratégie s'est remise en resserrant le pas.
+
+Le meilleur design **requalifié au réglage fin** donne Cd 0,02563, Cl 0,76572,
+**Cl/Cd 29,88** contre 13,41 pour le seed : **+123 %**. Le préréglage rapide
+annonçait +151 %, le réglage fin en confirme +123 % — même direction, même
+ordre de grandeur. C'est la vérification qui compte : le classement des formes
+établi en exploration tient au réglage précis.
+
+L'incidence trouvée, 5°, est celle qu'on attend physiquement pour la finesse
+maximale d'un profil cambré. Le seed, à 0°, était sur le flanc de la courbe.
+
 ---
 
 ## L'agent
@@ -325,8 +350,13 @@ Deux raffinements qui viennent de l'observation :
 - **Un paramètre sans effet mesuré est abandonné.** Deux essais qui ne changent
   rien à l'objectif suffisent : chaque évaluation coûte plusieurs minutes.
 
-Sur un modèle CFD analytique à optimum connu, la recherche améliore l'objectif
-de **+657 %** en 25 itérations.
+Sur une optimisation réelle de 22 itérations, elle a fait passer la finesse de
+8,13 à 20,45 (voir plus haut). Elle a aussi ses limites, qu'il vaut mieux
+connaître : c'est une descente gloutonne, coordonnée par coordonnée. Elle
+n'exploite pas les **couplages** — la cambrure optimale dépend de l'incidence —
+et ne peut que les rencontrer par rotation. C'est précisément là qu'un agent
+qui connaît l'aérodynamique fait mieux, et c'est pourquoi la stratégie `llm`
+reste la voie principale.
 
 ---
 
