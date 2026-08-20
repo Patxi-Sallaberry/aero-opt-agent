@@ -313,9 +313,20 @@ def test_maillage_valide_pour_openfoam_mais_trop_degrade(iteration_dir):
 
 def test_seuils_lus_dans_cfd_settings():
     limits = pp.mesh_limits_from_settings(REAL_CFD)
-    assert limits["max_non_orthogonality"] == 70.0
+    assert limits["max_non_orthogonality"] == 75.0
     assert limits["max_skewness"] == 4.0
     assert limits["max_aspect_ratio"] == 1000.0
+
+
+@pytest.mark.parametrize("non_ortho", [54.46, 68.49, 69.09])
+def test_la_dispersion_du_mailleur_ne_fait_pas_echouer(iteration_dir, non_ortho):
+    # Valeurs relevées sur trois maillages successifs de la MÊME géométrie :
+    # l'ajout de couches limites en parallèle n'est pas déterministe. Le seuil
+    # doit les accepter toutes, sinon l'optimisation n'est pas reproductible.
+    write_check_mesh(iteration_dir, ok=True, non_ortho=non_ortho)
+    mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log",
+                              pp.mesh_limits_from_settings(REAL_CFD))
+    assert mesh["mesh_ok"] is True
 
 
 def test_cli_evaluate_mesh_ok(iteration_dir, capsys):

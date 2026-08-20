@@ -93,7 +93,13 @@ mesh:
   check_mesh:
     enabled: true                # OBLIGATOIRE (Master Doc §4.3)
     fail_on_error: true
-    max_non_orthogonality: 70.0
+    # L'ajout de couches limites par snappyHexMesh en parallèle n'est pas
+    # déterministe : sur une même géométrie, trois maillages successifs ont
+    # donné 54,5 / 68,5 / 69,1 de non-orthogonalité max. Un seuil à 70 ferait
+    # donc échouer une itération au hasard, et l'optimisation ne serait plus
+    # reproductible. 75 reste sûr : fvSolution applique un correcteur de
+    # non-orthogonalité (nNonOrthogonalCorrectors 1).
+    max_non_orthogonality: 75.0
     max_skewness: 4.0
     max_aspect_ratio: 1000.0
 

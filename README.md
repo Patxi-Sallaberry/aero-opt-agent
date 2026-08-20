@@ -284,6 +284,12 @@ Le verdict utile vient de la comparaison aux seuils de `cfd_settings.yaml`
 peut être « Mesh OK » pour OpenFOAM tout en étant trop dégradé pour qu'on
 fasse confiance aux coefficients.
 
+Ces seuils tiennent compte d'un fait mesuré : **snappyHexMesh n'est pas
+déterministe en parallèle**. Trois maillages successifs de la même géométrie
+ont donné 54,5 / 68,5 / 69,1 de non-orthogonalité maximale. Un seuil trop
+serré ferait donc échouer une itération au hasard, et l'optimisation ne serait
+plus reproductible.
+
 ### Résultat de référence
 
 Chaîne validée de bout en bout sur OpenFOAM v2506, NACA 2412 à incidence nulle,
