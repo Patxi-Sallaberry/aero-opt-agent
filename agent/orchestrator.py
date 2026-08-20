@@ -364,6 +364,22 @@ def _already_evaluated(
     return any(same(proposal, point["values"]) for point in points)
 
 
+#: Paramètres dont on SAIT, avant toute mesure, qu'ils dominent la finesse.
+#: L'incidence d'abord : c'est le levier le plus direct sur la portance, et
+#: l'optimum d'un profil cambré se trouve entre 4 et 6 degrés.
+PROBE_PRIORITY = ("aoa", "chord")
+
+#: Au delà de ce nombre de paramètres libres, l'ordre de sondage cesse d'être
+#: un détail. Avec cinq paramètres, un cycle complet coûte dix itérations et
+#: tout finit par être essayé. Avec vingt-sept — le cas d'un profil CST —, il
+#: en coûte cinquante-quatre : ce qui est sondé en dernier n'est jamais sondé.
+#:
+#: Le cas observé : sur une série Clark Y de onze itérations, `aoa` n'a JAMAIS
+#: eu son tour. Il figurait après les vingt-quatre coefficients dans l'ordre de
+#: déclaration du fichier — un ordre qui n'a aucun sens physique.
+LARGE_SPACE_THRESHOLD = 8
+
+
 def _probe_order(
     free: Sequence[str],
     points: Sequence[Mapping[str, Any]],
@@ -374,9 +390,18 @@ def _probe_order(
     Tant qu'un paramètre n'a jamais été essayé, on ignore son effet : il faut
     le mesurer. Ensuite, autant concentrer un budget d'itérations coûteux sur
     ceux qui déplacent réellement l'objectif.
+
+    Sur un grand espace de conception, l'inexploré est lui-même trop vaste pour
+    être parcouru : on y fait passer devant les quelques paramètres dont
+    l'influence est connue d'avance. Ce n'est pas de l'arbitraire — c'est la
+    seule information disponible tant qu'aucune mesure n'existe, et elle vaut
+    mieux que l'ordre des lignes du fichier.
     """
     sensitivity = _sensitivities(points, parameters, free)
     unknown = [name for name in free if name not in sensitivity]
+    if len(free) > LARGE_SPACE_THRESHOLD:
+        priority = {name: rank for rank, name in enumerate(PROBE_PRIORITY)}
+        unknown.sort(key=lambda name: priority.get(name, len(priority)))
     known = sorted(
         (name for name in free if name in sensitivity),
         key=lambda name: sensitivity[name],

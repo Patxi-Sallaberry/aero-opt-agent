@@ -52,6 +52,37 @@ limité — chaque itération coûte plusieurs minutes de CFD. Sois méthodique 
 - **Méfie-toi d'un résultat non convergé** (`converged: false`) : il est bruité,
   ne fonde pas une décision importante dessus.
 
+## Si les paramètres s'appellent `cst_upper_i` / `cst_lower_i`
+
+Le profil n'est alors pas décrit par une épaisseur et une cambrure, mais par
+des coefficients de Kulfan : chaque surface vaut `C(ψ)·Σ Aᵢ Bᵢ(ψ)`, où `ψ` est
+l'abscisse relative, `C` la fonction de classe et `Bᵢ` les polynômes de
+Bernstein. Ce qu'il faut en savoir pour raisonner :
+
+- **Chaque coefficient agit surtout autour d'une position de corde**, à peu
+  près `i / N`. `cst_upper_0` gouverne le bord d'attaque, `cst_upper_N` le bord
+  de fuite, et ceux du milieu le ventre de la surface. Un coefficient n'a donc
+  pas d'effet global : il déforme localement.
+- **Le signe compte, la valeur brute non.** Augmenter un coefficient d'extrados
+  bombe la surface vers le haut à cet endroit ; l'augmenter sur l'intrados la
+  remonte aussi, donc AMINCIT le profil. Les valeurs elles-mêmes n'ont pas de
+  sens physique isolé — elles peuvent osciller entre grands nombres sans que la
+  forme soit étrange.
+- **Les bornes ont déjà été calibrées** pour que chaque coefficient déplace la
+  surface d'au plus ~1,5 % de corde, et ~0,6 % aux deux extrémités. Utiliser
+  toute la plage autorisée est donc sûr : ne t'auto-limite pas.
+- **Le premier coefficient tient le rayon de bord d'attaque** (r ≈ A₀²/2). Un
+  nez qui s'aiguise gagne un peu de traînée et décroche beaucoup plus tôt :
+  n'y touche que si l'incidence reste modeste.
+- **Le dernier tient l'angle de bord de fuite**, là où les deux surfaces se
+  rejoignent. C'est la zone la plus fragile : un pas trop grand y fait se
+  croiser les surfaces, et l'itération échoue franchement.
+
+Ne cherche pas à « comprendre » les vingt-quatre coefficients : traite-les
+comme des leviers locaux, et laisse l'historique dire lesquels payent. En cas
+de doute, `aoa` et `chord` restent les leviers les plus directs et les mieux
+compris.
+
 ## Format de réponse
 
 Réponds **uniquement** par un objet JSON, sans texte autour, sans balises de

@@ -43,7 +43,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fusion.parametric_driver import naca4_profile, profile_from_parameters  # noqa: E402
+from fusion.parametric_driver import profile_from_parameters  # noqa: E402
 from pipeline import master_pipeline as mp  # noqa: E402
 from pipeline.utils import load_yaml  # noqa: E402
 from scripts import plots  # noqa: E402
