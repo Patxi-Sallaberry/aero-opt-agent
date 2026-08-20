@@ -348,7 +348,14 @@ Elle est faite pour tourner sans surveillance :
 - **Ctrl-C** termine l'itération en cours puis sort proprement — couper au
   milieu d'un run OpenFOAM laisserait une archive que la reprise lirait mal.
 
-Bilan écrit dans `data/iterations/optimization_summary.json`.
+```bash
+python3 scripts/run_loop.py --report     # lire une série déjà exécutée
+python3 scripts/run_loop.py --resume     # reprendre sans écraser d'archive
+```
+
+Bilan écrit dans `data/iterations/optimization_summary.json` ; `--report`
+affiche la trajectoire complète — ce qui a bougé, ce que ça a donné, où ça a
+échoué — et les paramètres du meilleur design.
 
 ---
 

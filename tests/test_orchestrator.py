@@ -633,6 +633,85 @@ def test_cli_orchestrateur_sans_historique(config, iterations, capsys):
     assert json.loads(capsys.readouterr().out)["changed"]
 
 
+def test_rapport_dune_serie(config, iterations, monkeypatch, capsys):
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=4, strategy="local",
+                  geometry_backend="internal")
+    rapport = loop.build_report(iterations)
+    assert "iter" in rapport and "Cl/Cd" in rapport
+    assert "gain" in rapport
+    assert rapport.count("\n") > 6
+
+
+def test_rapport_sans_serie(tmp_path):
+    assert "Aucune itération" in loop.build_report(tmp_path)
+
+
+# ─────────────────────────────────────────────────────────────
+# Reprise
+# ─────────────────────────────────────────────────────────────
+
+
+def test_reprise_avance_le_compteur(config, iterations, monkeypatch):
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=3, strategy="local",
+                  geometry_backend="internal")
+    # Compteur remis en arrière, comme si l'on relançait la config d'origine.
+    set_values(config, iteration=0)
+    suivant = loop.resume_point(config, iterations)
+    assert suivant == 3
+    assert load_yaml(config)["iteration"] == 3
+
+
+def test_reprise_sans_rien_a_faire(config, iterations, monkeypatch):
+    # Compteur déjà au delà de la dernière archive : rien à recaler.
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=2, strategy="local",
+                  geometry_backend="internal")
+    set_values(config, iteration=9)
+    assert loop.resume_point(config, iterations) is None
+    assert load_yaml(config)["iteration"] == 9
+
+
+def test_reprise_sans_archive(config, iterations):
+    assert loop.resume_point(config, iterations) is None
+
+
+def test_la_reprise_nefface_pas_les_iterations(config, iterations, monkeypatch):
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=3, strategy="local",
+                  geometry_backend="internal")
+    empreinte = (iterations / "iter_0001" / "results.json").read_text(encoding="utf-8")
+
+    set_values(config, iteration=0)
+    loop.main(["--config", str(config), "--cfd-settings", str(REAL_CFD),
+               "--iterations-dir", str(iterations), "--max-iterations", "2",
+               "--strategy", "local", "--geometry-backend", "internal",
+               "--resume"])
+
+    assert (iterations / "iter_0001" / "results.json").read_text(
+        encoding="utf-8"
+    ) == empreinte
+    assert (iterations / "iter_0003").is_dir()
+
+
+def test_rapport_montre_les_echecs(config, iterations, monkeypatch):
+    analytic_cfd(monkeypatch, fail_when=lambda p: p["camber"] > 0.021)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=6, strategy="local",
+                  geometry_backend="internal", max_consecutive_failures=6,
+                  stagnation_patience=6)
+    rapport = loop.build_report(iterations)
+    assert "maillage invalide" in rapport
+
+
+def test_cli_rapport(config, iterations, monkeypatch, capsys):
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=3, strategy="local",
+                  geometry_backend="internal")
+    assert loop.main(["--iterations-dir", str(iterations), "--report"]) == 0
+    assert "itérations" in capsys.readouterr().out
+
+
 def test_cli_boucle(config, iterations, monkeypatch, capsys):
     analytic_cfd(monkeypatch)
     code = loop.main(["--config", str(config), "--cfd-settings", str(REAL_CFD),

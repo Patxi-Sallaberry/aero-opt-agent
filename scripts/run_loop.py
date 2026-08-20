@@ -39,7 +39,7 @@ if str(REPO_ROOT) not in sys.path:
 from agent import orchestrator  # noqa: E402
 from agent.orchestrator import ProposalError  # noqa: E402
 from pipeline import master_pipeline as mp  # noqa: E402
-from pipeline.utils import load_env, load_yaml  # noqa: E402
+from pipeline.utils import load_env, load_yaml, save_design_params  # noqa: E402
 
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "design_params.yaml"
 DEFAULT_CFD = REPO_ROOT / "configs" / "cfd_settings.yaml"
@@ -251,6 +251,112 @@ def run_loop(
     return summary
 
 
+def resume_point(config_path: Path, iterations_root: Path) -> int | None:
+    """Cale le compteur d'itérations après la dernière archive.
+
+    Relancer une série interrompue avec une configuration dont le compteur est
+    resté en arrière écraserait des itérations déjà calculées — et l'historique
+    sur lequel la stratégie s'appuie deviendrait incohérent.
+
+    Returns:
+        Le nouveau numéro d'itération s'il a fallu l'avancer, None sinon.
+    """
+    archived = mp.iteration_dirs(iterations_root)
+    if not archived:
+        return None
+
+    numbers = []
+    for directory in archived:
+        try:
+            numbers.append(int(directory.name.split("_")[1]))
+        except (IndexError, ValueError):
+            continue
+    if not numbers:
+        return None
+
+    design = load_yaml(config_path)
+    following = max(numbers) + 1
+    if int(design.get("iteration", 0)) >= following:
+        return None
+
+    design["iteration"] = following
+    save_design_params(design, config_path)
+    return following
+
+
+def build_report(iterations_root: Path) -> str:
+    """Rapport lisible d'une série déjà exécutée.
+
+    Après plusieurs heures sans surveillance, `optimization_summary.json` dit
+    l'essentiel mais se lit mal. Ce tableau montre la trajectoire : ce qui a
+    bougé, ce que ça a donné, et où ça a échoué.
+    """
+    records = mp.history(iterations_root)
+    if not records:
+        return f"Aucune itération archivée dans {iterations_root}."
+
+    lines: list[str] = []
+    header = f"{'iter':>5} {'statut':<18} {'Cd':>9} {'Cl':>9} {'Cl/Cd':>8} " \
+             f"{'objectif':>9} {'durée':>7}  paramètres"
+    lines.append(header)
+    lines.append("-" * len(header))
+
+    best_objective: float | None = None
+    best_iteration: int | None = None
+
+    for record in records:
+        iteration = record.get("iteration")
+        values = orchestrator.parameters_of(record, iterations_root) or {}
+        shown = ", ".join(
+            f"{name}={float(spec['value']):g}"
+            for name, spec in values.items()
+            if name != "span"
+        )
+        objective = record.get("objective")
+        if isinstance(objective, (int, float)) and (
+            best_objective is None or objective > best_objective
+        ):
+            best_objective, best_iteration = float(objective), iteration
+
+        statut = record.get("status", "?")
+        if not record.get("success"):
+            statut = f"{statut}/{record.get('stage', '?')}"
+
+        lines.append(
+            f"{iteration:>5} {statut:<18} {_fmt(record.get('Cd')):>9} "
+            f"{_fmt(record.get('Cl')):>9} {_fmt(record.get('Cl_Cd'), '.2f'):>8} "
+            f"{_fmt(objective, '.4f'):>9} "
+            f"{_fmt(record.get('duration_s'), '.0f'):>6}s  {shown}"
+        )
+        if not record.get("success") and record.get("error_message"):
+            lines.append(f"{'':>5} └─ {record['error_message'][:120]}")
+
+    lines.append("")
+    successes = sum(1 for r in records if r.get("success"))
+    lines.append(
+        f"{len(records)} itérations — {successes} réussies, "
+        f"{len(records) - successes} échouées"
+    )
+    if best_iteration is not None:
+        lines.append(
+            f"meilleure : itération {best_iteration}, objectif {best_objective:.4f}"
+        )
+        first = next(
+            (r for r in records
+             if r.get("success") and isinstance(r.get("objective"), (int, float))),
+            None,
+        )
+        if first and first["objective"]:
+            gain = (best_objective - first["objective"]) / abs(first["objective"]) * 100
+            lines.append(f"gain      : {gain:+.2f} % depuis la première évaluation")
+        best_values = orchestrator.parameters_of(
+            {"iteration": best_iteration}, iterations_root
+        ) or {}
+        for name, spec in best_values.items():
+            lines.append(f"    {name:<12} {float(spec['value']):g} {spec.get('unit', '')}")
+    return "\n".join(lines)
+
+
 def print_summary(summary: dict) -> None:
     print("\n" + "=" * 62, file=sys.stderr)
     print(f"  Objectif        : {summary['objective']}", file=sys.stderr)
@@ -292,9 +398,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-consecutive-failures", type=int, default=4)
     parser.add_argument("--stagnation-patience", type=int, default=6)
     parser.add_argument("--json", action="store_true", help="bilan sur stdout")
+    parser.add_argument(
+        "--report", action="store_true",
+        help="affiche le rapport d'une série déjà exécutée, sans rien relancer",
+    )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="reprend après la dernière itération archivée, sans l'écraser",
+    )
     args = parser.parse_args(argv)
 
+    if args.report:
+        print(build_report(Path(args.iterations_dir)))
+        return 0
+
     loaded = load_env()
+
+    if args.resume:
+        following = resume_point(Path(args.config), Path(args.iterations_dir))
+        if following is None:
+            print("[loop] rien à reprendre : le compteur est déjà à jour",
+                  file=sys.stderr)
+        else:
+            print(f"[loop] reprise à l'itération {following}", file=sys.stderr)
     if loaded:
         print(f"[loop] .env chargé ({len(loaded)} variables)", file=sys.stderr)
 
