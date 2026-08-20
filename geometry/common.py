@@ -63,6 +63,12 @@ def _coordinates(status: Mapping[str, Any]) -> list[tuple[float, float]] | None:
 
     Fermé et parcouru dans un seul sens, ce contour s'utilise directement pour
     un tracé ou un import CAO.
+
+    Le recalcul reprend aussi les ordonnées de bord de fuite que le driver a
+    rapportées. Elles décrivent la forme sans être des variables d'optimisation
+    — le contrat des paramètres exige `min < max`, ce qui interdit d'y loger
+    une grandeur figée — et sans elles un profil à bord de fuite ouvert serait
+    recalculé fermé, donc faux.
     """
     applied = status.get("applied_parameters")
     if not isinstance(applied, Mapping) or not applied:
@@ -74,10 +80,19 @@ def _coordinates(status: Mapping[str, Any]) -> list[tuple[float, float]] | None:
         if isinstance(spec, Mapping) and spec.get("requested_value") is not None
     }
 
+    geometry = status.get("geometry")
+    provenance = {}
+    if isinstance(geometry, Mapping):
+        provenance = {
+            key: geometry[key]
+            for key in ("trailing_edge_upper", "trailing_edge_lower")
+            if key in geometry
+        }
+
     try:
         from fusion.parametric_driver import profile_from_parameters
 
-        plan = profile_from_parameters(parameters)
+        plan = profile_from_parameters(parameters, provenance=provenance)
     except Exception:
         # Une forme dont le contour n'est pas calculable ici reste une
         # géométrie valide : le STL, lui, a bien été écrit. On rend simplement

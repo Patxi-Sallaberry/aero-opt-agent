@@ -239,6 +239,14 @@ def build_design_params(
         "provenance": {
             "source": str(profile.source) if profile.source else None,
             "cst_order": fitted.order,
+            # Les deux ordonnées, et pas seulement leur écart : un bord de
+            # fuite ouvert n'est pas forcément symétrique, et sur un profil
+            # cambré il ne se referme pas non plus sur l'axe. Elles vivent ici
+            # plutôt que dans `parameters` parce que le contrat exige
+            # `min < max` — une grandeur qui décrit la forme sans être une
+            # variable d'optimisation n'y a pas de place.
+            "trailing_edge_upper": round(fitted.upper.trailing_edge, 8),
+            "trailing_edge_lower": round(fitted.lower.trailing_edge, 8),
             "trailing_edge_gap": round(trailing_gap, 8),
             "original_chord_mm": profile.metadata.get("chord_mm"),
             "removed_incidence_deg": round(profile.transform.rotation_deg, 4),

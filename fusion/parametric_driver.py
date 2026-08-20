@@ -164,6 +164,15 @@ DEGENERATE_FACET_TOL = 1e-16
 
 REBUILD_PARAMETERS = ("chord", "thickness", "camber", "span", "aoa")
 
+# Paramétrisations reconnues. « naca » est celle de la v1.0 : quatre grandeurs
+# de forme. « cst » (v1.5) décrit un profil quelconque par ses coefficients de
+# Kulfan, et n'a donc ni `thickness` ni `camber` en entrée — ces grandeurs y
+# sont MESURÉES sur la forme reconstruite, pas imposées.
+PARAMETERIZATION_NACA = "naca"
+PARAMETERIZATION_CST = "cst"
+CST_REBUILD_PARAMETERS = ("chord", "span", "aoa")
+CST_PREFIXES = ("cst_upper_", "cst_lower_")
+
 # Noms posés sur ce que le driver crée, pour pouvoir le retrouver et le
 # supprimer à l'itération suivante.
 REBUILD_SKETCH_NAME = "AERO_OPT_PROFILE"
@@ -833,12 +842,56 @@ def naca4_profile(
     return {"upper": upper, "lower": lower}
 
 
-def profile_from_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
+def detect_parameterization(parameters: Mapping[str, Any]) -> str:
+    """Reconnaît la paramétrisation à ses paramètres.
+
+    On lit la forme dans les paramètres eux-mêmes plutôt que de se fier au seul
+    champ déclaré : un `design_params.yaml` peut être écrit à la main, et un
+    en-tête qui ment sur son contenu doit être détecté ici — pas trois étapes
+    plus loin, sur une géométrie déjà maillée.
+    """
+    if any(str(name).startswith(CST_PREFIXES) for name in parameters):
+        return PARAMETERIZATION_CST
+    return PARAMETERIZATION_NACA
+
+
+def profile_from_parameters(
+    parameters: Mapping[str, Any],
+    parameterization: str | None = None,
+    provenance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Traduit design_params.yaml en une description géométrique complète.
 
     Fonction pure : aucun appel Fusion. C'est elle qui est exécutée en mode
     simulation pour vérifier la reconstruction sans ouvrir Fusion.
+
+    Args:
+        parameterization: « naca » ou « cst ». Déduite des paramètres si elle
+            n'est pas fournie ; si elle l'est, elle doit s'accorder avec eux.
+        provenance: bloc `provenance` du fichier. La voie CST y lit les
+            ordonnées de bord de fuite, qui décrivent la forme sans être des
+            variables d'optimisation.
     """
+    detected = detect_parameterization(parameters)
+    declared = (parameterization or detected).strip().lower()
+    if declared not in (PARAMETERIZATION_NACA, PARAMETERIZATION_CST):
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"paramétrisation inconnue : {declared!r} — attendu "
+            f"{[PARAMETERIZATION_NACA, PARAMETERIZATION_CST]}",
+        )
+    if declared != detected:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"le fichier annonce la paramétrisation '{declared}' mais ses "
+            f"paramètres sont ceux de '{detected}' — reconstruire la géométrie "
+            f"depuis l'un en croyant tenir l'autre donnerait une forme "
+            f"silencieusement fausse",
+        )
+
+    if declared == PARAMETERIZATION_CST:
+        return _cst_plan(parameters, provenance or {})
+
     missing = [n for n in REBUILD_PARAMETERS if n not in parameters]
     if missing:
         raise DriverError(
@@ -872,6 +925,102 @@ def profile_from_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
         "aoa_deg": math.degrees(aoa_rad),
         "n_points": NACA_PROFILE_POINTS,
         "camber_position": NACA_CAMBER_POSITION,
+        "bbox_cm": {
+            "x_min": min(xs), "x_max": max(xs),
+            "y_min": min(ys), "y_max": max(ys),
+        },
+    }
+
+
+def _cst_plan(
+    parameters: Mapping[str, Any], provenance: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Description géométrique d'un profil décrit par ses coefficients CST.
+
+    Rend exactement la même structure que la voie NACA — mêmes clés, mêmes
+    unités, profil en centimètres. Tout ce qui suit dans la chaîne (écriture du
+    STL, résumé du statut, contrôle d'emprise, rapports) fonctionne donc sans
+    savoir d'où vient la forme, ce qui est le seul moyen de ne pas voir les
+    deux voies diverger avec le temps.
+
+    `thickness` et `camber` sont ici MESURÉES sur la forme reconstruite, là où
+    la voie NACA les reçoit en entrée. Ce sont les mêmes grandeurs, obtenues
+    dans l'autre sens.
+    """
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from profiles.geometry import (  # type: ignore[import-not-found]
+            CST_PROFILE_POINTS,
+            ContourError,
+            collect_coefficients,
+            cst_contour,
+            cst_measures,
+        )
+    except ImportError as exc:  # pragma: no cover - dépôt incomplet
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"paramétrisation CST demandée mais le module profiles.geometry "
+            f"est introuvable : {exc}",
+        ) from exc
+
+    missing = [n for n in CST_REBUILD_PARAMETERS if n not in parameters]
+    if missing:
+        raise DriverError(
+            STATUS_CONFIG_ERROR,
+            f"la paramétrisation '{PARAMETERIZATION_CST}' exige les paramètres "
+            f"{list(CST_REBUILD_PARAMETERS)} ; manquant(s) : {missing}",
+        )
+
+    chord_cm = to_cm(_spec(parameters, "chord"), "chord")
+    span_cm = to_cm(_spec(parameters, "span"), "span")
+    aoa_rad = to_rad(_spec(parameters, "aoa"), "aoa")
+    if not span_cm > 0:
+        raise DriverError(
+            STATUS_REBUILD_FAILED, f"envergure non positive : {span_cm} cm"
+        )
+
+    values = {
+        name: to_dimensionless(_spec(parameters, name), name)
+        for name in parameters
+        if str(name).startswith(CST_PREFIXES)
+    }
+    trailing_edges = (
+        float(provenance.get("trailing_edge_upper", 0.0) or 0.0),
+        float(provenance.get("trailing_edge_lower", 0.0) or 0.0),
+    )
+
+    try:
+        upper_coefficients = collect_coefficients(values, CST_PREFIXES[0])
+        lower_coefficients = collect_coefficients(values, CST_PREFIXES[1])
+        profile = cst_contour(
+            upper_coefficients, lower_coefficients, chord_cm,
+            trailing_edges, aoa_rad,
+        )
+        measures = cst_measures(
+            upper_coefficients, lower_coefficients, trailing_edges
+        )
+    except ContourError as exc:
+        raise DriverError(STATUS_REBUILD_FAILED, str(exc)) from exc
+
+    xs = [x for x, _ in profile["upper"] + profile["lower"]]
+    ys = [y for _, y in profile["upper"] + profile["lower"]]
+
+    return {
+        "profile": profile,
+        "chord_cm": chord_cm,
+        "span_cm": span_cm,
+        "thickness": measures["thickness"],
+        "camber": measures["camber"],
+        "aoa_rad": aoa_rad,
+        "aoa_deg": math.degrees(aoa_rad),
+        "n_points": CST_PROFILE_POINTS,
+        "camber_position": measures["camber_position"],
+        "parameterization": PARAMETERIZATION_CST,
+        "cst_order": len(upper_coefficients) - 1,
+        "leading_edge_radius": measures["leading_edge_radius"],
+        "trailing_edge_upper": trailing_edges[0],
+        "trailing_edge_lower": trailing_edges[1],
         "bbox_cm": {
             "x_min": min(xs), "x_max": max(xs),
             "y_min": min(ys), "y_max": max(ys),
@@ -1007,13 +1156,17 @@ def write_stl(plan: Mapping[str, Any], target: Path, name: str = "wing") -> Path
 
 
 def _drive_internal(
-    parameters: Mapping[str, Any], out_dir: Path
+    parameters: Mapping[str, Any],
+    out_dir: Path,
+    parameterization: str | None = None,
+    provenance: Mapping[str, Any] | None = None,
 ) -> tuple[dict, Path, list[str]]:
     """Produit la géométrie sans Fusion. Retourne (résumé, chemin STL, avertissements)."""
-    plan = profile_from_parameters(parameters)
+    plan = profile_from_parameters(parameters, parameterization, provenance)
     logger.info(
-        "Géométrie interne : corde %.3f cm, envergure %.3f cm, t/c %.4f, "
+        "Géométrie interne [%s] : corde %.3f cm, envergure %.3f cm, t/c %.4f, "
         "m/c %.4f, incidence %.3f deg",
+        plan.get("parameterization", PARAMETERIZATION_NACA),
         plan["chord_cm"], plan["span_cm"], plan["thickness"], plan["camber"],
         plan["aoa_deg"],
     )
@@ -1026,6 +1179,13 @@ def _drive_internal(
             "n_points", "camber_position", "bbox_cm",
         )
     }
+    # Ce qui n'existe que sur la voie CST : rapporté quand il est là, pour que
+    # le contour puisse être recalculé à l'identique en aval, mais jamais
+    # ajouté au résumé d'un profil NACA.
+    for key in ("parameterization", "cst_order", "leading_edge_radius",
+                "trailing_edge_upper", "trailing_edge_lower"):
+        if key in plan:
+            summary[key] = plan[key]
     summary["bodies"] = 1
     summary["purged_entities"] = 0
     summary["stl_units"] = "m"
@@ -1452,17 +1612,25 @@ def assert_only_created_bodies(root: Any, created: int) -> int:
 
 
 def _rebuild_geometry(
-    design: Any, parameters: Mapping[str, Any]
+    design: Any,
+    parameters: Mapping[str, Any],
+    parameterization: str | None = None,
+    provenance: Mapping[str, Any] | None = None,
 ) -> tuple[dict, list[str]]:  # pragma: no cover - nécessite Fusion
     """Reconstruit l'aile à partir de design_params.yaml.
 
-    Purge la géométrie précédente, retrace le profil NACA aux nouvelles
-    valeurs, l'extrude sur `span` et marque le résultat pour la purge suivante.
+    Purge la géométrie précédente, retrace le profil aux nouvelles valeurs,
+    l'extrude sur `span` et marque le résultat pour la purge suivante.
     L'incidence est déjà intégrée aux points du profil.
+
+    Le tracé ne travaille que sur des points : que ceux-ci viennent d'un NACA à
+    quatre chiffres ou de coefficients CST ne change rien ici, et c'est
+    pourquoi la voie Fusion accepte les deux paramétrisations sans code
+    supplémentaire.
     """
     root = design.rootComponent
     warnings: list[str] = []
-    plan = profile_from_parameters(parameters)
+    plan = profile_from_parameters(parameters, parameterization, provenance)
 
     logger.info(
         "Reconstruction : corde %.3f cm, envergure %.3f cm, t/c %.4f, m/c %.4f, "
@@ -1790,6 +1958,8 @@ def drive(
         iteration = config["iteration"]
         design_id = config.get("design_id")
         parameters = config["parameters"]
+        parameterization = config.get("parameterization")
+        provenance = config.get("provenance") or {}
 
         out_dir = iteration_dir(iteration, iterations_root)
         step_path = out_dir / STEP_FILENAME
@@ -1827,12 +1997,19 @@ def drive(
             }
 
             if dry_run:
-                plan = profile_from_parameters(parameters)
+                plan = profile_from_parameters(
+                    parameters, parameterization, provenance
+                )
                 geometry = {
                     key: plan[key]
                     for key in ("chord_cm", "span_cm", "thickness", "camber",
                                 "aoa_deg", "n_points", "camber_position", "bbox_cm")
                 }
+                for key in ("parameterization", "cst_order",
+                            "leading_edge_radius", "trailing_edge_upper",
+                            "trailing_edge_lower"):
+                    if key in plan:
+                        geometry[key] = plan[key]
                 status = _build_status(
                     False, STATUS_DRY_RUN,
                     iteration=iteration, design_id=design_id,
@@ -1846,7 +2023,7 @@ def drive(
                 return status
 
             geometry, stl_path, internal_warnings = _drive_internal(
-                parameters, out_dir
+                parameters, out_dir, parameterization, provenance
             )
             warnings.extend(internal_warnings)
             logger.info("=== Itération %04d : succès ===", iteration)
@@ -1876,7 +2053,9 @@ def drive(
             # on la déroule vraiment, ce qui valide la géométrie prévue sans
             # ouvrir la CAO.
             if geometry_mode == GEOMETRY_MODE_REBUILD:
-                plan = profile_from_parameters(parameters)
+                plan = profile_from_parameters(
+                    parameters, parameterization, provenance
+                )
                 geometry = {
                     key: plan[key]
                     for key in (
@@ -1940,7 +2119,9 @@ def drive(
         warnings.extend(param_warnings)
 
         if geometry_mode == GEOMETRY_MODE_REBUILD:
-            geometry, rebuild_warnings = _rebuild_geometry(design, parameters)
+            geometry, rebuild_warnings = _rebuild_geometry(
+                design, parameters, parameterization, provenance
+            )
             warnings.extend(rebuild_warnings)
         else:
             warnings.extend(_recompute(design))

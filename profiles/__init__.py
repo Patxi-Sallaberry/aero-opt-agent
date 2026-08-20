@@ -18,13 +18,23 @@ interrompre une boucle d'optimisation.
 
 from profiles.cst import (  # noqa: F401
     DEFAULT_ORDER,
+    ERROR_FLOOR,
     CSTProfile,
     CSTSurface,
     ReconstructionError,
     cosine_stations,
+    distance_to_curve,
     fit_profile,
     fit_surface,
     reconstruction_error,
+)
+from profiles.geometry import (  # noqa: F401
+    CST_PROFILE_POINTS,
+    ContourError,
+    collect_coefficients,
+    cst_contour,
+    cst_measures,
+    cst_profile,
 )
 from profiles.loader import (  # noqa: F401
     FORMAT_CSV,
@@ -42,14 +52,34 @@ from profiles.reparameterize import (  # noqa: F401
     check_reconstruction,
     reparameterize,
 )
+from profiles.roundtrip import (  # noqa: F401
+    ROUNDTRIP_TOLERANCE,
+    RoundTripReport,
+    check_roundtrip,
+    extract_section,
+    reference_contour,
+)
 from profiles.validation import ValidationReport, validate_profile  # noqa: F401
 
 __all__ = [
+    "CST_PROFILE_POINTS",
     "DEFAULT_ORDER",
+    "ERROR_FLOOR",
+    "ROUNDTRIP_TOLERANCE",
+    "ContourError",
     "CSTProfile",
     "CSTSurface",
     "FORMAT_CSV",
     "ReconstructionError",
+    "RoundTripReport",
+    "check_roundtrip",
+    "collect_coefficients",
+    "cst_contour",
+    "cst_measures",
+    "cst_profile",
+    "distance_to_curve",
+    "extract_section",
+    "reference_contour",
     "ReparameterizationResult",
     "build_design_params",
     "check_reconstruction",

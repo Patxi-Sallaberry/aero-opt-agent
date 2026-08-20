@@ -421,7 +421,7 @@ def _distance_to_segment(point: Point, start: Point, end: Point) -> float:
     return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
 
-def _distance_to_curve(point: Point, curve: Sequence[Point]) -> float:
+def distance_to_curve(point: Point, curve: Sequence[Point]) -> float:
     return min(
         (
             _distance_to_segment(point, curve[i], curve[i + 1])
@@ -460,7 +460,7 @@ def reconstruction_error(
     ):
         curve = surface.points(stations)
         for psi, zeta in points:
-            errors.append((_distance_to_curve((psi, zeta), curve), psi, label))
+            errors.append((distance_to_curve((psi, zeta), curve), psi, label))
             vertical_max = max(vertical_max, abs(surface.evaluate(psi) - zeta))
 
     if not errors:
