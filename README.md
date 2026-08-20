@@ -159,6 +159,10 @@ configs/
   design_params.yaml          ← SEUL fichier modifié par l'agent
   cfd_settings.yaml              conditions CFD (réglage fin)
   cfd_settings_fast.yaml         préréglage d'exploration, ~60 s/itération
+profiles/
+  loader.py                      lecture Selig / Lednicer / CSV
+  profile.py                     profil normalisé + mesures géométriques
+  validation.py                  contrôles de validité
 geometry/
   base.py                        interface GeometryBackend + registre
   internal_backend.py            producteur interne (toujours disponible)
@@ -232,6 +236,71 @@ STL et les dictionnaires. Le préréglage rapide utilise `"dicts"`.
 aucun effet sur Cd et Cl. La laisser varier ferait dépenser des itérations pour
 un gain nul. Pour la rendre influente, passer `domain.spanwise_treatment` à
 `full_3d` puis rouvrir ses bornes.
+
+---
+
+## Ingérer un profil existant
+
+```bash
+python3 profiles/loader.py mon_profil.dat            # lire et mesurer
+python3 profiles/validation.py mon_profil.dat        # + contrôles de validité
+python3 profiles/loader.py mon_profil.dat --json     # sortie exploitable
+```
+
+```
+Profil          : NACA 2412
+Format          : selig
+Points          : 202 (101 extrados, 101 intrados)
+Épaisseur max   : 0.1200 c à 29.2% de corde
+Cambrure max    : +0.0200 c à 39.8% de corde
+Bord de fuite   : 0.00000 c
+Rayon de nez    : 0.01459 c
+Incidence retirée : -3.000°
+```
+
+### Trois conventions, aucune déclarée
+
+Les fichiers de profils circulent depuis quarante ans dans trois formats
+incompatibles, qu'aucun en-tête n'identifie :
+
+| Format | Ce à quoi il ressemble |
+|---|---|
+| **Selig** | un contour continu : bord de fuite → extrados → nez → intrados → bord de fuite. Le plus répandu (UIUC, XFOIL). |
+| **Lednicer** | un en-tête de deux nombres — les comptes de points —, puis chaque surface du nez vers la queue. |
+| **CSV** | colonnes `x, y`, éventuellement précédées d'une colonne de surface. C'est ce que ce projet exporte. |
+
+Selig et Lednicer ont exactement la même allure : deux colonnes de nombres.
+Seule la façon dont l'abscisse évolue les sépare — elle décroît puis remonte
+dans l'un, monte deux fois dans l'autre. La reconnaissance porte donc sur la
+forme de la séquence, jamais sur l'extension du fichier.
+
+### Ce que l'ingestion normalise
+
+Le profil sort avec le nez à l'origine, le bord de fuite à (1, 0), et la corde
+unitaire. Deux choses sont retirées et **signalées** :
+
+- **l'échelle** — un fichier en millimètres est ramené à une corde unitaire, la
+  corde d'origine étant conservée ;
+- **l'incidence** — beaucoup de fichiers ont quelques degrés figés dans leurs
+  coordonnées. Or l'incidence est ici un paramètre de conception : la laisser
+  dans la géométrie la compterait deux fois.
+
+La transformation appliquée est conservée : `profile.transform.restore(point)`
+ramène n'importe quel point dans le repère du fichier d'origine.
+
+### Ce que la validation refuse — et ce qu'elle laisse passer
+
+Rédhibitoire : contour ouvert, surfaces qui se croisent, surface repliée sur
+elle-même, contour auto-intersectant, épaisseur hors de [1 %, 40 %].
+
+Simplement signalé : bord de fuite épais, forte cambrure, nez très aigu,
+faible densité de points. **Ce sont des choix de conception, pas des erreurs** —
+refuser tout ce qui sort de l'ordinaire interdirait la moitié des profils
+réels.
+
+Rien ne lève : le chargement comme la validation rendent un compte rendu, à
+l'image de `GeometryBackend.generate`. Un fichier douteux ne doit pas
+interrompre une boucle.
 
 ---
 
