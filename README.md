@@ -109,7 +109,7 @@ cp .env.example .env        # puis renseigner FOAM_BASHRC
 Vérifier que tout répond :
 
 ```bash
-python3 -m pytest tests/ -q                       # 700 tests, ~40 s
+python3 -m pytest tests/ -q                       # 726 tests, ~30 s
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
@@ -254,7 +254,7 @@ agent/
 scripts/
   run_loop.py                    boucle d'optimisation
 data/iterations/                 archives (non versionné)
-tests/                           700 tests
+tests/                           726 tests
 ```
 
 ---
@@ -946,7 +946,7 @@ ses paramètres n'est rattachable à rien.
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q          # 700 tests, ~40 s
+python3 -m pytest tests/ -q          # 726 tests, ~30 s
 ```
 
 Ce qui est couvert sans dépendance externe : validation du contrat, unités et
@@ -976,6 +976,10 @@ tournent réellement, sur un document qui reproduit celui du premier run réel.
 | Stratégie locale en repli de l'agent | Une optimisation de plusieurs heures ne peut pas dépendre d'une clé d'API ou du réseau. |
 | `configs/cfd_settings_fast.yaml` | Le réglage fin coûte 15 min par itération, soit 5 h pour 20 itérations. |
 | Mode `rebuild` par défaut | Le seed livré n'est pas réellement piloté par ses paramètres (voir plus haut). |
+| Coordonnées en listes de tuples, pas en `np.ndarray` | Le driver tourne dans l'interpréteur embarqué de Fusion, où numpy n'est pas garanti. Aucune opération n'en tire profit ici. |
+| Modes 3 et 4 du §3 (STEP/DXF, design Fusion existant) non implémentés | Ils demandent un noyau CAO ou une session Fusion pilotable. Les modes 1 et 2 couvrent l'usage visé, et l'interface `GeometryBackend` laisse la place. |
+| Ordonnées de bord de fuite dans `provenance`, pas dans `parameters` | Le contrat exige `min < max` : une grandeur qui décrit la forme sans être optimisable n'a pas sa place parmi les variables. |
+| Tolérance sur un défaut de skewness rare et contenu | Un bord de fuite épaissi produit quelques faces gauchies qu'aucun préréglage ne résout. Trois faces sur 258 814 ne rendent pas un maillage inexploitable ; le défaut est rapporté, pas tu. |
 
 ---
 
@@ -1007,6 +1011,32 @@ Trois voies, de la plus simple à la plus intrusive :
 
 Dans tous les cas, `design_params.yaml` doit lister les paramètres avec leurs
 bornes, et les noms doivent correspondre exactement.
+
+---
+
+## Où en est la v1.5
+
+Les critères du §10 du document maître, et ce qui les atteste :
+
+| critère | état | preuve |
+|---|---|---|
+| La v1.0 tourne toujours | ✅ | branche figée au tag `v1.0-stable`, jamais modifiée |
+| Un profil CSV/DAT ingéré et re-paramétré à faible erreur | ✅ | Clark Y : 3,25 × 10⁻⁴ de corde en écart maximal |
+| Une optimisation de ≥ 15 itérations aboutit de façon fiable | ✅ | 25 itérations, **0 échec** |
+| Les deux producteurs de géométrie fonctionnent | ✅ | interne exercé en continu ; Fusion couvert par une émulation de l'API `adsk` |
+| Un paquet `best_design` complet est produit automatiquement | ✅ | [exemple versionné](docs/example_report_clarky/) |
+| Des instructions claires et vérifiables pour reprendre en CAO | ✅ | `FUSION_RETURN.md` + script généré + contrôle d'aller-retour |
+| Une structure prête pour un backend 3D | ✅ | voir ci-dessous |
+
+Ce qui reste hors périmètre, assumé : les modes 3 et 4 du §3 — ingestion d'un
+STEP/DXF et d'un design Fusion existant — demandent un noyau CAO ou une session
+Fusion pilotable, que rien ici ne fournit.
+
+Une réserve honnête sur le producteur Fusion : il est exercé contre une
+**émulation** de l'API `adsk`, pas contre Fusion. Un faux valide la logique du
+driver, pas la lecture de l'API — un bug de ce genre est déjà passé au travers
+de 206 tests parce que la doublure encodait la même erreur de compréhension que
+le code.
 
 ---
 
