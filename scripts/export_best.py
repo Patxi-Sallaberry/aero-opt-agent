@@ -102,10 +102,20 @@ def iteration_dir(iterations_root: Path, iteration: int) -> Path:
     return Path(iterations_root) / f"iter_{int(iteration):04d}"
 
 
-def run_folder(root: Path = RESULTS_ROOT, when: datetime | None = None) -> Path:
-    """`results/run_AAAAMMJJ_HHMMSS/` — un dossier par série, jamais écrasé."""
+def run_folder(root: Path | None = None, when: datetime | None = None) -> Path:
+    """`results/run_AAAAMMJJ_HHMMSS/` — un dossier par série, jamais écrasé.
+
+    La racine est lue à l'APPEL, pas figée dans la signature. Une valeur par
+    défaut `root=RESULTS_ROOT` serait liée une fois pour toutes au chargement
+    du module : redéfinir `RESULTS_ROOT` ensuite n'aurait plus aucun effet.
+
+    Ce n'est pas une précaution théorique. Les tests redirigent précisément
+    cette constante pour ne rien écrire dans le dépôt ; avec la valeur figée,
+    la redirection ne faisait rien et chaque série de test laissait un dossier
+    horodaté sur le disque — le garde-fou passait au vert sans rien garder.
+    """
     stamp = (when or datetime.now()).strftime("%Y%m%d_%H%M%S")
-    return Path(root) / f"run_{stamp}"
+    return Path(RESULTS_ROOT if root is None else root) / f"run_{stamp}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

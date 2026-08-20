@@ -26,4 +26,10 @@ def _results_hors_du_depot(tmp_path, monkeypatch):
     """
     from scripts import export_best
 
-    monkeypatch.setattr(export_best, "RESULTS_ROOT", tmp_path / "results")
+    cible = tmp_path / "results"
+    monkeypatch.setattr(export_best, "RESULTS_ROOT", cible)
+    # La redirection doit être VÉRIFIÉE, pas supposée. Elle est restée
+    # inopérante un temps parce que `run_folder` figeait la racine dans sa
+    # signature : la constante était bien remplacée, et le code n'en tenait
+    # aucun compte. Le fixture passait au vert en ne gardant rien.
+    assert export_best.run_folder().parent == cible

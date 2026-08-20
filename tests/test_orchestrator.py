@@ -696,7 +696,12 @@ def test_la_reprise_nefface_pas_les_iterations(config, iterations, monkeypatch):
 
 
 def test_rapport_montre_les_echecs(config, iterations, monkeypatch):
-    analytic_cfd(monkeypatch, fail_when=lambda p: p["camber"] > 0.021)
+    # La condition d'échec porte sur la CORDE, sondée dès la première
+    # proposition dans les deux sens. Elle portait sur la cambrure, ce qui
+    # liait le test à l'ordre de rotation des sondes : le jour où cet ordre a
+    # changé, la cambrure n'a plus atteint le seuil en six itérations et le
+    # test a échoué sans qu'aucun comportement rapporté n'ait bougé.
+    analytic_cfd(monkeypatch, fail_when=lambda p: p["chord"] > 310.0)
     loop.run_loop(config, REAL_CFD, iterations, max_iterations=6, strategy="local",
                   geometry_backend="internal", max_consecutive_failures=6,
                   stagnation_patience=6)

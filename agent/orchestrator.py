@@ -241,7 +241,15 @@ def propose_local(
     # l'incidence eut trouvé son optimum, alors que les deux sont couplées.
     # L'exploitation d'une bonne direction reste assurée par la recherche
     # linéaire ci-dessous.
-    rotation = len(history)
+    #
+    # Le décalage d'un rang compte. `len(history)` vaut déjà 1 au moment de la
+    # PREMIÈRE proposition — l'itération de départ est archivée —, si bien que
+    # le cycle commençait à l'étape 1 : sens négatif du premier paramètre. Son
+    # sens positif n'était donc jamais essayé, sur aucune série. Sur un profil
+    # cambré parti à 3° d'incidence, cela revenait à ne sonder que 1,32° et à
+    # abandonner le paramètre, alors que l'optimum de finesse se trouve entre
+    # 4 et 6 degrés — dans la direction opposée.
+    rotation = max(len(history) - 1, 0)
 
     for extra in range((4 * n + 8) * 2):
         step = rotation + extra
