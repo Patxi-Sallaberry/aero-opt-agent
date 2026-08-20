@@ -304,6 +304,68 @@ def test_skip_cfd(config, iterations):
 
 
 # ─────────────────────────────────────────────────────────────
+# Allègement du case archivé
+# ─────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def case_dir(tmp_path) -> Path:
+    """Reproduit l'arborescence d'un case OpenFOAM calculé."""
+    iteration = tmp_path / "iter_0000"
+    case = iteration / "cfd"
+    for relative in (
+        "system/controlDict", "constant/transportProperties",
+        "constant/triSurface/wing.stl", "0/U",
+        "constant/polyMesh/points", "constant/polyMesh/faces",
+        "500/U", "500/p", "processor0/500/U",
+        "postProcessing/forceCoeffs/0/coefficient.dat",
+        "case_summary.json",
+    ):
+        target = case / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("x" * 4096, encoding="utf-8")
+    return iteration
+
+
+def test_par_defaut_tout_est_conserve(case_dir):
+    report = mp.prune_case(case_dir, {"execution": {"keep_case_after_run": True}})
+    assert report["removed"] == []
+    assert (case_dir / "cfd" / "constant" / "polyMesh" / "points").is_file()
+
+
+def test_politique_dicts_supprime_le_maillage(case_dir):
+    report = mp.prune_case(case_dir, {"execution": {"keep_case_after_run": "dicts"}})
+    case = case_dir / "cfd"
+    assert not (case / "constant" / "polyMesh").exists()
+    assert not (case / "500").exists()
+    assert not (case / "processor0").exists()
+    assert report["freed_bytes"] > 0
+    # Ce qui permet de rejouer le case, et de relire les coefficients, reste.
+    assert (case / "system" / "controlDict").is_file()
+    assert (case / "constant" / "triSurface" / "wing.stl").is_file()
+    assert (case / "0" / "U").is_file()
+    assert (case / "postProcessing" / "forceCoeffs" / "0" / "coefficient.dat").is_file()
+
+
+def test_politique_false_supprime_le_case(case_dir):
+    mp.prune_case(case_dir, {"execution": {"keep_case_after_run": False}})
+    assert not (case_dir / "cfd").exists()
+
+
+def test_lallegement_ne_leve_pas_sans_case(tmp_path):
+    vide = tmp_path / "iter_0001"
+    vide.mkdir()
+    assert mp.prune_case(vide, {"execution": {"keep_case_after_run": "dicts"}})[
+        "removed"
+    ] == []
+
+
+def test_politique_inconnue_ne_supprime_rien(case_dir):
+    mp.prune_case(case_dir, {"execution": {"keep_case_after_run": "peut-etre"}})
+    assert (case_dir / "cfd" / "constant" / "polyMesh").exists()
+
+
+# ─────────────────────────────────────────────────────────────
 # Historique
 # ─────────────────────────────────────────────────────────────
 

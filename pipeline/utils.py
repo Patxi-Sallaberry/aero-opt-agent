@@ -420,15 +420,36 @@ def max_abs_delta(previous_value: float, spec: Mapping[str, Any]) -> float:
     """Variation absolue maximale autorisée depuis `previous_value`.
 
     Règle nominale : max_delta_pct % de |previous_value|.
-    Repli quand previous_value est nul (delta relatif indéfini) :
-    max_delta_pct % de l'amplitude (max - min). Sans ce repli, un paramètre
-    valant 0 — un angle d'incidence par exemple — serait définitivement figé.
+
+    Deux cas imposent de la mesurer sur l'amplitude `max - min` :
+
+    1. **`previous_value` est nul.** Le pourcentage relatif est indéfini ; sans
+       ce repli, un paramètre valant 0 serait figé à jamais.
+
+    2. **Les bornes encadrent zéro** (`min < 0 < max`). Un pourcentage d'une
+       grandeur qui change de signe ne contraint rien de sensé : près de zéro
+       il autorise des pas infinitésimaux, loin de zéro des pas énormes. Pire,
+       il est ASYMÉTRIQUE — pour une incidence bornée à [-2, 12], passer de 0 à
+       -1,68° coûte une itération, mais revenir de -1,68° à 0 en coûte huit,
+       chaque pas étant limité à 12 % de la valeur courante. Une optimisation
+       s'y piège : elle explore une direction et ne peut plus en sortir.
+       Rapporter le budget à l'amplitude rend la règle symétrique, ce qu'une
+       contrainte de sécurité doit être.
+
+    Le garde-fou visé par le Master Document — empêcher un saut qui casserait
+    le maillage — est préservé dans les deux cas : le budget reste une petite
+    fraction de la plage utile du paramètre.
     """
     pct = float(spec["max_delta_pct"]) / 100.0
+    low, high = float(spec["min"]), float(spec["max"])
+    amplitude = abs(high - low) * pct
+
+    if low < 0.0 < high:
+        return amplitude
     prev = abs(float(previous_value))
     if prev > ZERO_EPS:
         return prev * pct
-    return abs(float(spec["max"]) - float(spec["min"])) * pct
+    return amplitude
 
 
 def allowed_range(

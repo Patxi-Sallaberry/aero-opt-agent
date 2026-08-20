@@ -213,70 +213,87 @@ def propose_local(
     # d'évaluation : chacune coûte plusieurs minutes de CFD.
     inert = _inert_parameters(points, parameters, free)
     active = [name for name in free if name not in inert] or free
-
-    n = len(active)
-    free = active
-    # Deux sens épuisés sur un paramètre avant de passer au suivant : essayer
-    # +7 % de corde puis +8 % d'épaisseur avant de seulement tenter -7 % de
-    # corde gaspillerait des évaluations.
-    index = (attempts // 2) % n
-    direction = 1.0 if attempts % 2 == 0 else -1.0
-    shrink = 0.5 ** (attempts // (2 * n))
-    # Un échec signale une forme trop agressive : on resserre franchement.
-    shrink *= 0.5 ** failures
+    # Sonder d'abord ce qui n'a jamais été essayé, puis ce qui s'est révélé le
+    # plus influent : le budget d'itérations va là où il rapporte.
+    free = _probe_order(active, points, parameters)
+    n = len(free)
 
     # Si la dernière sonde a payé, on poursuit dans la même direction plutôt
     # que de repartir du début du cycle : c'est une recherche linéaire, et
     # c'est ce qui permet à un paramètre de parcourir sa plage utile au lieu
     # d'avancer d'un pas toutes les 2n itérations.
     continuation = _last_improving_probe(points, best, parameters, free)
-    if continuation is not None:
-        forced_name, forced_direction = continuation
-        index = free.index(forced_name)
-        direction = forced_direction
-        shrink = 0.5 ** failures
 
     probe_name = ""
-    target = dict(best["values"])
-    for offset in range(n):
-        name = free[(index + offset) % n]
-        spec = parameters[name]
-        base_value = best["values"].get(name, float(spec["value"]))
-        budget = max_abs_delta(base_value, spec)
-        lo, hi = allowed_range(base_value, spec)
-        candidate = min(max(base_value + direction * shrink * budget, lo), hi)
-        if abs(candidate - base_value) <= abs(budget) * 1e-6:
-            continue  # buté sur une borne : passer au paramètre suivant
-        target[name] = candidate
-        probe_name = name
+    proposal: dict[str, float] = {}
+    clamped: list[str] = []
+    shrink = 1.0
+    direction = 1.0
+
+    # On balaie la suite des sondes jusqu'à en trouver une qui produise un point
+    # NOUVEAU. Sans ce contrôle, une sonde infructueuse est reproposée à
+    # l'identique — la boucle s'arrête alors sur « la cible coïncide avec
+    # l'itération précédente », en ayant gaspillé son budget.
+    for extra in range((4 * n + 8) * 2):
+        step = attempts + extra
+        # Deux sens épuisés sur un paramètre avant de passer au suivant :
+        # essayer +7 % de corde puis +8 % d'épaisseur avant de seulement tenter
+        # -7 % de corde gaspillerait des évaluations.
+        index = (step // 2) % n
+        direction = 1.0 if step % 2 == 0 else -1.0
+        shrink = 0.5 ** (step // (2 * n))
+        # Un échec signale une forme trop agressive : on resserre franchement.
+        shrink *= 0.5 ** failures
+
+        if extra == 0 and continuation is not None:
+            forced_name, forced_direction = continuation
+            index = free.index(forced_name)
+            direction = forced_direction
+            shrink = 0.5 ** failures
+
+        target = dict(best["values"])
+        candidate_name = ""
+        for offset in range(n):
+            name = free[(index + offset) % n]
+            spec = parameters[name]
+            base_value = best["values"].get(name, float(spec["value"]))
+            budget = max_abs_delta(base_value, spec)
+            lo, hi = allowed_range(base_value, spec)
+            value = min(max(base_value + direction * shrink * budget, lo), hi)
+            if abs(value - base_value) <= abs(budget) * 1e-6:
+                continue  # buté sur une borne : passer au paramètre suivant
+            target[name] = value
+            candidate_name = name
+            break
+
+        if not candidate_name:
+            continue
+
+        # Projection de la cible dans ce que le contrat autorise à cette
+        # itération.
+        attempt_proposal: dict[str, float] = {}
+        attempt_clamped: list[str] = []
+        for name, spec in parameters.items():
+            previous_value = last.get(name, float(spec["value"]))
+            wanted = target.get(name, previous_value)
+            lo, hi = allowed_range(previous_value, spec)
+            value = min(max(wanted, lo), hi)
+            if abs(value - wanted) > abs(wanted) * 1e-9 + 1e-12:
+                attempt_clamped.append(name)
+            attempt_proposal[name] = round(value, 9)
+
+        if _already_evaluated(attempt_proposal, points, last, parameters):
+            continue
+
+        probe_name = candidate_name
+        proposal = attempt_proposal
+        clamped = attempt_clamped
         break
 
     if not probe_name:
         raise ProposalError(
-            "aucune variation possible : tous les paramètres sont butés sur "
-            "leurs bornes"
-        )
-
-    # Projection de la cible dans ce que le contrat autorise à cette itération.
-    proposal: dict[str, float] = {}
-    clamped: list[str] = []
-    for name, spec in parameters.items():
-        previous_value = last.get(name, float(spec["value"]))
-        wanted = target.get(name, previous_value)
-        lo, hi = allowed_range(previous_value, spec)
-        value = min(max(wanted, lo), hi)
-        if abs(value - wanted) > abs(wanted) * 1e-9 + 1e-12:
-            clamped.append(name)
-        proposal[name] = round(value, 9)
-
-    if all(
-        abs(proposal[name] - last.get(name, float(spec["value"])))
-        <= 1e-12
-        for name, spec in parameters.items()
-    ):
-        raise ProposalError(
-            "aucune variation possible : la cible coïncide avec l'itération "
-            "précédente"
+            "aucune variation possible : toutes les sondes atteignables ont "
+            "déjà été évaluées ou butent sur les bornes"
         )
 
     origine = (
@@ -304,6 +321,86 @@ def propose_local(
 
 INERT_RELATIVE_EFFECT = 1e-4
 INERT_MIN_OBSERVATIONS = 2
+
+# Deux points sont « le même » si chaque paramètre est à moins de ce millième
+# de son budget de variation près.
+SAME_POINT_TOL = 1e-3
+
+
+def _already_evaluated(
+    proposal: Mapping[str, float],
+    points: Sequence[Mapping[str, Any]],
+    last: Mapping[str, float],
+    parameters: Mapping[str, Any],
+) -> bool:
+    """Vrai si ce point a déjà été simulé, ou s'il ne bouge pas du précédent.
+
+    Re-simuler un point connu, c'est perdre plusieurs minutes pour un résultat
+    qu'on a déjà. Le proposer à l'identique deux fois de suite arrête même la
+    boucle.
+    """
+    def same(a: Mapping[str, float], b: Mapping[str, float]) -> bool:
+        for name, spec in parameters.items():
+            if name not in a or name not in b:
+                return False
+            budget = abs(max_abs_delta(float(b[name]), spec)) or 1.0
+            if abs(float(a[name]) - float(b[name])) > budget * SAME_POINT_TOL:
+                return False
+        return True
+
+    if same(proposal, last):
+        return True
+    return any(same(proposal, point["values"]) for point in points)
+
+
+def _probe_order(
+    free: Sequence[str],
+    points: Sequence[Mapping[str, Any]],
+    parameters: Mapping[str, Any],
+) -> list[str]:
+    """Ordre de sondage : l'inexploré d'abord, puis le plus influent.
+
+    Tant qu'un paramètre n'a jamais été essayé, on ignore son effet : il faut
+    le mesurer. Ensuite, autant concentrer un budget d'itérations coûteux sur
+    ceux qui déplacent réellement l'objectif.
+    """
+    sensitivity = _sensitivities(points, parameters, free)
+    unknown = [name for name in free if name not in sensitivity]
+    known = sorted(
+        (name for name in free if name in sensitivity),
+        key=lambda name: sensitivity[name],
+        reverse=True,
+    )
+    return unknown + known
+
+
+def _sensitivities(
+    points: Sequence[Mapping[str, Any]],
+    parameters: Mapping[str, Any],
+    free: Sequence[str],
+) -> dict[str, float]:
+    """Effet relatif mesuré de chaque paramètre sur l'objectif."""
+    effects: dict[str, float] = {}
+    ordered = sorted(points, key=lambda p: p["iteration"])
+
+    for i, later in enumerate(ordered):
+        for earlier in ordered[:i]:
+            moved = [
+                name
+                for name in free
+                if abs(later["values"].get(name, 0.0) - earlier["values"].get(name, 0.0))
+                > abs(
+                    max_abs_delta(earlier["values"].get(name, 0.0), parameters[name])
+                )
+                * 1e-3
+            ]
+            if len(moved) != 1:
+                continue
+            reference = abs(earlier["objective"]) or 1.0
+            effect = abs(later["objective"] - earlier["objective"]) / reference
+            name = moved[0]
+            effects[name] = max(effects.get(name, 0.0), effect)
+    return effects
 
 
 def _inert_parameters(

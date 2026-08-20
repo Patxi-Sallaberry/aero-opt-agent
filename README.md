@@ -116,9 +116,18 @@ Trois familles de règles, appliquées par `pipeline/utils.py` :
 1. **Structure** — clés obligatoires, types stricts, aucune clé inconnue.
 2. **Bornes** — `min < max` et `min ≤ value ≤ max`.
 3. **max_delta_pct** — l'écart avec la dernière itération **réussie** ne dépasse
-   pas ce pourcentage. Quand la valeur précédente est nulle — une incidence à
-   0°, cas réel de ce projet — le budget retombe sur `max_delta_pct` % de
-   l'amplitude `max - min`, faute de quoi le paramètre serait figé à jamais.
+   pas ce pourcentage.
+
+   Deux cas imposent de mesurer ce budget sur l'amplitude `max - min` plutôt
+   que sur la valeur : quand la valeur précédente est **nulle** (le pourcentage
+   relatif est indéfini, et le paramètre serait figé à jamais), et quand les
+   **bornes encadrent zéro**. Ce second cas mérite une explication, parce qu'il
+   a piégé une optimisation réelle : pour une incidence bornée à [-2°, 12°],
+   passer de 0 à -1,68° coûte une itération, mais revenir en coûte **huit**,
+   chaque pas étant limité à 12 % de la valeur courante. La recherche explorait
+   une direction et ne pouvait plus en sortir. Un pourcentage d'une grandeur qui
+   change de signe ne contraint rien de sensé ; rapporté à l'amplitude, le
+   budget redevient symétrique — ce qu'une règle de sécurité doit être.
 
 Entre deux itérations, seule `value` peut changer.
 
@@ -131,6 +140,15 @@ chord:     [279, 321] mm          thickness: [0.1104, 0.1296]
 camber:    [0.018, 0.022]         span:      [79.2, 80.8] mm
 aoa:       [-1.68, 1.68] deg
 ```
+
+### Archivage et place disque
+
+`execution.keep_case_after_run` décide de ce qui survit à l'itération :
+`true` garde tout, `"dicts"` supprime maillage et champs en conservant les
+dictionnaires et les journaux, `false` supprime le case entier. Un case complet
+pèse une vingtaine de méga-octets — sur cinquante itérations sans surveillance,
+plusieurs gigaoctets — alors qu'il se régénère en quelques secondes depuis le
+STL et les dictionnaires. Le préréglage rapide utilise `"dicts"`.
 
 `span` est **tenu fixe à dessein** : le calcul est quasi-2D, l'envergure n'y a
 aucun effet sur Cd et Cl. La laisser varier ferait dépenser des itérations pour

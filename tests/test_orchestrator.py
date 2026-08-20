@@ -200,9 +200,11 @@ def test_la_recherche_repart_du_meilleur_point(config, iterations, monkeypatch):
     evaluate(config, iterations)
 
     result = orch.propose(config, iterations, strategy="local", write=False)
-    # On ne peut pas revenir à 4.0 d'un bond — le budget se mesure depuis la
-    # dernière itération réussie (1.0) — mais on doit s'en rapprocher.
-    assert 1.0 < result["values"]["aoa"] <= 1.12   # +12 % au maximum
+    # Le budget se mesure depuis la dernière itération réussie (1.0). Les
+    # bornes de `aoa` encadrent zéro, donc le budget vaut 12 % de l'amplitude
+    # (14 deg), soit 1.68 : on peut remonter jusqu'à 2.68, donc atteindre 4.0
+    # reste hors de portée en une itération.
+    assert 1.0 < result["values"]["aoa"] <= 2.68
     assert "retour progressif" in result["rationale"]
 
 
@@ -286,19 +288,78 @@ def test_la_recherche_approche_loptimum(config, iterations, monkeypatch):
     assert summary["improvement_pct"] > 100.0
 
 
-def test_les_parametres_sans_effet_sont_abandonnes(config, iterations, monkeypatch):
-    # `chord` n'a aucun effet dans le modèle analytique : après quelques
-    # sondes infructueuses, la recherche doit cesser de le proposer.
+def test_un_point_deja_evalue_nest_jamais_repropose(config, iterations, monkeypatch):
+    """Non-régression : la boucle réelle s'est arrêtée sur ce défaut.
+
+    Après une sonde infructueuse, la stratégie reproposait exactement le point
+    déjà simulé, et la boucle s'arrêtait sur « la cible coïncide avec
+    l'itération précédente » — budget gaspillé.
+    """
     analytic_cfd(monkeypatch)
-    loop.run_loop(config, REAL_CFD, iterations, max_iterations=14,
+    proposes = []
+    for i in range(10):
+        record = evaluate(config, iterations)
+        assert record["success"], record["error_message"]
+        proposes.append(
+            {n: round(v, 6) for n, v in
+             orch.propose(config, iterations, strategy="local")["values"].items()}
+        )
+    # Chaque proposition doit être un point neuf.
+    empreintes = [tuple(sorted(p.items())) for p in proposes]
+    assert len(set(empreintes)) == len(empreintes)
+
+
+def test_lordre_de_sondage_suit_la_sensibilite(config, iterations, monkeypatch):
+    analytic_cfd(monkeypatch)
+    loop.run_loop(config, REAL_CFD, iterations, max_iterations=10,
                   strategy="local", geometry_backend="internal",
-                  stagnation_patience=14)
+                  stagnation_patience=10)
     points = orch.evaluated_points(mp.history(iterations), iterations)
+    parametres = load_yaml(config)["parameters"]
+    free = ["chord", "thickness", "camber", "aoa"]
+    effets = orch._sensitivities(points, parametres, free)
+    ordre = orch._probe_order(free, points, parametres)
+
+    # Les paramètres déjà mesurés sont classés par effet décroissant.
+    mesures = [name for name in ordre if name in effets]
+    assert mesures == sorted(mesures, key=lambda n: effets[n], reverse=True)
+    # Et ceux jamais essayés passent devant, pour être mesurés.
+    inconnus = [name for name in ordre if name not in effets]
+    assert ordre[:len(inconnus)] == inconnus
+
+
+def test_les_parametres_sans_effet_sont_abandonnes(config):
+    # Trois points : `chord` bouge sans rien changer, `aoa` bouge et l'objectif
+    # suit. Le premier ne mérite plus qu'on dépense une CFD dessus.
+    parametres = load_yaml(config)["parameters"]
+    base = {n: float(s["value"]) for n, s in parametres.items()}
+    points = [
+        {"iteration": 0, "objective": 10.0, "values": dict(base)},
+        {"iteration": 1, "objective": 10.0,
+         "values": {**base, "chord": 315.0}},
+        {"iteration": 2, "objective": 10.0,
+         "values": {**base, "chord": 285.0}},
+        {"iteration": 3, "objective": 14.0,
+         "values": {**base, "aoa": 1.5}},
+        {"iteration": 4, "objective": 17.0,
+         "values": {**base, "aoa": 3.0}},
+    ]
     inertes = orch._inert_parameters(
-        points, load_yaml(config)["parameters"], ["chord", "thickness", "camber", "aoa"]
+        points, parametres, ["chord", "thickness", "camber", "aoa"]
     )
     assert "chord" in inertes
     assert "aoa" not in inertes
+
+
+def test_un_parametre_sonde_une_seule_fois_reste_en_jeu(config):
+    # Une seule observation ne suffit pas à condamner un paramètre.
+    parametres = load_yaml(config)["parameters"]
+    base = {n: float(s["value"]) for n, s in parametres.items()}
+    points = [
+        {"iteration": 0, "objective": 10.0, "values": dict(base)},
+        {"iteration": 1, "objective": 10.0, "values": {**base, "chord": 315.0}},
+    ]
+    assert orch._inert_parameters(points, parametres, ["chord"]) == set()
 
 
 def test_la_boucle_survit_aux_echecs(config, iterations, monkeypatch):

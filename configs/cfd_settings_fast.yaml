@@ -106,4 +106,9 @@ geometry_check:
 execution:
   n_processors: 8
   decomposition_method: "scotch"
-  keep_case_after_run: true
+  # "dicts" : le maillage et les champs sont supprimés après extraction des
+  # coefficients, les dictionnaires et les journaux sont conservés. Un case
+  # complet pèse une vingtaine de méga-octets ; sur une longue série sans
+  # surveillance, cela fait des gigaoctets, alors que le maillage se
+  # régénère en quelques secondes depuis le STL et ces dictionnaires.
+  keep_case_after_run: "dicts"

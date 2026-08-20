@@ -185,6 +185,68 @@ def run_cfd(
     return False, " ".join(tail[-6:])[:800] or f"run_cfd.sh a échoué (code {proc.returncode})"
 
 
+def prune_case(iteration_dir: Path, cfd_settings: Mapping[str, Any]) -> dict:
+    """Allège le case OpenFOAM archivé selon `execution.keep_case_after_run`.
+
+    Un case complet pèse une vingtaine de méga-octets, presque entièrement du
+    maillage et des champs. Sur une optimisation de cinquante itérations qui
+    tourne sans surveillance, cela fait plus d'un gigaoctet — et le maillage se
+    régénère en quelques secondes à partir du STL et des dictionnaires, qui,
+    eux, tiennent en quelques kilo-octets.
+
+    Trois politiques :
+      `true`    tout est conservé (défaut : ne rien jeter sans qu'on l'ait dit) ;
+      `"dicts"` maillage et champs supprimés, dictionnaires, journaux et
+                coefficients conservés — le case reste rejouable ;
+      `false`   le case entier disparaît, seuls results.json et les journaux
+                restent.
+    """
+    case_dir = Path(iteration_dir) / "cfd"
+    policy = (cfd_settings.get("execution") or {}).get("keep_case_after_run", True)
+    if isinstance(policy, str):
+        policy = policy.strip().lower()
+
+    report = {"policy": policy, "removed": [], "freed_bytes": 0}
+    if not case_dir.is_dir() or policy is True or policy == "true":
+        return report
+
+    def _size(path: Path) -> int:
+        try:
+            return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+        except OSError:
+            return 0
+
+    targets: list[Path] = []
+    if policy in (False, "false", "0"):
+        targets = [case_dir]
+    elif policy == "dicts":
+        targets = [case_dir / "constant" / "polyMesh"]
+        targets += list(case_dir.glob("processor*"))
+        for entry in case_dir.iterdir():
+            # Les répertoires temporels sont numériques ; « 0 » porte les
+            # conditions initiales et doit survivre pour rejouer le case.
+            if entry.is_dir() and entry.name != "0":
+                try:
+                    float(entry.name)
+                except ValueError:
+                    continue
+                targets.append(entry)
+    else:
+        return report
+
+    for target in targets:
+        if not target.exists():
+            continue
+        freed = _size(target)
+        try:
+            shutil.rmtree(target)
+            report["removed"].append(str(target.relative_to(iteration_dir)))
+            report["freed_bytes"] += freed
+        except OSError:
+            continue
+    return report
+
+
 def read_results(iteration_dir: Path) -> dict | None:
     path = Path(iteration_dir) / RESULTS_FILENAME
     if not path.is_file():
@@ -331,6 +393,11 @@ def run_iteration(
         )
         results = read_results(out_dir)
 
+        try:
+            pruned = prune_case(out_dir, load_yaml(cfd_settings_path))
+        except Exception:
+            pruned = {"policy": "erreur", "removed": [], "freed_bytes": 0}
+
         if results is None:
             record = _record(
                 iteration, design_id, False, STATUS_CFD_FAILED, "cfd",
@@ -360,6 +427,7 @@ def run_iteration(
             geometry_status=geometry_status,
             geometry_report=geometry_report,
             results=results,
+            pruned=pruned,
             duration_s=round(time.time() - started, 1),
         )
         _write_record(out_dir, record)
