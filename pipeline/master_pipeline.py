@@ -538,6 +538,15 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
+    if record["status"] == STATUS_SKIPPED_CFD:
+        # Demandé explicitement : ce n'est pas un échec du système.
+        print(
+            f"iter {record['iteration']:>4} | géométrie validée, CFD ignorée "
+            f"(--skip-cfd) | {record['duration_s']} s",
+            file=sys.stderr,
+        )
+        return 0
+
     print(
         f"iter {record['iteration']} | ÉCHEC [{record['status']}/{record['stage']}] "
         f"{record['error_message']}",

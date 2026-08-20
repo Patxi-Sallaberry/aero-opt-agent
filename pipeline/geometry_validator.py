@@ -38,6 +38,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from openfoam.case_builder import (  # noqa: E402
     CaseBuildError,
+    _length_m,
     expected_bounding_box,
     stl_bounding_box,
 )
@@ -105,9 +106,11 @@ def _check_thickness(
 
     params = design.get("parameters") or {}
     try:
-        chord_mm = float(params["chord"]["value"])
+        # L'unité de la corde est lue, jamais supposée : un modèle décrit en
+        # centimètres ou en pouces donnerait sinon un verdict absurde.
+        chord_mm = _length_m(params["chord"], "chord") * 1000.0
         ratio = float(params["thickness"]["value"])
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, CaseBuildError):
         return problems
 
     thickness_mm = ratio * chord_mm
@@ -190,7 +193,13 @@ def validate_geometry(
             "n'a pas pu être vérifiée"
         )
     else:
-        chord_m = float(design["parameters"]["chord"]["value"]) / 1000.0
+        try:
+            chord_m = _length_m(design["parameters"]["chord"], "chord")
+        except (KeyError, TypeError, CaseBuildError) as exc:
+            raise GeometryError(
+                STATUS_GEOMETRY_MISMATCH,
+                f"corde illisible dans design_params.yaml : {exc}",
+            ) from exc
         tolerance = abs(chord_m) * tolerance_pct / 100.0
         problems = [
             f"{axis}_{bound} : {bbox[f'{axis}_{bound}']:.5f} m au lieu de "

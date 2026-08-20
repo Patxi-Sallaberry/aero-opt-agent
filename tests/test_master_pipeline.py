@@ -152,6 +152,18 @@ def test_epaisseur_sous_le_minimum(geometry, config):
     assert exc.value.status == gv.STATUS_CONSTRAINT_VIOLATED
 
 
+def test_la_corde_est_lue_avec_son_unite(geometry, config):
+    # Même géométrie, corde décrite en centimètres : le contrôle doit passer.
+    # Supposer les millimètres en dur donnerait un verdict absurde.
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    data["parameters"]["chord"].update(
+        {"value": 30.0, "min": 22.0, "max": 42.0, "unit": "cm"}
+    )
+    config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    report = gv.validate_geometry(geometry, config)
+    assert report["status"] == gv.STATUS_OK
+
+
 def test_step_seul_avertit(tmp_path, config):
     d = tmp_path / "iter_0000"
     d.mkdir()
@@ -438,6 +450,16 @@ def test_cli_succes(config, iterations, monkeypatch, capsys):
                     "--geometry-backend", "internal", "--quiet"])
     assert code == 0
     assert "Cl/Cd" in capsys.readouterr().err
+
+
+def test_cli_skip_cfd_nest_pas_un_echec(config, iterations, capsys):
+    # Ignorer la CFD est demandé explicitement : le code de retour ne doit pas
+    # laisser croire à une panne.
+    code = mp.main(["--config", str(config), "--cfd-settings", str(REAL_CFD),
+                    "--iterations-dir", str(iterations), "--skip-cfd",
+                    "--geometry-backend", "internal", "--quiet"])
+    assert code == 0
+    assert "géométrie validée" in capsys.readouterr().err
 
 
 def test_cli_echec(config, iterations, capsys):
