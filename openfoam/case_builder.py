@@ -484,6 +484,120 @@ def expected_bounding_box(design: Mapping[str, Any]) -> dict[str, float] | None:
     }
 
 
+def detect_scale_factor(
+    actual: Mapping[str, float],
+    expected: Mapping[str, float],
+    tolerance_pct: float = 5.0,
+) -> float | None:
+    """Facteur d'échelle entre le STL et la géométrie demandée.
+
+    Fusion, gmsh et les convertisseurs CAO n'écrivent pas tous dans la même
+    unité, et l'unité d'export n'est pas garantie d'une version à l'autre.
+    Plutôt que de supposer, on la MESURE : on compare l'étendue du fichier à
+    celle attendue et on retient le facteur usuel qui colle.
+
+    Returns:
+        1.0 si le STL est déjà en mètres, 1e-3 s'il est en millimètres, 1e-2
+        en centimètres, ou None si aucun facteur usuel n'explique l'écart —
+        auquel cas ce n'est pas un problème d'unité mais de géométrie.
+    """
+    def extent(box: Mapping[str, float]) -> float:
+        return max(
+            float(box["x_max"]) - float(box["x_min"]),
+            float(box["y_max"]) - float(box["y_min"]),
+            float(box["z_max"]) - float(box["z_min"]),
+        )
+
+    expected_extent = extent(expected)
+    actual_extent = extent(actual)
+    if expected_extent <= 0 or actual_extent <= 0:
+        return None
+
+    for factor in (1.0, 1e-3, 1e-2, 1e-1, 10.0, 100.0, 1000.0):
+        if abs(actual_extent * factor - expected_extent) <= expected_extent * (
+            tolerance_pct / 100.0
+        ):
+            return factor
+    return None
+
+
+def rescale_stl(path: Path, factor: float) -> dict[str, float]:
+    """Réécrit un STL ASCII à l'échelle demandée et rend sa nouvelle emprise."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    out: list[str] = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) == 4 and parts[0] == "vertex":
+            x, y, z = (float(v) * factor for v in parts[1:4])
+            out.append(f"      vertex {x:.8e} {y:.8e} {z:.8e}")
+        else:
+            out.append(line)
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return stl_bounding_box(path)
+
+
+def to_ascii_stl(path: Path) -> None:
+    """Convertit un STL binaire en ASCII, pour pouvoir le remettre à l'échelle."""
+    bbox = stl_bounding_box(path)
+    del bbox  # la lecture valide le fichier ; la conversion suit
+
+    with path.open("rb") as fh:
+        header = fh.read(80)
+        del header
+        n_tri = struct.unpack("<I", fh.read(4))[0]
+        data = fh.read(n_tri * 50)
+
+    lines = ["solid wing"]
+    for i in range(n_tri):
+        base = i * 50
+        nx, ny, nz = struct.unpack_from("<3f", data, base)
+        vertices = struct.unpack_from("<9f", data, base + 12)
+        lines.append(f"  facet normal {nx:.6e} {ny:.6e} {nz:.6e}")
+        lines.append("    outer loop")
+        for j in range(3):
+            x, y, z = vertices[j * 3: j * 3 + 3]
+            lines.append(f"      vertex {x:.8e} {y:.8e} {z:.8e}")
+        lines.append("    endloop")
+        lines.append("  endfacet")
+    lines.append("endsolid wing")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def is_binary_stl(path: Path) -> bool:
+    """Vrai si le fichier est un STL binaire (critère : la taille exacte)."""
+    size = path.stat().st_size
+    with path.open("rb") as fh:
+        fh.seek(80)
+        count = fh.read(4)
+    if len(count) != 4:
+        return False
+    return size == 84 + struct.unpack("<I", count)[0] * 50
+
+
+def normalize_stl_scale(
+    path: Path,
+    expected: Mapping[str, float] | None,
+    tolerance_pct: float,
+) -> tuple[dict[str, float], list[str]]:
+    """Ramène le STL en mètres si son unité diffère, et rend son emprise."""
+    bbox = stl_bounding_box(path)
+    if expected is None:
+        return bbox, []
+
+    factor = detect_scale_factor(bbox, expected, tolerance_pct)
+    if factor is None or factor == 1.0:
+        return bbox, []
+
+    if is_binary_stl(path):
+        to_ascii_stl(path)
+    bbox = rescale_stl(path, factor)
+    return bbox, [
+        f"STL remis à l'échelle d'un facteur {factor:g} : le fichier n'était pas "
+        f"en mètres (unité d'export CAO). Emprise corrigée "
+        f"x [{bbox['x_min']:.4f}, {bbox['x_max']:.4f}] m."
+    ]
+
+
 def check_geometry(
     actual: Mapping[str, float],
     expected: Mapping[str, float] | None,
@@ -638,18 +752,21 @@ def build_case(
         )
         rendered.append(str(dst.relative_to(case_dir)))
 
-    geometry = ensure_stl(iteration_dir, case_dir / "constant" / "triSurface" / STL_NAME)
-    bbox = stl_bounding_box(case_dir / "constant" / "triSurface" / STL_NAME)
+    stl_path = case_dir / "constant" / "triSurface" / STL_NAME
+    geometry = ensure_stl(iteration_dir, stl_path)
 
-    warnings: list[str] = []
     check_cfg = cfd.get("geometry_check", {})
+    tolerance_pct = float(check_cfg.get("tolerance_pct", 5.0))
+    expected = expected_bounding_box(design)
+
+    # La mise à l'échelle précède le contrôle : un STL en millimètres est un
+    # problème d'unité, pas de géométrie, et il se corrige tout seul.
+    bbox, warnings = normalize_stl_scale(stl_path, expected, tolerance_pct)
+
     if bool(check_cfg.get("enabled", True)):
         warnings.extend(
             check_geometry(
-                bbox,
-                expected_bounding_box(design),
-                values["_design"]["chord_m"],
-                float(check_cfg.get("tolerance_pct", 5.0)),
+                bbox, expected, values["_design"]["chord_m"], tolerance_pct
             )
         )
 

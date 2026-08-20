@@ -63,7 +63,9 @@ def write_coefficients(
 
 
 def write_check_mesh(iteration_dir: Path, ok: bool = True, n_failed: int = 3,
-                     cells: int = 254000) -> Path:
+                     cells: int = 254000, non_ortho: float = 68.49,
+                     skewness: float = 2.57, aspect: float = 14.52) -> Path:
+    """Reproduit un journal checkMesh réel (valeurs du premier run OpenFOAM)."""
     logs = iteration_dir / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     body = f"""
@@ -73,6 +75,11 @@ Mesh stats
     cells:            {cells}
 
 Checking geometry...
+    Max aspect ratio = {aspect} OK.
+    Min volume = 1.28e-10. Max volume = 1.90e-05.  Cell volumes OK.
+    Mesh non-orthogonality Max: {non_ortho} average: 3.75
+    Non-orthogonality check OK.
+    Max skewness = {skewness} OK.
 """
     body += "\nMesh OK.\n" if ok else f"\n***Failed {n_failed} mesh checks.\n"
     path = logs / "checkMesh.log"
@@ -260,6 +267,71 @@ def test_checkmesh_en_echec(iteration_dir):
 def test_checkmesh_non_execute(iteration_dir):
     mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log")
     assert mesh["mesh_ok"] is False and mesh["mesh_checked"] is False
+
+
+def test_grandeurs_de_qualite_extraites(iteration_dir):
+    write_check_mesh(iteration_dir, non_ortho=68.49, skewness=2.57, aspect=14.52)
+    mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log")
+    assert mesh["max_non_orthogonality"] == pytest.approx(68.49)
+    assert mesh["max_skewness"] == pytest.approx(2.57)
+    assert mesh["max_aspect_ratio"] == pytest.approx(14.52)
+
+
+def test_valeurs_du_premier_run_reel_acceptees(iteration_dir):
+    # Valeurs mesurées sur le premier maillage réel : sous les seuils du
+    # projet (70 / 4 / 1000), donc exploitables.
+    write_check_mesh(iteration_dir, ok=True, non_ortho=68.49, skewness=2.57)
+    mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log",
+                              pp.DEFAULT_MESH_LIMITS)
+    assert mesh["mesh_ok"] is True
+
+
+def test_non_orthogonalite_au_dessus_du_seuil(iteration_dir):
+    write_check_mesh(iteration_dir, ok=True, non_ortho=78.0)
+    mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log",
+                              {"max_non_orthogonality": 70.0})
+    assert mesh["mesh_ok"] is False
+    assert "non-orthogonalité" in mesh["mesh_message"]
+
+
+def test_skewness_au_dessus_du_seuil(iteration_dir):
+    write_check_mesh(iteration_dir, ok=True, skewness=6.0)
+    mesh = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log",
+                              {"max_skewness": 4.0})
+    assert mesh["mesh_ok"] is False
+
+
+def test_maillage_valide_pour_openfoam_mais_trop_degrade(iteration_dir):
+    # « Mesh OK » côté OpenFOAM n'implique pas exploitable : les seuils du
+    # projet sont plus stricts que ceux du solveur.
+    write_check_mesh(iteration_dir, ok=True, non_ortho=69.9, skewness=3.9)
+    strict = pp.read_check_mesh(iteration_dir / "logs" / "checkMesh.log",
+                                {"max_non_orthogonality": 60.0, "max_skewness": 2.0})
+    assert strict["mesh_ok"] is False
+    assert len(strict["mesh_problems"]) == 2
+
+
+def test_seuils_lus_dans_cfd_settings():
+    limits = pp.mesh_limits_from_settings(REAL_CFD)
+    assert limits["max_non_orthogonality"] == 70.0
+    assert limits["max_skewness"] == 4.0
+    assert limits["max_aspect_ratio"] == 1000.0
+
+
+def test_cli_evaluate_mesh_ok(iteration_dir, capsys):
+    write_check_mesh(iteration_dir, ok=True)
+    code = pp.main(["--iteration-dir", str(iteration_dir),
+                    "--cfd-settings", str(REAL_CFD), "--evaluate-mesh"])
+    assert code == 0
+    assert json.loads(capsys.readouterr().out)["mesh_ok"] is True
+
+
+def test_cli_evaluate_mesh_echec(iteration_dir, capsys):
+    write_check_mesh(iteration_dir, ok=True, non_ortho=85.0)
+    code = pp.main(["--iteration-dir", str(iteration_dir),
+                    "--cfd-settings", str(REAL_CFD), "--evaluate-mesh"])
+    assert code == 1
+    assert json.loads(capsys.readouterr().out)["mesh_ok"] is False
 
 
 def test_convergence_du_solveur(iteration_dir):

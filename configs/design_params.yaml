@@ -57,13 +57,20 @@ parameters:
     unit: "unitless"
 
   # Profondeur d'extrusion du tronçon d'aile (le seed est une tranche de
-  # 80 mm, pas une aile complète). Peu d'influence aérodynamique tant que le
-  # calcul reste quasi-2D, mais coût de maillage direct : budget serré.
+  # 80 mm, pas une aile complète).
+  #
+  # TENU FIXE, à dessein. Le calcul CFD est quasi-2D (deux plans de symétrie
+  # que la géométrie traverse, cf. domain.spanwise_treatment) : l'envergure n'a
+  # alors AUCUN effet sur Cd et Cl. La laisser varier ferait dépenser des
+  # itérations à l'agent pour un gain nul. Les bornes ci-dessous l'immobilisent
+  # sans sortir du contrat §3.1, qui exige min < max.
+  # Pour la rendre réellement influente : passer domain.spanwise_treatment à
+  # full_3d dans cfd_settings.yaml, puis rouvrir ces bornes.
   span:
     value: 80.0
-    min: 50.0
-    max: 200.0
-    max_delta_pct: 5.0
+    min: 79.0
+    max: 81.0
+    max_delta_pct: 1.0
     unit: "mm"
 
   # Angle d'incidence. Le paramètre le plus sensible : quelques degrés

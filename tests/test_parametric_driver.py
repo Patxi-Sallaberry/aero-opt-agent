@@ -1057,7 +1057,7 @@ def test_statut_serialisable_en_json(tmp_path, cfg_file):
                       geometry_mode="parameters")
     json.dumps(status)  # ne doit pas lever
     for key in ("success", "status", "iteration", "design_id", "step_path",
-                "geometry_mode", "geometry", "applied_parameters",
+                "stl_path", "geometry_mode", "geometry", "applied_parameters",
                 "error_message", "warnings", "timestamp"):
         assert key in status
 

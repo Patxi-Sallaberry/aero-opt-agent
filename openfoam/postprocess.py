@@ -221,43 +221,105 @@ def average_coefficients(
 
 _FAILED_CHECKS_RE = re.compile(r"Failed\s+(\d+)\s+mesh\s+checks", re.IGNORECASE)
 _CELLS_RE = re.compile(r"^\s*cells:\s+(\d+)", re.MULTILINE)
+_NON_ORTHO_RE = re.compile(r"non-orthogonality Max:\s*([0-9.eE+-]+)", re.IGNORECASE)
+_SKEWNESS_RE = re.compile(r"Max skewness\s*=\s*([0-9.eE+-]+)", re.IGNORECASE)
+_ASPECT_RE = re.compile(r"Max aspect ratio\s*=\s*([0-9.eE+-]+)", re.IGNORECASE)
+
+# Seuils par défaut, alignés sur cfd_settings.yaml (mesh.check_mesh).
+DEFAULT_MESH_LIMITS = {
+    "max_non_orthogonality": 70.0,
+    "max_skewness": 4.0,
+    "max_aspect_ratio": 1000.0,
+}
 
 
-def read_check_mesh(log_path: Path) -> dict[str, Any]:
-    """Verdict de checkMesh : réussi, échoué, ou non exécuté."""
+def _search_float(pattern: re.Pattern[str], text: str) -> float | None:
+    match = pattern.search(text)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def read_check_mesh(
+    log_path: Path, limits: Mapping[str, float] | None = None
+) -> dict[str, Any]:
+    """Verdict de checkMesh : contrôles OpenFOAM ET seuils du projet.
+
+    Deux niveaux volontairement distincts :
+
+    - les contrôles que checkMesh lui-même déclare en échec (cellules à volume
+      négatif, faces ouvertes...) : rédhibitoires ;
+    - les grandeurs de qualité (non-orthogonalité, skewness, aspect ratio)
+      comparées aux seuils de `cfd_settings.yaml`. Un maillage peut être
+      « Mesh OK » pour OpenFOAM tout en étant trop dégradé pour qu'on fasse
+      confiance aux coefficients.
+
+    Le script d'orchestration lance `checkMesh` sans `-allGeometry`, dont le
+    contrôle de cellules concaves fait échouer à peu près tout maillage
+    snappyHexMesh avec couches limites, sans que le solveur en souffre.
+    """
+    thresholds = {**DEFAULT_MESH_LIMITS, **(limits or {})}
+
     if not log_path.is_file():
         return {
             "mesh_ok": False,
             "mesh_checked": False,
             "mesh_message": f"checkMesh non exécuté (journal absent : {log_path.name})",
             "n_cells": None,
+            "max_non_orthogonality": None,
+            "max_skewness": None,
+            "max_aspect_ratio": None,
+            "mesh_problems": ["checkMesh non exécuté"],
         }
 
     text = log_path.read_text(encoding="utf-8", errors="replace")
     cells_match = _CELLS_RE.search(text)
-    n_cells = int(cells_match.group(1)) if cells_match else None
+    info: dict[str, Any] = {
+        "mesh_checked": True,
+        "n_cells": int(cells_match.group(1)) if cells_match else None,
+        "max_non_orthogonality": _search_float(_NON_ORTHO_RE, text),
+        "max_skewness": _search_float(_SKEWNESS_RE, text),
+        "max_aspect_ratio": _search_float(_ASPECT_RE, text),
+    }
 
+    problems: list[str] = []
     failed = _FAILED_CHECKS_RE.search(text)
     if failed:
-        return {
-            "mesh_ok": False,
-            "mesh_checked": True,
-            "mesh_message": f"checkMesh : {failed.group(1)} contrôle(s) en échec",
-            "n_cells": n_cells,
-        }
-    if "Mesh OK" in text:
-        return {
-            "mesh_ok": True,
-            "mesh_checked": True,
-            "mesh_message": "checkMesh : maillage valide",
-            "n_cells": n_cells,
-        }
-    return {
-        "mesh_ok": False,
-        "mesh_checked": True,
-        "mesh_message": "checkMesh : verdict illisible dans le journal",
-        "n_cells": n_cells,
-    }
+        problems.append(f"checkMesh signale {failed.group(1)} contrôle(s) en échec")
+    elif "Mesh OK" not in text:
+        problems.append("verdict de checkMesh illisible dans le journal")
+
+    for key, label in (
+        ("max_non_orthogonality", "non-orthogonalité"),
+        ("max_skewness", "skewness"),
+        ("max_aspect_ratio", "aspect ratio"),
+    ):
+        value = info[key]
+        limit = thresholds[key]
+        if value is not None and value > limit:
+            problems.append(f"{label} {value:g} au dessus du seuil {limit:g}")
+
+    info["mesh_ok"] = not problems
+    info["mesh_problems"] = problems
+    info["mesh_message"] = (
+        "checkMesh : maillage valide ("
+        + ", ".join(
+            f"{label} {info[key]:g}"
+            for key, label in (
+                ("max_non_orthogonality", "non-ortho"),
+                ("max_skewness", "skewness"),
+                ("max_aspect_ratio", "aspect ratio"),
+            )
+            if info[key] is not None
+        )
+        + ")"
+        if not problems
+        else "checkMesh : " + " | ".join(problems)
+    )
+    return info
 
 
 def read_solver_convergence(log_dir: Path, solver: str) -> dict[str, Any]:
@@ -303,6 +365,22 @@ def write_results(iteration_dir: Path, result: Mapping[str, Any]) -> Path:
         json.dumps(result, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
     )
     return target
+
+
+def mesh_limits_from_settings(cfd_settings_path: Path | None) -> dict[str, float]:
+    """Seuils de qualité de maillage lus dans cfd_settings.yaml."""
+    if cfd_settings_path is None:
+        return dict(DEFAULT_MESH_LIMITS)
+    try:
+        from pipeline.utils import load_yaml
+
+        check = ((load_yaml(cfd_settings_path).get("mesh") or {}).get("check_mesh") or {})
+        return {
+            key: float(check.get(key, default))
+            for key, default in DEFAULT_MESH_LIMITS.items()
+        }
+    except Exception:
+        return dict(DEFAULT_MESH_LIMITS)
 
 
 def _read_design(design_params_path: Path | None) -> tuple[Any, Any]:
@@ -365,7 +443,9 @@ def postprocess(
     iteration, design_id = _read_design(design_params_path)
     result = _base_result(iteration, design_id)
 
-    mesh = read_check_mesh(log_dir / "checkMesh.log")
+    mesh = read_check_mesh(
+        log_dir / "checkMesh.log", mesh_limits_from_settings(cfd_settings_path)
+    )
     result["mesh_ok"] = mesh["mesh_ok"]
     result["mesh"] = mesh
 
@@ -410,11 +490,24 @@ def main(argv: list[str] | None = None) -> int:
         help="écrit un results.json d'échec avec ce statut au lieu de dépouiller",
     )
     parser.add_argument("--failure-message", default="")
+    parser.add_argument(
+        "--evaluate-mesh", action="store_true",
+        help="juge le journal checkMesh contre les seuils de cfd_settings.yaml "
+             "et sort en 1 si le maillage est inexploitable",
+    )
     args = parser.parse_args(argv)
 
     iteration_dir = Path(args.iteration_dir)
     design_params = Path(args.design_params) if args.design_params else None
     cfd_settings = Path(args.cfd_settings) if args.cfd_settings else None
+
+    if args.evaluate_mesh:
+        mesh = read_check_mesh(
+            iteration_dir / "logs" / "checkMesh.log",
+            mesh_limits_from_settings(cfd_settings),
+        )
+        print(json.dumps(mesh, indent=2, ensure_ascii=False, default=str))
+        return 0 if mesh["mesh_ok"] else 1
 
     if args.failure_status:
         result = build_failure(

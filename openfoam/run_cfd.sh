@@ -134,7 +134,16 @@ fi
 
 if [ "$DRY_RUN" -eq 0 ] && ! command -v blockMesh >/dev/null 2>&1; then
     fail "OPENFOAM_MISSING" \
-        "OpenFOAM introuvable. Definir FOAM_BASHRC dans .env (ex. /usr/lib/openfoam/openfoam2312/etc/bashrc) ou installer OpenFOAM."
+        "OpenFOAM introuvable. Definir FOAM_BASHRC dans .env (ex. /usr/lib/openfoam/openfoam2506/etc/bashrc) ou installer OpenFOAM."
+fi
+
+# OpenMPI refuse de demarrer en root. C est une precaution saine sur une
+# machine partagee, mais en WSL et en conteneur on EST root : sans cette
+# levee, tout calcul parallele echoue.
+if [ "$(id -u)" -eq 0 ] && [ -z "${OMPI_ALLOW_RUN_AS_ROOT:-}" ]; then
+    warn "execution en root : levee de la protection OpenMPI (OMPI_ALLOW_RUN_AS_ROOT)"
+    export OMPI_ALLOW_RUN_AS_ROOT=1
+    export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 fi
 
 SOLVER="$("$PYTHON" - "$CFD_SETTINGS" <<'PY'
@@ -198,10 +207,25 @@ fi
 # ─────────────────────────────────────────────────────────────
 log "-> checkMesh"
 if [ "$DRY_RUN" -eq 0 ]; then
-    ( cd "$CASE_DIR" && checkMesh -allGeometry -allTopology ) \
-        > "$LOG_DIR/checkMesh.log" 2>&1 || true
-    if grep -qE "^\s*Failed [0-9]+ mesh checks" "$LOG_DIR/checkMesh.log"; then
-        FAILED_LINE="$(grep -E "^\s*Failed [0-9]+ mesh checks" "$LOG_DIR/checkMesh.log" | head -1 | tr -s ' ')"
+    # checkMesh SANS -allGeometry : ce mode signale les cellules concaves, que
+    # tout maillage snappyHexMesh avec couches limites produit, et que le
+    # solveur encaisse sans difficulte. Le verdict utile vient de la
+    # comparaison aux seuils de cfd_settings.yaml, faite par postprocess.py.
+    ( cd "$CASE_DIR" && checkMesh ) > "$LOG_DIR/checkMesh.log" 2>&1 || true
+
+    MESH_VERDICT="$("$PYTHON" "$REPO_ROOT/openfoam/postprocess.py" \
+        --iteration-dir "$ITERATION_DIR" --cfd-settings "$CFD_SETTINGS" \
+        --evaluate-mesh 2>/dev/null)"
+    MESH_RC=$?
+    MESH_MSG="$("$PYTHON" -c "
+import json,sys
+try:
+    print(json.loads(sys.argv[1])['mesh_message'])
+except Exception:
+    print('verdict de maillage illisible')
+" "$MESH_VERDICT" 2>/dev/null || echo 'verdict de maillage illisible')"
+
+    if [ "$MESH_RC" -ne 0 ]; then
         FAIL_ON_ERROR="$("$PYTHON" - "$CFD_SETTINGS" <<'PY'
 import sys, yaml
 cfg = yaml.safe_load(open(sys.argv[1], encoding="utf-8")) or {}
@@ -209,12 +233,12 @@ print(int(bool(((cfg.get("mesh") or {}).get("check_mesh") or {}).get("fail_on_er
 PY
 )"
         if [ "$FAIL_ON_ERROR" = "1" ]; then
-            fail "MESH_CHECK_FAILED" "checkMesh :${FAILED_LINE}. Le maillage est invalide, inutile de lancer le solveur — proposer une variation plus conservative."
+            fail "MESH_CHECK_FAILED" "$MESH_MSG. Le maillage est inexploitable, inutile de lancer le solveur — proposer une variation plus conservative."
         else
-            warn "checkMesh :${FAILED_LINE} (fail_on_error=false, on continue)"
+            warn "$MESH_MSG (fail_on_error=false, on continue)"
         fi
     else
-        log "   maillage valide"
+        log "   $MESH_MSG"
     fi
 fi
 

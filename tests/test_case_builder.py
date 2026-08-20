@@ -362,6 +362,90 @@ def test_emprise_non_calculable_avertit_sans_bloquer():
 
 
 # ─────────────────────────────────────────────────────────────
+# Détection d'échelle
+#
+# L'unité d'export CAO n'est pas garantie : Fusion, gmsh et les convertisseurs
+# n'écrivent pas tous en mètres. Plutôt que de supposer, on mesure.
+# ─────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "facteur_fichier,attendu",
+    [(1.0, 1.0), (1000.0, 1e-3), (100.0, 1e-2), (0.001, 1000.0)],
+)
+def test_detection_du_facteur_dechelle(design, facteur_fichier, attendu):
+    expected = cb.expected_bounding_box(design)
+    actual = {k: v * facteur_fichier for k, v in expected.items()}
+    assert cb.detect_scale_factor(actual, expected) == pytest.approx(attendu)
+
+
+def test_aucun_facteur_usuel_pour_une_vraie_erreur(design):
+    expected = cb.expected_bounding_box(design)
+    actual = {k: v * 3.7 for k, v in expected.items()}   # ni mm, ni cm : géométrie fausse
+    assert cb.detect_scale_factor(actual, expected) is None
+
+
+def test_stl_en_millimetres_corrige(tmp_path, design):
+    expected = cb.expected_bounding_box(design)
+    # Le même profil, écrit en millimètres.
+    p = write_ascii_stl(tmp_path / "mm.stl", [
+        [(expected["x_min"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_max"] * 1000, expected["z_max"] * 1000)],
+    ])
+    bbox, warnings = cb.normalize_stl_scale(p, expected, 5.0)
+    assert bbox["x_max"] == pytest.approx(expected["x_max"], rel=1e-3)
+    assert warnings and "0.001" in warnings[0]
+    # Et le fichier sur disque est bien corrigé, pas seulement la mesure.
+    assert cb.stl_bounding_box(p)["x_max"] == pytest.approx(expected["x_max"], rel=1e-3)
+
+
+def test_stl_binaire_en_millimetres_corrige(tmp_path, design):
+    expected = cb.expected_bounding_box(design)
+    p = write_binary_stl(tmp_path / "mm.stl", [
+        [(expected["x_min"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_max"] * 1000, expected["z_max"] * 1000)],
+    ])
+    assert cb.is_binary_stl(p) is True
+    bbox, warnings = cb.normalize_stl_scale(p, expected, 5.0)
+    assert warnings
+    assert bbox["x_max"] == pytest.approx(expected["x_max"], rel=1e-3)
+    assert cb.is_binary_stl(p) is False   # converti en ASCII pour la mise à l'échelle
+
+
+def test_stl_deja_en_metres_intact(tmp_path, design):
+    expected = cb.expected_bounding_box(design)
+    p = write_ascii_stl(tmp_path / "m.stl", [
+        [(expected["x_min"], expected["y_min"], expected["z_min"]),
+         (expected["x_max"], expected["y_min"], expected["z_min"]),
+         (expected["x_max"], expected["y_max"], expected["z_max"])],
+    ])
+    avant = p.read_text(encoding="utf-8")
+    bbox, warnings = cb.normalize_stl_scale(p, expected, 5.0)
+    assert warnings == []
+    assert p.read_text(encoding="utf-8") == avant
+
+
+def test_construction_avec_stl_en_millimetres(tmp_path, design):
+    # Bout en bout : un STL en mm ne doit pas faire échouer l'itération.
+    d = tmp_path / "iter_0000"
+    d.mkdir()
+    expected = cb.expected_bounding_box(design)
+    write_ascii_stl(d / "geometry.stl", [
+        [(expected["x_min"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_max"] * 1000, expected["z_max"] * 1000)],
+        [(expected["x_min"] * 1000, expected["y_min"] * 1000, expected["z_min"] * 1000),
+         (expected["x_max"] * 1000, expected["y_max"] * 1000, expected["z_max"] * 1000),
+         (expected["x_min"] * 1000, expected["y_max"] * 1000, expected["z_max"] * 1000)],
+    ])
+    summary = cb.build_case(d, REAL_DESIGN, REAL_CFD)
+    assert any("échelle" in w for w in summary["warnings"])
+    assert summary["geometry"]["bounding_box_m"]["x_max"] == pytest.approx(0.3, rel=1e-2)
+
+
+# ─────────────────────────────────────────────────────────────
 # Construction complète
 # ─────────────────────────────────────────────────────────────
 

@@ -19,7 +19,7 @@ Ce README ne la remplace pas : en cas de divergence, le Master Document gagne.
 |-------|---------|--------|
 | 0 | Fondations : structure, Git, configs, validation de `design_params.yaml` | **Terminée** |
 | 1 | Geometry — `fusion/parametric_driver.py` | **Terminée** (validation sur seed réel en attente) |
-| 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | **Terminée** (validation sur solveur réel en attente) |
+| 2 | OpenFOAM — template de case, `run_cfd.sh`, `postprocess.py` | **Terminée et validée sur solveur réel** |
 | 3 | Master Pipeline — enchaînement, validation, archivage | À faire |
 | 4 | Agent + boucle d'optimisation | À faire |
 | 5 | Durcissement, messages d'erreur, tests sur design réel | À faire |
@@ -50,6 +50,16 @@ cp .env.example .env      # puis remplir les clés / chemins
 
 OpenFOAM est une dépendance **système** (non pip) ; Fusion 360 exécute le
 driver dans son propre interpréteur Python embarqué.
+
+```bash
+# OpenFOAM (ESI) — fournit simpleFoam, snappyHexMesh, checkMesh
+curl -s https://dl.openfoam.com/add-debian-repo.sh | sudo bash
+sudo apt-get install openfoam2506-default
+```
+
+Puis renseigner `FOAM_BASHRC` dans `.env`. En WSL ou en conteneur on est root,
+et OpenMPI refuse alors de démarrer : `run_cfd.sh` lève cette protection
+lui-même et le signale dans le journal.
 
 ---
 
@@ -249,12 +259,51 @@ jusqu'à v10. Les versions OpenFOAM.org ≥ 11 ont remplacé `simpleFoam` par
 `foamRun -solver incompressibleFluid` — `run_cfd.sh` le détecte et le dit.
 Définir `FOAM_BASHRC` dans `.env`.
 
-### STEP → STL
+### Géométrie et unités
 
-snappyHexMesh ne lit pas le STEP. `case_builder.py` prend `geometry.stl` s'il
-existe, sinon convertit `geometry.step` avec gmsh, sinon échoue en disant quoi
-faire. Le plus robuste est de faire exporter un STL au driver Fusion en même
-temps que le STEP, ce qui supprime la conversion du chemin critique.
+snappyHexMesh ne lit pas le STEP. Le driver Fusion exporte donc **`geometry.stl`
+en plus du `geometry.step`** — gmsh n'est plus dans le chemin critique, il ne
+sert que de secours si l'export STL a échoué.
+
+L'unité d'écriture d'un STL n'est garantie par personne. Plutôt que de la
+supposer, `case_builder.py` la **mesure** : il compare l'étendue du fichier à
+la géométrie demandée et, si l'écart correspond à un facteur usuel (mm, cm),
+remet le STL à l'échelle et le signale. Si l'écart ne s'explique par aucun
+facteur d'unité, ce n'est pas un problème d'unité mais de géométrie, et
+l'itération est refusée.
+
+### Qualité de maillage
+
+`run_cfd.sh` lance `checkMesh` **sans** `-allGeometry` : ce mode signale les
+cellules concaves, que tout maillage snappyHexMesh avec couches limites
+produit, et que le solveur encaisse sans difficulté — il ferait échouer
+pratiquement toutes les itérations.
+
+Le verdict utile vient de la comparaison aux seuils de `cfd_settings.yaml`
+(`mesh.check_mesh`) : non-orthogonalité, skewness, aspect ratio. Un maillage
+peut être « Mesh OK » pour OpenFOAM tout en étant trop dégradé pour qu'on
+fasse confiance aux coefficients.
+
+### Résultat de référence
+
+Chaîne validée de bout en bout sur OpenFOAM v2506, NACA 2412 à incidence nulle,
+Re = 4 × 10⁵ :
+
+| | |
+|---|---|
+| Cellules | 168 312 |
+| checkMesh | non-ortho 54,5 · skewness 2,6 · aspect ratio 14,5 |
+| **Cl** | **0,2275** (théorie NACA 2412 à α = 0° : ≈ 0,25) |
+| **Cd** | **0,0170** |
+| Cl/Cd | 13,4 |
+| Stabilité | écart-type relatif 4 × 10⁻⁵ sur les 200 dernières itérations |
+
+Le Cl est juste. Le **Cd est surestimé d'un facteur ≈ 2** par rapport aux
+mesures en soufflerie : `kOmegaSST` suppose la couche limite turbulente dès le
+bord d'attaque, ce qui est faux à Re = 4 × 10⁵ où une bonne partie de
+l'extrados est encore laminaire. Pour de l'optimisation — qui compare des
+formes entre elles — ce biais systématique est acceptable ; pour une valeur
+absolue de traînée, il ne l'est pas.
 
 ---
 

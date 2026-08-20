@@ -110,6 +110,10 @@ DEFAULT_ITERATIONS_DIR = REPO_ROOT / "data" / "iterations"
 DEFAULT_SEED_PATH = REPO_ROOT / "fusion" / "seed_design.f3d"
 
 STEP_FILENAME = "geometry.step"
+# snappyHexMesh ne lit pas le STEP. Exporter aussi un STL depuis Fusion evite
+# de dependre d'un convertisseur externe (gmsh, FreeCAD) dans le chemin
+# critique de la boucle d'optimisation.
+STL_FILENAME = "geometry.stl"
 STATUS_FILENAME = "fusion_status.json"
 LOG_FILENAME = "fusion_driver.log"
 
@@ -1436,6 +1440,46 @@ def _export_step(
     logger.info("STEP écrit : %s (%.1f Ko)", target, size / 1024.0)
 
 
+def _export_stl(
+    design: Any, target: Path
+) -> tuple[Path | None, list[str]]:  # pragma: no cover - nécessite Fusion
+    """Exporte aussi la géométrie en STL, pour snappyHexMesh.
+
+    Échec NON bloquant : le STEP reste le livrable contractuel (§3.2), et la
+    chaîne CFD sait retomber sur une conversion externe. Un STL manquant ne
+    doit pas invalider une itération dont la géométrie est bonne — il sera
+    signalé, et l'étape CFD dira précisément ce qui manque.
+
+    L'unité d'écriture de Fusion n'est pas garantie d'une version à l'autre :
+    c'est `openfoam/case_builder.py` qui détecte l'échelle réelle en comparant
+    l'emprise du fichier à la géométrie demandée, et la corrige.
+    """
+    warnings: list[str] = []
+    root = design.rootComponent
+    try:
+        if target.exists():
+            target.unlink()
+        export_manager = design.exportManager
+        options = export_manager.createSTLExportOptions(root, str(target))
+        options.isBinaryFormat = True
+        refinement = getattr(adsk.fusion, "MeshRefinementSettings", None)
+        if refinement is not None:
+            options.meshRefinement = refinement.MeshRefinementHigh
+        if not export_manager.execute(options):
+            warnings.append(f"Fusion a signalé un échec d'export STL vers {target}")
+            return None, warnings
+    except Exception as exc:
+        warnings.append(f"export STL impossible ({exc}) — la CFD devra convertir le STEP")
+        return None, warnings
+
+    if not target.is_file() or target.stat().st_size == 0:
+        warnings.append(f"STL absent ou vide après export : {target}")
+        return None, warnings
+
+    logger.info("STL écrit : %s (%.1f Ko)", target, target.stat().st_size / 1024.0)
+    return target, warnings
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Statut
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1449,6 +1493,7 @@ def _build_status(
     design_id: str | None = None,
     config_path: Path | None = None,
     step_path: Path | None = None,
+    stl_path: Path | None = None,
     applied: Mapping[str, dict] | None = None,
     error_message: str | None = None,
     details: Any = None,
@@ -1464,6 +1509,7 @@ def _build_status(
         "design_id": design_id,
         "config_path": _relative_to_repo(config_path) if config_path else None,
         "step_path": _relative_to_repo(step_path) if step_path else None,
+        "stl_path": _relative_to_repo(stl_path) if stl_path else None,
         "geometry_mode": geometry_mode,
         "geometry": dict(geometry) if geometry else None,
         "applied_parameters": dict(applied) if applied else {},
@@ -1651,6 +1697,8 @@ def drive(
             warnings.extend(_recompute(design))
 
         _export_step(design, step_path)
+        stl_path, stl_warnings = _export_stl(design, out_dir / STL_FILENAME)
+        warnings.extend(stl_warnings)
 
         logger.info("=== Itération %04d : succès ===", iteration)
         status = _build_status(
@@ -1660,6 +1708,7 @@ def drive(
             design_id=design_id,
             config_path=config_path,
             step_path=step_path,
+            stl_path=stl_path,
             applied=applied,
             warnings=warnings,
             geometry_mode=geometry_mode,
