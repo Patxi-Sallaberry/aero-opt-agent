@@ -265,10 +265,19 @@ def check_roundtrip(
             f"{max_error:.2e} corde au plus du profil d'origine"
         )
     elif max_error > tolerance:
+        # Le message ne DÉSIGNE pas de coupable. L'outil mesure un écart entre
+        # deux formes ; il ne peut pas savoir si le solide est mal écrit ou si
+        # la référence qu'on lui a donnée n'est simplement pas celle dont il
+        # est issu. Comparer une géométrie OPTIMISÉE à son profil de départ
+        # produit un écart important et parfaitement normal — c'est le but même
+        # de l'optimisation.
         message = (
             f"la section écrite s'écarte de {max_error:.2e} corde du profil "
-            f"d'origine (tolérance {tolerance:.0e}) — échelle, unité ou "
-            f"orientation en cause, pas l'ajustement"
+            f"fourni (tolérance {tolerance:.0e}). Deux lectures possibles : "
+            f"soit le solide a été écrit à la mauvaise échelle, dans la "
+            f"mauvaise unité ou avec la mauvaise orientation ; soit la "
+            f"référence n'est pas la forme dont il est issu — comparer un "
+            f"design optimisé à son profil de départ donne exactement cela"
         )
     else:
         message = (

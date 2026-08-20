@@ -46,9 +46,28 @@ vingt-quatre coefficients CST, sans rien perdre de ce qui précède.
 **La v1.0 n'a pas été modifiée** : elle vit sur sa propre branche, figée au tag
 `v1.0-stable`.
 
-## Résultat obtenu
+## Résultats obtenus
 
-Sur un profil NACA 2412 à incidence nulle, **22 itérations en 27 minutes** :
+**Clark Y ingéré depuis la base UIUC** — 121 points, re-paramétré en 24
+coefficients CST, **25 itérations, 0 échec**, corde 300 mm, incidence 3° :
+
+| | départ | optimisé | |
+|---|---|---|---|
+| Portance Cl | 0,7659 | **0,7784** | +1,6 % |
+| Traînée Cd | 0,02725 | **0,02653** | −2,6 % |
+| **Finesse Cl/Cd** | **28,11** | **29,34** | **+4,4 %** |
+
+Le gain est modeste, et c'est le résultat honnête : le Clark Y est un profil
+éprouvé depuis 1922, et à 3° d'incidence il travaille déjà près de son optimum
+de finesse. La recherche l'a vérifié en chiffres — porter l'incidence à 4,68°
+gagne 20 % de portance mais 24 % de traînée, donc perd. Ce que la v1.5 apporte
+ici n'est pas un gain spectaculaire, c'est la capacité d'affiner une forme que
+la v1.0 ne savait pas même décrire.
+
+**[→ Rapport complet, profil Clark Y](docs/example_report_clarky/README.md)**
+
+**NACA 2412 à incidence nulle** (v1.0, paramétrisation à quatre chiffres) —
+**22 itérations en 27 minutes** :
 
 | | seed | optimisé | |
 |---|---|---|---|
@@ -56,10 +75,11 @@ Sur un profil NACA 2412 à incidence nulle, **22 itérations en 27 minutes** :
 | Traînée Cd | 0,01693 | **0,02563** | +51 % |
 | **Finesse Cl/Cd** | **13,43** | **29,88** | **+122 %** |
 
-L'incidence trouvée — 5,04° — est celle qu'on attend physiquement pour la
+Ici le point de départ était délibérément loin de l'optimum, d'où l'ampleur du
+gain. L'incidence trouvée — 5,04° — est celle qu'on attend physiquement pour la
 finesse maximale d'un profil cambré.
 
-**[→ Voir le rapport complet généré par le système](docs/example_report/README.md)**
+**[→ Rapport complet, profil NACA](docs/example_report/README.md)**
 (sections avant/après, distributions de pression, lignes de courant)
 
 ---

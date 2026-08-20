@@ -1,0 +1,40 @@
+{
+  "iteration": 0,
+  "design_id": "CLARK_Y_AIRFOIL",
+  "success": true,
+  "status": "OK",
+  "Cd": 0.027250185599999997,
+  "Cl": 0.7659027983833333,
+  "Cl_Cd": 28.106333278821168,
+  "mesh_ok": true,
+  "error_message": null,
+  "timestamp": "2026-08-20T19:38:59+00:00",
+  "mesh": {
+    "mesh_checked": true,
+    "n_cells": 81510,
+    "n_faces": 258814,
+    "n_skew_faces": 3,
+    "max_non_orthogonality": 73.594049,
+    "max_skewness": 4.2812955,
+    "max_aspect_ratio": 33.504016,
+    "skewness_tolerated": true,
+    "mesh_ok": true,
+    "mesh_problems": [],
+    "mesh_warnings": [
+      "3 face(s) gauchie(s) sur 258814 (skewness 4.2813) — défaut local, toléré"
+    ],
+    "mesh_message": "checkMesh : maillage valide (non-ortho 73.594, skewness 4.2813, aspect ratio 33.504) — 3 face(s) gauchie(s) sur 258814 (skewness 4.2813) — défaut local, toléré"
+  },
+  "Cd_std": 6.063108391028187e-07,
+  "Cl_std": 5.978365030680868e-06,
+  "Cd_rel_std": 2.2249787506137896e-05,
+  "Cl_rel_std": 7.805644584795869e-06,
+  "coefficients_stable": true,
+  "averaging_window": 120,
+  "samples": 500,
+  "last_time": 500.0,
+  "source": "/root/projects/aero-opt-agent-v1.5-universal-2d/data/iterations_clarky/iter_0000/cfd/postProcessing/forceCoeffs/0/coefficient.dat",
+  "solver_converged": false,
+  "solver_iterations": 500,
+  "converged": true
+}

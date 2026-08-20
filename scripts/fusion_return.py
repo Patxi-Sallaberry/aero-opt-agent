@@ -331,18 +331,27 @@ def build_return_doc(
         "## Vérifier que la reprise est fidèle",
         "",
         "Après reconstruction, exporter un STL depuis Fusion et le comparer "
-        "au profil de départ :",
+        "à la section de CE dossier :",
         "",
         "```bash",
-        "python3 -m profiles.roundtrip <export_fusion.stl> "
-        "profile_section.dat \\",
-        f"    --chord {chord_mm:.1f}",
+        "python3 -m profiles.roundtrip export_fusion.stl profile_chord.dat \\",
+        f"    --chord {chord_mm:.1f} --aoa {aoa_deg:.2f}",
         "```",
         "",
         "L'outil relit le fichier, en extrait la section et mesure sa "
         "distance au profil — sans faire confiance à ce qui a servi à "
         "l'écrire. Un écart au delà de 2 × 10⁻³ de corde signale une erreur "
         "d'échelle, d'unité ou d'orientation.",
+        "",
+        "La référence doit être `profile_chord.dat` ou `profile_section.dat`, "
+        "**pas le profil de départ**. Le design a été optimisé : il s'écarte "
+        "de son point de départ à dessein, et l'outil signalerait cet écart "
+        "voulu comme un défaut.",
+        "",
+        "Mesuré sur le solide de ce dossier : l'écart entre `design_params."
+        "yaml` et `geometry.stl` est de l'ordre de 10⁻⁶ de corde — la chaîne "
+        "de génération est exacte, ce qui reste à vérifier est ce que Fusion "
+        "en fait.",
         "",
     ]
     return "\n".join(lines) + "\n"

@@ -430,6 +430,9 @@ def test_une_erreur_d_echelle_est_attrapee(tmp_path):
     )
     assert not report.success
     assert "échelle" in report.message
+    # Le message propose les deux lectures possibles sans en désigner une :
+    # l'outil mesure un écart, il ne sait pas d'où il vient.
+    assert "référence" in report.message
 
 
 def test_un_solide_ampute_est_attrape(tmp_path):

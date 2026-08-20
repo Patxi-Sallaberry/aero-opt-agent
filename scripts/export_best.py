@@ -662,6 +662,37 @@ def render_paraview(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+#: En deçà de cette fraction de l'amplitude autorisée, une valeur de départ est
+#: trop proche de zéro pour qu'un pourcentage la commente utilement.
+NEGLIGIBLE_BASE_FRACTION = 0.05
+
+
+def _parameter_delta(start: float, final: float, spec: Mapping[str, Any]) -> str:
+    """Écart entre deux valeurs, en pourcentage ou en absolu selon le sens.
+
+    Un pourcentage rapporté à une valeur quasi nulle n'informe pas : sur un
+    coefficient CST parti de 0,0013, un déplacement parfaitement ordinaire
+    s'affichait « +2037,1 % ». Le lecteur en conclut qu'il s'est passé quelque
+    chose d'extraordinaire, alors que le coefficient a simplement traversé
+    zéro.
+
+    On rapporte donc l'écart à l'AMPLITUDE autorisée quand la base est trop
+    petite pour servir de référence — la même règle que celle qui gouverne le
+    budget de variation, et pour la même raison.
+    """
+    if abs(final - start) < 1e-12:
+        return "inchangé"
+    try:
+        span = abs(float(spec["max"]) - float(spec["min"]))
+    except (KeyError, TypeError, ValueError):
+        span = 0.0
+    if span > 0 and abs(start) < NEGLIGIBLE_BASE_FRACTION * span:
+        return f"{final - start:+.4g} ({(final - start) / span * 100:+.0f} % de la plage)"
+    if start:
+        return f"{(final - start) / abs(start) * 100:+.1f} %"
+    return f"{final - start:+g}"
+
+
 def shape_values(design: Mapping[str, Any]) -> dict[str, float]:
     """Valeurs des paramètres, complétées des grandeurs de forme mesurées.
 
@@ -1031,12 +1062,7 @@ def build_report(
             start_text = "—"
         else:
             start_text = f"{start_value:g}"
-            if abs(final_value - start_value) < 1e-12:
-                delta = "inchangé"
-            elif start_value:
-                delta = f"{(final_value - start_value) / abs(start_value) * 100:+.1f} %"
-            else:
-                delta = f"{final_value - start_value:+g}"
+            delta = _parameter_delta(start_value, final_value, spec)
         lines.append(
             f"| `{name}` | {start_text} | **{final_value:g}** {spec.get('unit', '')} "
             f"| {delta} | {float(spec['min']):g} … {float(spec['max']):g} |"

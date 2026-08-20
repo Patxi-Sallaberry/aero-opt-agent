@@ -327,6 +327,44 @@ def test_le_rapport_tait_l_absence_de_step_quand_il_y_en_a_un(serie, config, tmp
     assert "pas de fichier STEP dans ce dossier" not in report
 
 
+def test_un_ecart_partant_de_presque_zero_est_donne_en_absolu():
+    """« +2037 % » sur un coefficient parti de 0,0013 n'informe personne.
+
+    Le lecteur en conclut qu'il s'est passé quelque chose d'extraordinaire,
+    alors que le coefficient a simplement traversé zéro. L'écart est donc
+    rapporté à l'AMPLITUDE quand la base est trop petite pour servir de
+    référence — la même règle que celle du budget de variation, et pour la
+    même raison.
+    """
+    texte = eb._parameter_delta(
+        0.00131412, 0.0280843, {"min": -0.132537, "max": 0.135165}
+    )
+    assert "%" in texte and "plage" in texte
+    assert "2037" not in texte
+    assert "+0.0268" in texte or "+0.02677" in texte
+
+
+def test_un_ecart_ordinaire_reste_en_pourcentage():
+    texte = eb._parameter_delta(
+        -0.59732, -0.537588, {"min": -0.783533, "max": -0.411108}
+    )
+    assert texte == "+10.0 %"
+
+
+def test_une_valeur_de_depart_nulle_ne_fait_pas_diviser_par_zero():
+    texte = eb._parameter_delta(0.0, 1.68, {"min": -2.0, "max": 12.0})
+    assert "1.68" in texte
+
+
+def test_un_parametre_inchange_est_dit_inchange():
+    assert eb._parameter_delta(3.0, 3.0, {"min": -2.0, "max": 12.0}) == "inchangé"
+
+
+def test_des_bornes_illisibles_ne_font_pas_echouer_le_rapport():
+    """Un rapport dégradé vaut mieux qu'un rapport absent."""
+    assert eb._parameter_delta(2.0, 3.0, {}) == "+50.0 %"
+
+
 def test_le_profil_est_aussi_exporte_redresse(config, tmp_path):
     """XFOIL pilote lui-même l'incidence : lui en donner une la compterait deux fois."""
     design = load_yaml(config)
