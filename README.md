@@ -159,6 +159,11 @@ configs/
   design_params.yaml          ← SEUL fichier modifié par l'agent
   cfd_settings.yaml              conditions CFD (réglage fin)
   cfd_settings_fast.yaml         préréglage d'exploration, ~60 s/itération
+geometry/
+  base.py                        interface GeometryBackend + registre
+  internal_backend.py            producteur interne (toujours disponible)
+  fusion_backend.py              producteur Fusion 360
+  common.py                      normalisation des comptes rendus
 fusion/
   seed_design.f3d                modèle Fusion (non versionné)
   parametric_driver.py           géométrie : Fusion ou production interne
@@ -232,18 +237,77 @@ un gain nul. Pour la rendre influente, passer `domain.spanwise_treatment` à
 
 ## Géométrie
 
-### Deux producteurs
+### L'interface `GeometryBackend`
+
+Tout ce qui est en aval — CFD, optimiseur, rapport — ne parle qu'à une seule
+interface. Quel producteur travaille derrière est un choix de configuration.
+
+```python
+from geometry import get_backend
+
+backend = get_backend("auto")            # ou "internal", ou "fusion"
+result  = backend.generate(design_params, output_dir)
+
+result.success              # bool
+result.stl_path             # Path | None
+result.step_path            # Path | None — un modèle CAO, s'il y en a un
+result.profile_coordinates  # contour fermé, en mètres
+result.message              # ce qui s'est passé, en clair
+```
+
+`generate` **ne lève jamais** : un échec attendu est un résultat, pas une
+exception. C'est ce qui permet à la boucle d'archiver l'itération ratée, d'en
+tirer une conséquence, et de continuer.
+
+### Les deux producteurs livrés
 
 | Producteur | Ce qu'il fait | Quand |
 |------------|---------------|-------|
 | `fusion` | Met à jour les User Parameters, reconstruit la géométrie, exporte STEP + STL | Le script tourne **dans** Fusion 360 |
 | `internal` | Calcule le profil et écrit le STL en mètres, sans Fusion | Partout ailleurs — c'est ce qui rend la boucle autonome |
 
-`auto` (défaut) choisit Fusion si son API est importable, le producteur interne
-sinon. **L'API Fusion n'a pas de mode headless** : sans le producteur interne,
-chaque itération attendrait qu'un humain clique sur *Run*. Les deux chemins
-partagent la même fonction de profil, donc la même forme ; le mode interne ne
-produit simplement pas de STEP, faute de noyau CAO.
+`auto` (défaut) interroge chaque backend sur sa disponibilité et retient le
+premier utilisable, Fusion d'abord. **L'API Fusion n'a pas de mode headless** :
+sans le producteur interne, chaque itération attendrait qu'un humain clique sur
+*Run*. Les deux chemins partagent la même fonction de profil, donc la même
+forme ; le mode interne ne produit simplement pas de STEP, faute de noyau CAO.
+
+Demander la disponibilité **avant** de lancer évite de découvrir l'absence de
+Fusion après cinq minutes de maillage.
+
+```bash
+python3 pipeline/master_pipeline.py --geometry-backend internal
+python3 scripts/run_loop.py         --geometry-backend fusion
+```
+
+```python
+import geometry
+geometry.describe_backends()   # nom, disponibilité, description
+geometry.resolve("auto")       # ce que « auto » retient ici
+```
+
+### Ajouter un producteur
+
+Trois gestes, et aucune ligne du pipeline à modifier :
+
+```python
+from geometry import GeometryBackend, GeometryResult, register_backend
+
+@register_backend
+class MonBackend(GeometryBackend):
+    name = "mon_backend"
+
+    @classmethod
+    def available(cls) -> bool:
+        return True                       # les outils nécessaires sont là ?
+
+    def generate(self, design_params, output_dir, **options):
+        ...
+        return GeometryResult(success=True, stl_path=..., message="...")
+```
+
+Il devient aussitôt sélectionnable par `--geometry-backend mon_backend`, et
+apparaît dans l'aide des commandes : les choix sont lus dans le registre.
 
 ### Deux stratégies, dans Fusion
 

@@ -47,6 +47,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from fusion import parametric_driver as driver  # noqa: E402
+from geometry import (  # noqa: E402
+    GeometryResult,
+    NoBackendAvailable,
+    UnknownBackend,
+    configuration_choices,
+    get_backend,
+)
 from pipeline.geometry_validator import GeometryError, validate_geometry  # noqa: E402
 from pipeline.utils import (  # noqa: E402
     ConfigValidationError,
@@ -132,6 +139,30 @@ def _archive_config(config_path: Path, out_dir: Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(config_path, target)
     return target
+
+
+def produce_geometry(
+    config_path: Path,
+    out_dir: Path,
+    iterations_root: Path,
+    geometry_backend: str | None = None,
+) -> GeometryResult:
+    """Fait produire la géométrie de l'itération par le backend configuré.
+
+    Un backend indisponible ou inconnu ne remonte pas d'exception : c'est un
+    échec d'itération comme un autre, que la boucle archive et dont la
+    stratégie tire les conséquences.
+    """
+    try:
+        backend = get_backend(geometry_backend)
+    except (UnknownBackend, NoBackendAvailable) as exc:
+        return GeometryResult(
+            success=False,
+            status=STATUS_GEOMETRY_FAILED,
+            message=str(exc),
+            backend=str(geometry_backend or "auto"),
+        )
+    return backend.generate(config_path, out_dir)
 
 
 def _previous_geometry(iterations_root: Path, iteration: int) -> tuple[str | None, dict | None]:
@@ -341,16 +372,22 @@ def run_iteration(
         _archive_config(config_path, out_dir)
 
         # ── 2. Géométrie ─────────────────────────────────────────────────
-        geometry_status = driver.drive(
-            config_path=config_path,
-            iterations_root=iterations_root,
-            geometry_backend=geometry_backend,
+        # Le pipeline ne connaît que l'interface : quel producteur travaille
+        # derrière — calcul interne, Fusion, ou un backend à venir — est un
+        # choix de configuration.
+        geometry_result = produce_geometry(
+            config_path, out_dir, iterations_root, geometry_backend
         )
-        if not geometry_status.get("success"):
+        geometry_status = geometry_result.raw or {
+            "success": geometry_result.success,
+            "status": geometry_result.status,
+            "error_message": geometry_result.message,
+        }
+        if not geometry_result.success:
             record = _record(
                 iteration, design_id, False, STATUS_GEOMETRY_FAILED, "geometry",
-                error_message=geometry_status.get("error_message"),
-                error_details=geometry_status.get("status"),
+                error_message=geometry_result.message,
+                error_details=geometry_result.status,
                 geometry_status=geometry_status,
                 duration_s=round(time.time() - started, 1),
             )
@@ -503,8 +540,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--geometry-backend", default=None,
-        choices=driver.GEOMETRY_BACKENDS,
-        help="producteur de géométrie (défaut : auto)",
+        choices=configuration_choices(),
+        help="producteur de géométrie (défaut : auto). Les choix viennent du "
+             "registre : un backend ajouté y apparaît sans modifier ce code.",
     )
     parser.add_argument("--cfd-timeout", type=int, default=None)
     parser.add_argument(

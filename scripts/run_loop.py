@@ -38,6 +38,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from agent import orchestrator  # noqa: E402
 from agent.orchestrator import ProposalError  # noqa: E402
+from geometry import configuration_choices  # noqa: E402
 from pipeline import master_pipeline as mp  # noqa: E402
 from pipeline.utils import load_env, load_yaml, save_design_params  # noqa: E402
 
@@ -431,7 +432,10 @@ def main(argv: list[str] | None = None) -> int:
         default=orchestrator.STRATEGY_AUTO,
         help="'auto' interroge l'agent et retombe sur la recherche locale",
     )
-    parser.add_argument("--geometry-backend", default=None)
+    parser.add_argument(
+        "--geometry-backend", default=None, choices=configuration_choices(),
+        help="producteur de géométrie (défaut : auto)",
+    )
     parser.add_argument("--skip-cfd", action="store_true")
     parser.add_argument("--cfd-timeout", type=int, default=None)
     parser.add_argument("--max-consecutive-failures", type=int, default=4)
