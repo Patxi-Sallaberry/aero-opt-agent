@@ -220,8 +220,10 @@ avant d'atteindre le disque.
 ```
 configs/
   design_params.yaml          ← SEUL fichier modifié par l'agent
+  design_params_clarky.yaml      exemple issu d'un profil réel (24 coeff. CST)
   cfd_settings.yaml              conditions CFD (réglage fin)
   cfd_settings_fast.yaml         préréglage d'exploration, ~60 s/itération
+  cfd_settings_demo.yaml         le rapide, mais qui garde les cases (visuels)
 examples/profiles/               profils d'exemple (NACA, Clark Y, E387, S1223)
 profiles/
   loader.py                      lecture Selig / Lednicer / CSV

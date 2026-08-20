@@ -1,4 +1,22 @@
 # ─────────────────────────────────────────────────────────────
+# cfd_settings_demo.yaml — le preglage rapide, mais qui CONSERVE les cases.
+#
+# Identique a cfd_settings_fast.yaml sur un point pres :
+# `keep_case_after_run` vaut `true` au lieu de "dicts". Le preglage rapide
+# purge maillage et champs a la fin de chaque iteration pour economiser le
+# disque — et ParaView ne peut alors plus produire les visuels CFD du
+# rapport, faute de maillage a lire.
+#
+# A utiliser quand on veut un livrable complet, illustre, plutot qu'une
+# longue serie d'exploration. Compter une vingtaine de mega-octets par
+# iteration.
+#
+#   python3 scripts/run_loop.py --cfd-settings configs/cfd_settings_demo.yaml
+#
+# C'est ce reglage qui a produit docs/example_report_clarky/.
+#
+# Herite de cfd_settings_fast.yaml :
+# ─────────────────────────────────────────────────────────────
 # cfd_settings_fast.yaml — préréglage d'exploration.
 #
 # Même montage que cfd_settings.yaml, calibré pour ~60 s par itération
