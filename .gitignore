@@ -35,6 +35,14 @@ data/iterations/*
 !data/iterations/.gitkeep
 
 # ─────────────────────────────────────────────────────────────
+# Dossiers livrables : le rapport et la géométrie sont légers, mais
+# le case OpenFOAM qui les accompagne pèse des dizaines de Mo et se
+# régénère. On garde la trace, pas le maillage.
+# ─────────────────────────────────────────────────────────────
+results/**/cfd/
+results/**/logs/
+
+# ─────────────────────────────────────────────────────────────
 # CAO / géométrie (binaires lourds)
 # ─────────────────────────────────────────────────────────────
 *.f3d

@@ -1,0 +1,63 @@
+{
+  "success": true,
+  "status": "OK",
+  "iteration": 0,
+  "design_id": "wing_v01",
+  "config_path": "/tmp/aerodemo/qualify/best.yaml",
+  "step_path": null,
+  "stl_path": "/tmp/aerodemo/qualify/iterations/iter_0000/geometry.stl",
+  "geometry_backend": "internal",
+  "geometry_mode": "rebuild",
+  "geometry": {
+    "chord_cm": 34.347,
+    "span_cm": 8.0,
+    "thickness": 0.113351058,
+    "camber": 0.02,
+    "aoa_deg": 5.04,
+    "n_points": 80,
+    "camber_position": 0.4,
+    "bbox_cm": {
+      "x_min": 0.0,
+      "x_max": 34.214201073240545,
+      "y_min": -3.017425047928376,
+      "y_max": 1.7740939990621496
+    },
+    "bodies": 1,
+    "purged_entities": 0,
+    "stl_units": "m"
+  },
+  "applied_parameters": {
+    "chord": {
+      "expression": "343.47 mm",
+      "requested_value": 343.47,
+      "unit": "mm"
+    },
+    "thickness": {
+      "expression": "0.113351058",
+      "requested_value": 0.113351058,
+      "unit": "unitless"
+    },
+    "camber": {
+      "expression": "0.02",
+      "requested_value": 0.02,
+      "unit": "unitless"
+    },
+    "span": {
+      "expression": "80 mm",
+      "requested_value": 80.0,
+      "unit": "mm"
+    },
+    "aoa": {
+      "expression": "5.04 deg",
+      "requested_value": 5.04,
+      "unit": "deg"
+    }
+  },
+  "error_message": null,
+  "error_details": null,
+  "warnings": [
+    "géométrie produite sans Fusion (mode interne) : pas de STEP, pas d'historique CAO. La forme est celle de design_params.yaml."
+  ],
+  "fusion_available": false,
+  "timestamp": "2026-08-20T09:38:28+00:00"
+}

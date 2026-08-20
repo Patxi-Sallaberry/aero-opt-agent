@@ -86,6 +86,9 @@ def run_loop(
     min_relative_gain: float = 1e-3,
     cfd_timeout_s: int | None = None,
     on_iteration=None,
+    export_best: bool = True,
+    export_output: Path | None = None,
+    visuals: bool = True,
 ) -> dict:
     """Enchaîne les itérations et retourne le bilan de la série."""
     config_path = Path(config_path)
@@ -225,7 +228,6 @@ def run_loop(
         ],
     }
 
-    best = mp.last_successful(iterations_root)
     if best_iteration is not None:
         summary["best_parameters"] = orchestrator.parameters_of(
             {"iteration": best_iteration}, iterations_root
@@ -237,7 +239,6 @@ def run_loop(
                 summary["improvement_pct"] = round(
                     (best_objective - initial) / abs(initial) * 100.0, 2
                 )
-    del best
 
     try:
         Path(iterations_root).mkdir(parents=True, exist_ok=True)
@@ -247,6 +248,42 @@ def run_loop(
         )
     except OSError:
         pass
+
+    # Post-traitement : le meilleur design est rangé, expliqué et illustré sans
+    # qu'on ait à y penser. Une série qui s'achève sans livrable oblige à
+    # replonger dans l'arborescence des itérations pour retrouver ce qu'elle a
+    # produit — et ce travail-là se refait à chaque fois.
+    if export_best and best_iteration is not None:
+        try:
+            from scripts.export_best import export_best as export
+
+            print("[loop] export du meilleur design…", file=sys.stderr)
+            exported = export(
+                iterations_root,
+                output=export_output,
+                include_case=True,
+                visuals=visuals,
+                cfd_settings_path=Path(cfd_settings_path),
+            )
+            summary["export"] = {
+                "output": exported["output"],
+                "iteration": exported["iteration"],
+                "images": exported["images"],
+                "size_bytes": exported["size_bytes"],
+            }
+            print(f"[loop] dossier : {exported['output']}", file=sys.stderr)
+            if exported.get("visuals_error"):
+                print(f"[loop] visuels : {exported['visuals_error']}", file=sys.stderr)
+        except Exception as exc:
+            # L'export ne doit jamais faire échouer une optimisation réussie :
+            # les résultats sont archivés, et il se relance à la main.
+            summary["export_error"] = f"{type(exc).__name__}: {exc}"
+            print(f"[loop] export impossible : {exc}", file=sys.stderr)
+            print(
+                "[loop] relancer avec : python3 scripts/export_best.py "
+                f"--iterations-dir {iterations_root}",
+                file=sys.stderr,
+            )
 
     return summary
 
@@ -375,6 +412,8 @@ def print_summary(summary: dict) -> None:
         print(f"  Gain            : {summary['improvement_pct']:+.2f} %", file=sys.stderr)
     print(f"  Arrêt           : {summary['stop_reason']}", file=sys.stderr)
     print(f"  Durée           : {summary['duration_s']} s", file=sys.stderr)
+    if "export" in summary:
+        print(f"  Design exporté  : {summary['export']['output']}", file=sys.stderr)
     print("=" * 62, file=sys.stderr)
 
 
@@ -406,7 +445,43 @@ def main(argv: list[str] | None = None) -> int:
         "--resume", action="store_true",
         help="reprend après la dernière itération archivée, sans l'écraser",
     )
+    parser.add_argument(
+        "--no-export", action="store_true",
+        help="n'exporte pas le meilleur design en fin de série",
+    )
+    parser.add_argument(
+        "--no-visuals", action="store_true",
+        help="exporte sans appeler ParaView (les courbes restent produites)",
+    )
+    parser.add_argument(
+        "--export-output", default=None,
+        help="dossier d'export (défaut : results/run_AAAAMMJJ_HHMMSS/best_design)",
+    )
+    parser.add_argument(
+        "--export-best", action="store_true",
+        help="exporte le meilleur design d'une série déjà exécutée, sans "
+             "relancer de calcul",
+    )
     args = parser.parse_args(argv)
+
+    if args.export_best:
+        from scripts.export_best import ExportError
+        from scripts.export_best import export_best as export
+
+        try:
+            exported = export(
+                Path(args.iterations_dir),
+                output=Path(args.export_output) if args.export_output else None,
+                visuals=not args.no_visuals,
+                cfd_settings_path=Path(args.cfd_settings),
+            )
+        except ExportError as exc:
+            print(f"[loop] export impossible : {exc}", file=sys.stderr)
+            return 1
+        print(exported["output"])
+        if exported.get("visuals_error"):
+            print(f"[loop] visuels : {exported['visuals_error']}", file=sys.stderr)
+        return 0
 
     if args.report:
         print(build_report(Path(args.iterations_dir)))
@@ -437,6 +512,9 @@ def main(argv: list[str] | None = None) -> int:
         max_consecutive_failures=args.max_consecutive_failures,
         stagnation_patience=args.stagnation_patience,
         cfd_timeout_s=args.cfd_timeout,
+        export_best=not args.no_export,
+        export_output=Path(args.export_output) if args.export_output else None,
+        visuals=not args.no_visuals,
     )
 
     print_summary(summary)

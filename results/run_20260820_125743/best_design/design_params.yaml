@@ -1,0 +1,38 @@
+iteration: 11
+design_id: wing_v01
+parameters:
+  chord:
+    value: 298.53
+    min: 220.0
+    max: 420.0
+    max_delta_pct: 7.0
+    unit: mm
+  thickness:
+    value: 0.10969344
+    min: 0.08
+    max: 0.2
+    max_delta_pct: 8.0
+    unit: unitless
+  camber:
+    value: 0.0242
+    min: 0.0
+    max: 0.09
+    max_delta_pct: 10.0
+    unit: unitless
+  span:
+    value: 80.0
+    min: 79.0
+    max: 81.0
+    max_delta_pct: 1.0
+    unit: mm
+  aoa:
+    value: 0.0
+    min: -2.0
+    max: 12.0
+    max_delta_pct: 12.0
+    unit: deg
+constraints:
+  topology_preserving: true
+  min_wall_thickness_mm: 1.5
+objectives:
+  primary: maximize_Cl_Cd

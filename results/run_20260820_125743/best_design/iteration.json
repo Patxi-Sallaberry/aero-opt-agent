@@ -1,0 +1,114 @@
+{
+  "iteration": 11,
+  "design_id": "wing_v01",
+  "success": true,
+  "status": "OK",
+  "stage": "done",
+  "Cd": 0.04699178,
+  "Cl": 0.2254,
+  "Cl_Cd": 4.796583572701438,
+  "mesh_ok": true,
+  "error_message": null,
+  "timestamp": "2026-08-20T10:57:43+00:00",
+  "converged": true,
+  "error_details": "OK",
+  "objective": 4.796583572701438,
+  "geometry_status": {
+    "success": true,
+    "status": "OK",
+    "iteration": 11,
+    "design_id": "wing_v01",
+    "config_path": "/tmp/pytest-of-root/pytest-49/test_toutes_les_iterations_res0/design_params.yaml",
+    "step_path": null,
+    "stl_path": "/tmp/pytest-of-root/pytest-49/test_toutes_les_iterations_res0/iterations/iter_0011/geometry.stl",
+    "geometry_backend": "internal",
+    "geometry_mode": "rebuild",
+    "geometry": {
+      "chord_cm": 29.852999999999998,
+      "span_cm": 8.0,
+      "thickness": 0.10969344,
+      "camber": 0.0242,
+      "aoa_deg": 0.0,
+      "n_points": 80,
+      "camber_position": 0.4,
+      "bbox_cm": {
+        "x_min": 0.0,
+        "x_max": 29.852999999999998,
+        "y_min": -1.0226324471583643,
+        "y_max": 2.333770432648041
+      },
+      "bodies": 1,
+      "purged_entities": 0,
+      "stl_units": "m"
+    },
+    "applied_parameters": {
+      "chord": {
+        "expression": "298.53 mm",
+        "requested_value": 298.53,
+        "unit": "mm"
+      },
+      "thickness": {
+        "expression": "0.10969344",
+        "requested_value": 0.10969344,
+        "unit": "unitless"
+      },
+      "camber": {
+        "expression": "0.0242",
+        "requested_value": 0.0242,
+        "unit": "unitless"
+      },
+      "span": {
+        "expression": "80 mm",
+        "requested_value": 80.0,
+        "unit": "mm"
+      },
+      "aoa": {
+        "expression": "0 deg",
+        "requested_value": 0.0,
+        "unit": "deg"
+      }
+    },
+    "error_message": null,
+    "error_details": null,
+    "warnings": [
+      "géométrie produite sans Fusion (mode interne) : pas de STEP, pas d'historique CAO. La forme est celle de design_params.yaml."
+    ],
+    "fusion_available": false,
+    "timestamp": "2026-08-20T10:57:43+00:00"
+  },
+  "geometry_report": {
+    "status": "OK",
+    "path": "/tmp/pytest-of-root/pytest-49/test_toutes_les_iterations_res0/iterations/iter_0011/geometry.stl",
+    "format": "stl",
+    "size_bytes": 171030,
+    "fingerprint": "d8a96a22647c9b460d880a0f0bcc20c9df128c08ce67bae38ebf7b56e83fa9da",
+    "warnings": [],
+    "bounding_box_m": {
+      "x_min": 0.0,
+      "x_max": 0.29853,
+      "y_min": -0.0102263245,
+      "y_max": 0.0233377043,
+      "z_min": 0.0,
+      "z_max": 0.08,
+      "n_vertices": 1908
+    },
+    "max_thickness_mm": 32.7467826432
+  },
+  "results": {
+    "iteration": 11,
+    "success": true,
+    "status": "OK",
+    "Cd": 0.04699178,
+    "Cl": 0.2254,
+    "Cl_Cd": 4.796583572701438,
+    "mesh_ok": true,
+    "converged": true,
+    "error_message": null
+  },
+  "pruned": {
+    "policy": true,
+    "removed": [],
+    "freed_bytes": 0
+  },
+  "duration_s": 0.0
+}

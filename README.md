@@ -389,6 +389,52 @@ affiche la trajectoire complète — ce qui a bougé, ce que ça a donné, où �
 
 ---
 
+## Le dossier livrable
+
+**À la fin de chaque série, le meilleur design est extrait automatiquement**
+dans `results/run_AAAAMMJJ_HHMMSS/best_design/`. Sans cela, il faudrait
+replonger dans l'arborescence des itérations pour retrouver ce que
+l'optimisation a produit — et ce travail se referait à chaque fois.
+
+```bash
+python3 scripts/export_best.py --iterations-dir data/iterations
+python3 scripts/run_loop.py --export-best         # sur une série déjà faite
+python3 scripts/run_loop.py --no-export           # désactiver
+python3 scripts/run_loop.py --no-visuals          # sans ParaView
+```
+
+Le dossier contient :
+
+| | |
+|---|---|
+| `README.md` | le rapport complet |
+| `report.html` | le même, **autonome** — SVG intégrés, images en base64 |
+| `geometry.stl` | la géométrie, en mètres |
+| `geometry.step` | si la CAO en a produit un |
+| `profile_section.csv` / `.dat` | la section, pour reprendre la forme en CAO |
+| `design_params.yaml` | les paramètres exacts, rejouables |
+| `results.json` | les coefficients |
+| `figures/` | courbes SVG et images CFD |
+| `cfd/` | le case OpenFOAM, avec `best_design.foam` pour ParaView |
+| `logs/` | les journaux de chaque étape |
+
+Le rapport donne les paramètres de départ face aux paramètres finaux,
+l'évolution de Cd, Cl et Cl/Cd itération par itération, la distribution de
+pression sur le profil, et une **lecture physique** de ce qui a changé —
+déduite des écarts mesurés, jamais d'un texte générique : un paramètre qui n'a
+pas bougé n'est pas commenté.
+
+Les visuels CFD — champ de Cp, lignes de courant, module de la vitesse — sont
+rendus par ParaView en lot (`scripts/paraview_render.py`, `pvbatch` sous
+`xvfb-run` pour se passer d'affichage). Le script est copié dans le dossier :
+il reste rejouable sans le reste du système. S'il manque ParaView, le rapport
+sort quand même, avec ses courbes et la raison de l'absence des images.
+
+L'export ne peut pas faire échouer une optimisation réussie : en cas de
+problème, les résultats restent archivés et la commande se relance à la main.
+
+---
+
 ## Archivage
 
 Chaque itération, **réussie ou non**, laisse dans `data/iterations/iter_XXXX/` :
