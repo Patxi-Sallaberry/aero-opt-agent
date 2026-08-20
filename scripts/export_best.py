@@ -540,9 +540,16 @@ def render_paraview(
     celui du design optimisé cohabitent alors dans le même dossier, avec la
     MÊME échelle de couleurs — sans quoi les comparer visuellement n'aurait
     aucun sens.
+
+    Le rendu préfixé passe par un dossier temporaire : ParaView écrit toujours
+    sous les mêmes noms, et renommer après coup écraserait les images déjà
+    produites pour l'autre design — la comparaison se retrouverait alors avec
+    deux fois la même image, ou une référence vide.
     """
     figures = output / "figures"
     figures.mkdir(parents=True, exist_ok=True)
+    destination = figures / "_render_tmp" if prefix else figures
+    destination.mkdir(parents=True, exist_ok=True)
 
     if not shutil.which("pvbatch"):
         return [], (
@@ -556,7 +563,7 @@ def render_paraview(
             "de rejouer le calcul"
         )
 
-    command = ["pvbatch", str(PARAVIEW_SCRIPT), str(case_dir), str(figures),
+    command = ["pvbatch", str(PARAVIEW_SCRIPT), str(case_dir), str(destination),
                str(u_inf), str(rho)]
     # `xvfb-run` fournit l'affichage virtuel que le rendu réclame sur une
     # machine sans serveur X — le cas de tout serveur de calcul.
@@ -574,15 +581,17 @@ def render_paraview(
 
     produced: list[str] = []
     for name in ("pressure_field.png", "velocity_field.png", "streamlines.png"):
-        source = figures / name
+        source = destination / name
         if not source.is_file():
             continue
         if prefix:
-            target = figures / f"{prefix}{name}"
-            source.replace(target)
-            produced.append(target.name)
+            source.replace(figures / f"{prefix}{name}")
+            produced.append(f"{prefix}{name}")
         else:
             produced.append(name)
+
+    if prefix:
+        shutil.rmtree(destination, ignore_errors=True)
 
     if not produced:
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]

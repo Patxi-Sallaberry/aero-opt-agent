@@ -1,21 +1,41 @@
 # aero-opt-agent — Optimisation Aérodynamique Agentique
 
-**Fusion 360 + OpenFOAM + Orchestrateur LLM** — version **Core First v1.0**.
+**Optimisation automatique de forme aérodynamique : géométrie paramétrique →
+CFD OpenFOAM → nouveaux paramètres, en boucle, sans intervention.**
 
-Le système part d'un design paramétrique, en produit la géométrie, la simule
-sous OpenFOAM, lit les coefficients aérodynamiques, et propose les paramètres de
-l'itération suivante. En boucle, sans intervention.
+Vous décrivez un profil d'aile par quelques paramètres — corde, épaisseur,
+cambrure, incidence — et un objectif. Le système construit la géométrie, la
+maille, lance le calcul, lit les coefficients aérodynamiques, propose une forme
+meilleure, et recommence. À la fin, il vous rend un dossier avec la géométrie
+optimisée, les champs CFD et un rapport illustré.
 
-La spécification qui fait loi est
-[`MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md`](MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md).
-En cas de divergence, c'est elle qui gagne. Les écarts assumés sont listés
-en fin de document.
+## Résultat obtenu
+
+Sur un profil NACA 2412 à incidence nulle, **22 itérations en 27 minutes** :
+
+| | seed | optimisé | |
+|---|---|---|---|
+| Portance Cl | 0,2274 | **0,7657** | +237 % |
+| Traînée Cd | 0,01693 | **0,02563** | +51 % |
+| **Finesse Cl/Cd** | **13,43** | **29,88** | **+122 %** |
+
+L'incidence trouvée — 5,04° — est celle qu'on attend physiquement pour la
+finesse maximale d'un profil cambré.
+
+**[→ Voir le rapport complet généré par le système](docs/example_report/README.md)**
+(sections avant/après, distributions de pression, lignes de courant)
 
 ---
 
-## Démarrage
+## Installation
+
+**Prérequis** : Linux ou WSL, Python 3.10+, et OpenFOAM. Fusion 360 est
+facultatif — sans lui, le système calcule la géométrie lui-même.
 
 ```bash
+git clone https://github.com/<votre-compte>/aero-opt-agent.git
+cd aero-opt-agent
+
 python3 -m venv .venv && source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 
@@ -23,25 +43,78 @@ python3 -m pip install -r requirements.txt
 curl -s https://dl.openfoam.com/add-debian-repo.sh | sudo bash
 sudo apt-get install openfoam2506-default
 
+# facultatif : visuels CFD du rapport
+sudo apt-get install paraview xvfb
+
 cp .env.example .env        # puis renseigner FOAM_BASHRC
 ```
 
-Une itération :
+Vérifier que tout répond :
 
 ```bash
-python3 pipeline/master_pipeline.py
+python3 -m pytest tests/ -q                       # 506 tests, ~15 s
+python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
-Une optimisation complète :
+## Lancer une optimisation
 
 ```bash
 python3 scripts/run_loop.py --max-iterations 20 \
     --cfd-settings configs/cfd_settings_fast.yaml
 ```
 
-C'est tout. La boucle produit la géométrie, maille, calcule, lit les résultats,
-propose de nouveaux paramètres et recommence — jusqu'au budget d'itérations, à
-la stagnation, ou à une série d'échecs.
+C'est tout. Comptez environ une minute par itération avec ce préréglage. La
+boucle s'arrête d'elle-même sur stagnation, et **survit aux échecs** : une
+itération dont le maillage casse est archivée, la stratégie resserre le pas, et
+la suivante repart de la meilleure forme connue.
+
+Ce qui s'affiche pendant qu'elle tourne :
+
+```
+[loop] iter   0 | Cd 0.03107 | Cl 0.25266 | Cl/Cd 8.13 | 84.8s  <- meilleur
+[loop]      proposition [local] chord 300->321
+[loop] iter   1 | Cd 0.03097 | Cl 0.24549 | Cl/Cd 7.93 | 78.6s
+```
+
+Pour changer ce qui est optimisé, éditez `configs/design_params.yaml` :
+valeurs de départ, bornes, et objectif (`maximize_Cl_Cd`, `minimize_Cd` ou
+`maximize_downforce`).
+
+## Récupérer le résultat
+
+**Le dossier est créé automatiquement en fin de série** :
+
+```
+results/run_AAAAMMJJ_HHMMSS/best_design/
+├── report.html            ← ouvrez celui-ci
+├── README.md              le même rapport, en Markdown
+├── geometry.stl           la géométrie optimisée, en mètres
+├── profile_section.csv    la section, pour la reprendre en CAO
+├── design_params.yaml     les paramètres exacts, rejouables
+├── results.json           les coefficients
+├── figures/               courbes et images CFD
+├── comparison/            le seed, pour la comparaison avant/après
+└── cfd/                   le case OpenFOAM complet (ParaView)
+```
+
+Le rapport contient les paramètres de départ face aux paramètres finaux,
+l'évolution des coefficients itération par itération, les sections avant/après,
+les distributions de pression, les champs CFD, et une lecture physique de ce
+qui a changé.
+
+Sur une série déjà exécutée :
+
+```bash
+python3 scripts/run_loop.py --report        # la trajectoire, en console
+python3 scripts/run_loop.py --export-best   # (re)générer le dossier
+```
+
+---
+
+La spécification qui fait loi est
+[`MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md`](MASTER_DOCUMENTATION_AGENTIC_AERO_OPTIMIZATION.md).
+En cas de divergence, c'est elle qui gagne. Les écarts assumés sont listés
+en fin de document.
 
 ---
 
@@ -389,19 +462,23 @@ affiche la trajectoire complète — ce qui a bougé, ce que ça a donné, où �
 
 ---
 
-## Le dossier livrable
+## Le dossier livrable — options
 
-**À la fin de chaque série, le meilleur design est extrait automatiquement**
-dans `results/run_AAAAMMJJ_HHMMSS/best_design/`. Sans cela, il faudrait
-replonger dans l'arborescence des itérations pour retrouver ce que
-l'optimisation a produit — et ce travail se referait à chaque fois.
+Le contenu du dossier et la façon de le récupérer sont décrits
+[plus haut](#récupérer-le-résultat) ; cette section traite du réglage fin de
+l'export.
 
 ```bash
 python3 scripts/export_best.py --iterations-dir data/iterations
 python3 scripts/run_loop.py --export-best         # sur une série déjà faite
 python3 scripts/run_loop.py --no-export           # désactiver
 python3 scripts/run_loop.py --no-visuals          # sans ParaView
+python3 scripts/export_best.py --no-case          # sans le maillage (léger)
 ```
+
+L'export ne peut pas faire échouer une optimisation réussie : en cas de
+problème, les résultats restent archivés dans `data/iterations/` et la commande
+se relance à la main.
 
 ### Avant / après
 
@@ -485,7 +562,7 @@ ses paramètres n'est rattachable à rien.
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q          # 431 tests, ~8 s
+python3 -m pytest tests/ -q          # 506 tests, ~15 s
 ```
 
 Ce qui est couvert sans dépendance externe : validation du contrat, unités et
@@ -518,9 +595,34 @@ tournent réellement, sur un document qui reproduit celui du premier run réel.
 
 ---
 
-## À fournir
+## Ce qui n'est pas dans le dépôt
 
-- `fusion/seed_design.f3d` — le modèle Fusion, si l'on veut passer par la CAO
-  plutôt que par le producteur interne.
-- `ANTHROPIC_API_KEY` dans `.env` — pour la stratégie LLM. Sans elle, la boucle
-  tourne en recherche locale.
+- **`fusion/seed_design.f3d`** — le modèle Fusion. Binaire propre à chaque
+  projet, donc non versionné. Sans lui, le système calcule la géométrie
+  lui-même : rien ne bloque.
+- **`.env`** — vos chemins et votre clé d'API. Partez de `.env.example`.
+- **`ANTHROPIC_API_KEY`** — pour la stratégie LLM. Sans elle, la boucle tourne
+  en recherche locale, qui ne demande ni clé ni réseau.
+- **`data/iterations/` et `results/`** — des sorties, régénérables. Un exemple
+  de rendu est conservé dans [`docs/example_report/`](docs/example_report/).
+
+## Adapter à votre géométrie
+
+Le profil reconstruit est un NACA 4 chiffres, décrit par `naca4_profile()` dans
+`fusion/parametric_driver.py`. Pour une autre forme, deux voies :
+
+1. **Passer par Fusion** — modélisez ce que vous voulez, exposez des User
+   Parameters, et lancez le driver depuis Fusion en mode `parameters`. Le
+   système ne fait alors que piloter vos cotes.
+2. **Remplacer la fonction de profil** — si votre forme se décrit
+   analytiquement, `naca4_profile()` est le seul endroit à changer ; tout le
+   reste (validation, maillage, CFD, boucle, rapport) est indépendant de la
+   forme.
+
+Dans les deux cas, `configs/design_params.yaml` doit lister les paramètres avec
+leurs bornes, et les noms doivent correspondre exactement.
+
+## Licence
+
+Aucune licence n'est déclarée à ce jour : tous droits réservés par défaut.
+Ajoutez un fichier `LICENSE` si vous souhaitez autoriser la réutilisation.

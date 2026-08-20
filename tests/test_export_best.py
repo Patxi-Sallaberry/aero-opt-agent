@@ -526,6 +526,45 @@ def test_la_lecture_physique_ne_melange_pas_les_regimes(serie, tmp_path):
         assert f"{attendu:+.0f} %" in ligne
 
 
+def test_le_rendu_du_seed_necrase_pas_celui_du_design(tmp_path, monkeypatch):
+    """Non-régression : ParaView écrit toujours sous les mêmes noms. Renommer
+    après coup effaçait les images du design optimisé, et le côte à côte du
+    rapport pointait dans le vide."""
+    figures = tmp_path / "figures"
+    figures.mkdir()
+    (figures / "pressure_field.png").write_bytes(b"design optimise")
+
+    def _fake_pvbatch(command, **kwargs):
+        # Le script écrit dans le dossier qu'on lui donne (avant-dernier
+        # argument avant U_inf et rho).
+        target = Path(command[-3])
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "pressure_field.png").write_bytes(b"seed")
+
+        class Proc:
+            returncode = 0
+            stdout = stderr = ""
+
+        return Proc()
+
+    monkeypatch.setattr(eb.shutil, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(eb.subprocess, "run", _fake_pvbatch)
+    monkeypatch.setattr(eb, "PARAVIEW_SCRIPT", tmp_path / "render.py")
+    (tmp_path / "render.py").write_text("", encoding="utf-8")
+    # Le rendu exige un maillage : on le simule.
+    (tmp_path / "case" / "constant" / "polyMesh").mkdir(parents=True)
+
+    images, error = eb.render_paraview(
+        tmp_path / "case", tmp_path, 20.0, 1.225, prefix="seed_"
+    )
+    assert error is None
+    assert images == ["seed_pressure_field.png"]
+    # Les deux images coexistent, et chacune a son contenu.
+    assert (figures / "pressure_field.png").read_bytes() == b"design optimise"
+    assert (figures / "seed_pressure_field.png").read_bytes() == b"seed"
+    assert not (figures / "_render_tmp").exists()
+
+
 def test_figures_de_comparaison(serie, tmp_path):
     summary = eb.export_best(serie, tmp_path / "sortie", visuals=False)
     figures = tmp_path / "sortie" / "figures"

@@ -35,12 +35,11 @@ data/iterations/*
 !data/iterations/.gitkeep
 
 # ─────────────────────────────────────────────────────────────
-# Dossiers livrables : le rapport et la géométrie sont légers, mais
-# le case OpenFOAM qui les accompagne pèse des dizaines de Mo et se
-# régénère. On garde la trace, pas le maillage.
+# Dossiers livrables : ce sont des SORTIES, régénérables à volonté.
+# Un exemple curé est versionné dans docs/example_report/ pour que
+# le dépôt montre ce que le système produit sans rien exécuter.
 # ─────────────────────────────────────────────────────────────
-results/**/cfd/
-results/**/logs/
+results/
 
 # ─────────────────────────────────────────────────────────────
 # CAO / géométrie (binaires lourds)
