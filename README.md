@@ -51,9 +51,12 @@ dépôt :
 - **[Rapport — NACA 2412, v1.0](docs/example_report/README.md)** —
   paramétrisation à quatre chiffres.
 
-Chacun est accompagné du `report.html` d'origine, autoportant (figures et images
-CFD incluses) : [`docs/example_report_clarky/report.html`](docs/example_report_clarky/report.html)
-et [`docs/example_report/report.html`](docs/example_report/report.html).
+Les liens ci-dessus mènent à la version Markdown, que GitHub affiche
+directement. Le rapport tel que le système l'écrit est un fichier HTML
+autoportant — figures et images CFD embarquées, aucun fichier annexe à
+récupérer : `docs/example_report_clarky/report.html` et
+`docs/example_report/report.html`, à ouvrir dans un navigateur après un clone.
+`docs/index.html` en est la page d'accueil.
 
 ## Optimiser n'importe quel profil, en trois commandes
 
