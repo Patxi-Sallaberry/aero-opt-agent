@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aero-opt-agent — rapports d'optimisation</title>
+<style>
+  :root {
+    --fond: #ffffff;
+    --encre: #16191d;
+    --encre-douce: #5b6470;
+    --trait: #dfe3e8;
+    --accent: #16466b;
+    --carte: #f7f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #101315;
+      --encre: #e6e9ec;
+      --encre-douce: #98a2ae;
+      --trait: #2a3036;
+      --accent: #7fb2d9;
+      --carte: #171b1f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--fond);
+    color: var(--encre);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 .5rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.1rem; margin: 0 0 .35rem; letter-spacing: -.005em; }
+  p { margin: 0 0 1rem; }
+  .chapeau { color: var(--encre-douce); margin-bottom: 2.5rem; }
+  a { color: var(--accent); }
+  .cartes { display: grid; gap: 1rem; margin: 0 0 2.5rem; }
+  @media (min-width: 44rem) { .cartes { grid-template-columns: 1fr 1fr; } }
+  .carte {
+    background: var(--carte);
+    border: 1px solid var(--trait);
+    border-radius: 6px;
+    padding: 1.25rem 1.25rem 1.4rem;
+  }
+  .etiquette {
+    display: inline-block;
+    font-size: .72rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--encre-douce);
+    border: 1px solid var(--trait);
+    border-radius: 3px;
+    padding: .1rem .45rem;
+    margin-bottom: .7rem;
+  }
+  .carte p { font-size: .93rem; color: var(--encre-douce); margin-bottom: .9rem; }
+  .chiffre { color: var(--encre); font-variant-numeric: tabular-nums; }
+  .liens { display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; font-size: .9rem; }
+  footer {
+    border-top: 1px solid var(--trait);
+    padding-top: 1.25rem;
+    font-size: .88rem;
+    color: var(--encre-douce);
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .88em;
+    background: var(--carte);
+    border: 1px solid var(--trait);
+    border-radius: 3px;
+    padding: .08em .32em;
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <h1>aero-opt-agent — rapports d'optimisation</h1>
+  <p class="chapeau">
+    Deux rapports produits automatiquement par le système en fin de série
+    d'optimisation. Chacun contient les paramètres de départ face aux paramètres
+    finaux, l'évolution des coefficients itération par itération, les sections
+    avant/après, les distributions de pression, les champs CFD et une lecture
+    physique de ce qui a changé. Ils sont écrits par la machine, pas à la main.
+  </p>
+
+  <div class="cartes">
+
+    <section class="carte">
+      <span class="etiquette">v1.5 — Universal 2D</span>
+      <h2>Clark Y</h2>
+      <p>
+        Profil réel ingéré depuis la base UIUC, re-paramétré en 24 coefficients
+        CST. <span class="chiffre">25 itérations, 0 échec.</span>
+        Finesse Cl/Cd <span class="chiffre">28,11 → 29,34</span>
+        (<span class="chiffre">+4,4 %</span>).
+      </p>
+      <div class="liens">
+        <a href="example_report_clarky/report.html">Rapport HTML</a>
+        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report_clarky/README.md">Version Markdown</a>
+      </div>
+    </section>
+
+    <section class="carte">
+      <span class="etiquette">v1.0 — profils NACA</span>
+      <h2>NACA 2412</h2>
+      <p>
+        Paramétrisation à quatre chiffres, incidence de départ nulle.
+        <span class="chiffre">22 itérations.</span>
+        Finesse Cl/Cd <span class="chiffre">13,43 → 29,88</span>
+        (<span class="chiffre">+122 %</span>).
+      </p>
+      <div class="liens">
+        <a href="example_report/report.html">Rapport HTML</a>
+        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report/README.md">Version Markdown</a>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>
+      Le système reçoit un profil et un objectif, puis construit la géométrie,
+      la maille, lance un calcul CFD OpenFOAM, lit les coefficients, propose une
+      forme meilleure, et recommence — sans intervention.
+    </p>
+    <p>
+      Code, documentation et mode d'emploi :
+      <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent">github.com/Patxi-Sallaberry/aero-opt-agent</a>.
+      La branche <code>main</code> porte la v1.5 ; la v1.0 est figée au tag
+      <code>v1.0-stable</code>.
+    </p>
+  </footer>
+
+</main>
+</body>
+</html>

@@ -1,15 +1,59 @@
 # aero-opt-agent — Optimisation Aérodynamique Agentique
 
-**v1.5 « Universal 2D » — optimisation automatique de forme aérodynamique :
-n'importe quel profil 2D → CFD OpenFOAM → nouveaux paramètres, en boucle, sans
-intervention.**
+**Optimisation automatique de forme aérodynamique : un profil 2D → CFD OpenFOAM
+→ une forme meilleure, en boucle, sans intervention.**
 
-Vous donnez un profil — un fichier de coordonnées téléchargé, un modèle Fusion
-paramétrique, ou quatre chiffres NACA — et un objectif. Le système le
-re-paramétrise, construit la géométrie, la maille, lance le calcul, lit les
-coefficients aérodynamiques, propose une forme meilleure, et recommence. À la
-fin il vous rend un dossier avec la géométrie optimisée, les champs CFD, un
-rapport illustré, et de quoi reprendre le design dans Fusion 360.
+Vous donnez un profil — un fichier de coordonnées téléchargé, un dessin, une
+pièce CAO, un modèle Fusion paramétrique, ou quatre chiffres NACA — et un
+objectif. Le système le re-paramétrise, construit la géométrie, la maille, lance
+le calcul, lit les coefficients aérodynamiques, propose une forme meilleure, et
+recommence. À la fin il vous rend un dossier avec la géométrie optimisée, les
+champs CFD, un rapport illustré, et de quoi reprendre le design dans Fusion 360.
+
+Python, sans dépendance lourde. 788 tests.
+
+---
+
+## Deux versions
+
+`main` porte la **v1.5 « Universal 2D »**, l'état le plus abouti du projet. La
+**v1.0** n'a pas été remplacée : elle est un **ancêtre direct** de la v1.5, son
+chemin NACA tourne toujours à l'identique dans la v1.5, et des tests le
+garantissent. La v1.5, c'est la v1.0 *plus* des capacités.
+
+| | **v1.0** — profils NACA | **v1.5** — Universal 2D |
+|---|---|---|
+| Entrée | 4 chiffres NACA | + `.dat` / `.csv` (Selig, Lednicer, CSV), dessins `.dxf`, pièces `.step` |
+| Description de la forme | épaisseur, cambrure | + 24 coefficients de Kulfan (CST) |
+| Producteurs de géométrie | interne, Fusion 360 | les deux, derrière une interface commune |
+| Fidélité contrôlée | emprise du STL | + porte de reconstruction, aller-retour STL |
+| Sortie CAO | STL seul | + **STEP** : un vrai solide, ouvrable tel quel |
+| Retour en CAO | section CSV | + `FUSION_RETURN.md` et script Fusion généré |
+| Résultat de référence | NACA 2412 : Cl/Cd **13,43 → 29,88** (+122 %), 22 itérations | Clark Y : Cl/Cd **28,11 → 29,34** (+4,4 %), 25 itérations, **0 échec** |
+| Tag | `v1.0-stable` | `v1.5.0` |
+
+Le code de la v1.0 reste accessible tel quel, figé à son tag :
+
+```bash
+git checkout v1.0-stable
+```
+
+## Voir un rapport produit par le système
+
+Le système rédige lui-même son rapport en fin de série : paramètres de départ
+face aux paramètres finaux, évolution des coefficients itération par itération,
+sections avant/après, distributions de pression, champs CFD, et une lecture
+physique de ce qui a changé. Deux exemplaires complets sont versionnés dans le
+dépôt :
+
+- **[Rapport — Clark Y, v1.5](docs/example_report_clarky/README.md)** — profil
+  réel ingéré depuis la base UIUC, re-paramétré en 24 coefficients CST.
+- **[Rapport — NACA 2412, v1.0](docs/example_report/README.md)** —
+  paramétrisation à quatre chiffres.
+
+Chacun est accompagné du `report.html` d'origine, autoportant (figures et images
+CFD incluses) : [`docs/example_report_clarky/report.html`](docs/example_report_clarky/report.html)
+et [`docs/example_report/report.html`](docs/example_report/report.html).
 
 ## Optimiser n'importe quel profil, en trois commandes
 
@@ -33,19 +77,8 @@ Le dossier `results/run_*/best_design/` apparaît tout seul à la fin, avec son
 
 La v1.0 optimisait une famille de profils NACA à quatre chiffres — trois
 paramètres de forme. La v1.5 accepte **une forme quelconque** et la décrit par
-vingt-quatre coefficients CST, sans rien perdre de ce qui précède.
-
-| | v1.0 | v1.5 |
-|---|---|---|
-| Entrée | 4 chiffres NACA | + `.dat` / `.csv` (Selig, Lednicer, CSV), dessins `.dxf`, pièces `.step` |
-| Description de la forme | épaisseur, cambrure | + 24 coefficients de Kulfan |
-| Producteurs de géométrie | interne, Fusion | les deux, derrière une interface commune |
-| Fidélité contrôlée | emprise du STL | + porte de reconstruction, aller-retour STL |
-| Sortie CAO | STL seul | + **STEP** : un vrai solide, ouvrable tel quel |
-| Retour en CAO | section CSV | + `FUSION_RETURN.md` et script Fusion généré |
-
-**La v1.0 n'a pas été modifiée** : elle vit sur sa propre branche, figée au tag
-`v1.0-stable`.
+vingt-quatre coefficients CST, sans rien perdre de ce qui précède : le tableau
+comparatif est [en haut de page](#deux-versions).
 
 ## Résultats obtenus
 
@@ -91,7 +124,7 @@ finesse maximale d'un profil cambré.
 facultatif — sans lui, le système calcule la géométrie lui-même.
 
 ```bash
-git clone https://github.com/<votre-compte>/aero-opt-agent.git
+git clone https://github.com/Patxi-Sallaberry/aero-opt-agent.git
 cd aero-opt-agent
 
 python3 -m venv .venv && source .venv/bin/activate
@@ -1167,7 +1200,7 @@ Les critères du §10 du document maître, et ce qui les atteste :
 
 | critère | état | preuve |
 |---|---|---|
-| La v1.0 tourne toujours | ✅ | branche figée au tag `v1.0-stable`, jamais modifiée |
+| La v1.0 tourne toujours | ✅ | son code est figé au tag `v1.0-stable`, jamais modifié, et reste exercé dans la v1.5 |
 | Un profil CSV/DAT ingéré et re-paramétré à faible erreur | ✅ | Clark Y : 3,25 × 10⁻⁴ de corde en écart maximal |
 | Les trois grandeurs de forme sous contrôle explicite | ✅ | bornes écrites et vérifiées à chaque itération |
 | Une optimisation de ≥ 15 itérations aboutit de façon fiable | ✅ | 25 itérations, **0 échec** |
