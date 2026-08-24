@@ -1,18 +1,18 @@
-"""Retrace le profil optimisé dans Fusion 360, puis l'extrude.
+"""Redraw the optimised profile in Fusion 360, then extrude it.
 
-Généré automatiquement par aero-opt-agent — ne pas modifier à la main.
+Generated automatically by aero-opt-agent — do not edit by hand.
 
-    Fusion 360 → Utilities → ADD-INS → Scripts and Add-Ins → + → ce fichier
+    Fusion 360 → Utilities → ADD-INS → Scripts and Add-Ins → + → this file
 
-Les coordonnées sont en CENTIMÈTRES : c'est l'unité interne de l'API Fusion,
-quelle que soit l'unité affichée dans le document.
+Coordinates are in CENTIMETRES: that is the internal unit of the Fusion API,
+whatever unit the document displays.
 """
 
 import adsk.core
 import adsk.fusion
 import traceback
 
-# Extrados, du bord d'attaque vers le bord de fuite (cm).
+# Upper surface, from leading edge to trailing edge (cm).
 UPPER = [
     (0.000000, 0.000000),
     (0.010604, 0.060905),
@@ -117,7 +117,7 @@ UPPER = [
     (29.959827, -1.552133),
 ]
 
-# Intrados, du bord d'attaque vers le bord de fuite (cm).
+# Lower surface, from leading edge to trailing edge (cm).
 LOWER = [
     (0.000000, -0.000000),
     (0.003041, -0.083397),
@@ -234,8 +234,8 @@ def run(context):
         design = adsk.fusion.Design.cast(app.activeProduct)
         if design is None:
             ui.messageBox(
-                "Aucun design actif. Ouvrir ou créer un document Fusion, "
-                "puis relancer le script."
+                "No active design. Open or create a Fusion document, "
+                "then run the script again."
             )
             return
 
@@ -243,16 +243,16 @@ def run(context):
         sketch = root.sketches.add(root.xYConstructionPlane)
         sketch.name = NAME
 
-        # Une spline par surface, et non une seule sur tout le contour : au
-        # bord d'attaque la courbe rebrousse, et une spline unique y placerait
-        # un point d'inflexion au lieu d'un nez.
+        # One spline per surface, rather than a single one over the whole
+        # contour: at the leading edge the curve turns back on itself, and a
+        # single spline would put an inflection point there instead of a nose.
         for points in (UPPER, LOWER):
             collection = adsk.core.ObjectCollection.create()
             for x, y in points:
                 collection.add(adsk.core.Point3D.create(x, y, 0.0))
             sketch.sketchCurves.sketchFittedSplines.add(collection)
 
-        # Refermer le bord de fuite s'il est ouvert.
+        # Close the trailing edge if it is open.
         tail_upper = adsk.core.Point3D.create(UPPER[-1][0], UPPER[-1][1], 0.0)
         tail_lower = adsk.core.Point3D.create(LOWER[-1][0], LOWER[-1][1], 0.0)
         if tail_upper.distanceTo(tail_lower) > 1e-6:
@@ -261,9 +261,9 @@ def run(context):
         profiles = sketch.profiles
         if profiles.count == 0:
             ui.messageBox(
-                "L'esquisse a été tracée mais Fusion n'y voit aucun profil "
-                "fermé. Vérifier la jonction au bord d'attaque, puis extruder "
-                "à la main."
+                "The sketch was drawn but Fusion sees no closed profile in "
+                "it. Check the junction at the leading edge, then extrude by "
+                "hand."
             )
             return
 
@@ -279,12 +279,12 @@ def run(context):
         body.name = NAME
 
         ui.messageBox(
-            "Profil reconstruit et extrudé sur %.1f mm.\n\n"
-            "La géométrie est native : on peut désormais y ajouter des "
-            "congés, la vriller, ou en changer l'envergure."
+            "Profile rebuilt and extruded over %.1f mm.\n\n"
+            "The geometry is native: you can now add fillets to it, twist it, "
+            "or change its span."
             % (SPAN_CM * 10.0)
         )
 
     except Exception:
         if ui:
-            ui.messageBox("Échec du script :\n{}".format(traceback.format_exc()))
+            ui.messageBox("Script failed:\n{}".format(traceback.format_exc()))

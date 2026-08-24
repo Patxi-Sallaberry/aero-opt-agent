@@ -93,7 +93,7 @@ def best_iteration(iterations_root: Path) -> dict:
     ]
     if not candidates:
         raise ExportError(
-            f"aucune itération réussie dans {iterations_root} — rien à exporter"
+            f"no successful iteration in {iterations_root} — nothing to export"
         )
     return max(candidates, key=lambda record: float(record["objective"]))
 
@@ -450,7 +450,7 @@ def build_figures(
         plots.airfoil_outline(
             section["upper"], section["lower"],
             title=(
-                f"Section optimisée — corde {section['chord_mm']:.0f} mm, "
+                f"Optimised section — chord {section['chord_mm']:.0f} mm, "
                 f"incidence {section['aoa_deg']:.2f}°"
             ),
         ),
@@ -470,8 +470,8 @@ def build_figures(
                     {"points": tail(convergence["Cd"]), "label": "Cd"},
                     {"points": tail(convergence.get("Cl", [])), "label": "Cl"},
                 ],
-                title="Convergence du calcul (seconde moitié)",
-                x_label="itération du solveur", y_label="coefficient",
+                title="Solver convergence (second half)",
+                x_label="solver iteration", y_label="coefficient",
                 y_zero_line=True,
             ),
         )
@@ -514,27 +514,27 @@ def build_comparison_figures(
 
     before_panel = {
         **before_section,
-        "label": "Seed (départ)",
+        "label": "Seed (start)",
         "caption": (
             f"corde {before_section['chord_mm']:.0f} mm · "
             f"incidence {before_section['aoa_deg']:.2f}° · "
-            f"épaisseur {before_section['thickness']:.3f}"
+            f"thickness {before_section['thickness']:.3f}"
         ),
     }
     after_panel = {
         **after_section,
-        "label": "Design optimisé",
+        "label": "Optimised design",
         "caption": (
             f"corde {after_section['chord_mm']:.0f} mm · "
             f"incidence {after_section['aoa_deg']:.2f}° · "
-            f"épaisseur {after_section['thickness']:.3f}"
+            f"thickness {after_section['thickness']:.3f}"
         ),
     }
 
     write(
         "comparison_sections.svg",
         plots.airfoil_comparison(
-            before_panel, after_panel, title="Section : avant / après",
+            before_panel, after_panel, title="Section: before / after",
         ),
     )
     write(
@@ -542,7 +542,7 @@ def build_comparison_figures(
         plots.airfoil_overlay(
             {**before_panel, "label": "seed"},
             {**after_panel, "label": "optimisé"},
-            title="Les deux sections superposées",
+            title="The two sections superimposed",
         ),
     )
 
@@ -557,7 +557,7 @@ def build_comparison_figures(
     write(
         "comparison_performance.svg",
         plots.comparison_bars(
-            groups, title=f"Performances — {regime}",
+            groups, title=f"Performance — {regime}",
             before_label="seed", after_label="optimisé",
         ),
     )
@@ -567,16 +567,16 @@ def build_comparison_figures(
             "comparison_cp.svg",
             plots.chart(
                 [
-                    {"points": before_cp["upper"], "label": "seed — extrados",
+                    {"points": before_cp["upper"], "label": "seed — upper",
                      "color": plots.COLORS[1], "dashed": True},
-                    {"points": before_cp["lower"], "label": "seed — intrados",
+                    {"points": before_cp["lower"], "label": "seed — lower",
                      "color": plots.COLORS[4], "dashed": True},
-                    {"points": after_cp["upper"], "label": "optimisé — extrados",
+                    {"points": after_cp["upper"], "label": "optimised — upper",
                      "color": plots.COLORS[0]},
-                    {"points": after_cp["lower"], "label": "optimisé — intrados",
+                    {"points": after_cp["lower"], "label": "optimised — lower",
                      "color": plots.COLORS[2]},
                 ],
-                title="Distribution de pression : avant / après",
+                title="Pressure distribution: before / after",
                 x_label="x / corde", y_label="Cp",
                 invert_y=True, y_zero_line=True,
             ),
@@ -611,14 +611,14 @@ def render_paraview(
 
     if not shutil.which("pvbatch"):
         return [], (
-            "pvbatch introuvable — installer ParaView "
-            "(`apt install paraview`) pour obtenir les visuels CFD"
+            "pvbatch not found — install ParaView "
+            "(`apt install paraview`) to get the CFD visuals"
         )
     if not (Path(case_dir) / "constant" / "polyMesh").is_dir():
         return [], (
-            "le maillage a été purgé du case archivé "
-            "(`execution.keep_case_after_run`) : les visuels CFD demandent "
-            "de rejouer le calcul"
+            "the mesh was purged from the archived case "
+            "(`execution.keep_case_after_run`): the CFD visuals require "
+            "re-running the computation"
         )
 
     command = ["pvbatch", str(PARAVIEW_SCRIPT), str(case_dir), str(destination),
@@ -633,7 +633,7 @@ def render_paraview(
             command, capture_output=True, text=True, timeout=timeout_s
         )
     except subprocess.TimeoutExpired:
-        return [], f"ParaView n'a pas terminé en {timeout_s} s"
+        return [], f"ParaView did not finish within {timeout_s} s"
     except OSError as exc:
         return [], f"lancement de ParaView impossible : {exc}"
 
@@ -681,13 +681,13 @@ def _parameter_delta(start: float, final: float, spec: Mapping[str, Any]) -> str
     budget de variation, et pour la même raison.
     """
     if abs(final - start) < 1e-12:
-        return "inchangé"
+        return "unchanged"
     try:
         span = abs(float(spec["max"]) - float(spec["min"]))
     except (KeyError, TypeError, ValueError):
         span = 0.0
     if span > 0 and abs(start) < NEGLIGIBLE_BASE_FRACTION * span:
-        return f"{final - start:+.4g} ({(final - start) / span * 100:+.0f} % de la plage)"
+        return f"{final - start:+.4g} ({(final - start) / span * 100:+.0f} % of the range)"
     if start:
         return f"{(final - start) / abs(start) * 100:+.1f} %"
     return f"{final - start:+g}"
@@ -753,66 +753,64 @@ def explain_physics(
 
     d_aoa = moved("aoa", 0.05)
     if d_aoa is not None:
-        direction = "augmentée" if d_aoa > 0 else "réduite"
+        direction = "raised" if d_aoa > 0 else "lowered"
         notes.append(
-            f"**Incidence {direction} de {abs(d_aoa):.2f}°** "
+            f"**Incidence {direction} by {abs(d_aoa):.2f}°** "
             f"({float(initial['aoa']):.2f}° → {float(final['aoa']):.2f}°). "
-            "C'est le levier le plus direct sur la portance : incliner le "
-            "profil dévie davantage l'écoulement vers le bas, et la réaction "
-            "de cette déviation *est* la portance. La traînée induite croît "
-            "en gros comme le carré de la portance, si bien que la finesse "
-            "passe par un maximum — typiquement entre 4° et 6° pour un profil "
-            "cambré — puis s'effondre au décrochage. "
+            "This is the most direct lever on lift: tilting the profile "
+            "deflects more flow downwards, and the reaction to that deflection "
+            "*is* the lift. Induced drag grows roughly as the square of lift, "
+            "so lift-to-drag passes through a maximum — typically between 4° "
+            "and 6° for a cambered profile — then collapses at stall. "
             + (
-                f"La valeur retenue, {float(final['aoa']):.2f}°, tombe dans "
-                "cette plage : la recherche a trouvé le sommet de la courbe."
+                f"The value retained, {float(final['aoa']):.2f}°, falls in "
+                "that range: the search found the top of the curve."
                 if 3.0 <= float(final["aoa"]) <= 7.0
-                else "La valeur retenue reste en deçà de cette plage, signe "
-                "que le budget d'itérations ou les bornes ont limité la "
-                "progression."
+                else "The value retained stays below that range, a sign that "
+                "the iteration budget or the bounds limited the progress."
             )
         )
 
     d_camber = moved("camber", 1e-4)
     if d_camber is not None:
-        direction = "accentuée" if d_camber > 0 else "réduite"
+        direction = "increased" if d_camber > 0 else "reduced"
         notes.append(
-            f"**Cambrure {direction}** ({float(initial['camber']):.4f} → "
-            f"{float(final['camber']):.4f}). La cambrure décale toute la "
-            "courbe de portance : un profil cambré porte déjà à incidence "
-            "nulle. Elle se paie en traînée de forme et en moment de tangage, "
-            "d'où l'existence d'un optimum plutôt qu'une croissance sans fin."
+            f"**Camber {direction}** ({float(initial['camber']):.4f} → "
+            f"{float(final['camber']):.4f}). Camber shifts the whole lift "
+            "curve: a cambered profile already lifts at zero incidence. It is "
+            "paid for in form drag and in pitching moment, hence the existence "
+            "of an optimum rather than endless growth."
         )
 
     d_thickness = moved("thickness", 1e-4)
     if d_thickness is not None:
         if d_thickness < 0:
             notes.append(
-                f"**Profil aminci** ({float(initial['thickness']):.4f} → "
-                f"{float(final['thickness']):.4f} d'épaisseur relative). Un "
-                "profil plus fin perturbe moins l'écoulement et traîne moins. "
-                "La contrepartie est structurelle — moins d'inertie, donc "
-                "moins de rigidité — et un décrochage plus brutal, le bord "
-                "d'attaque plus aigu supportant mal les fortes incidences."
+                f"**Profile thinned** ({float(initial['thickness']):.4f} → "
+                f"{float(final['thickness']):.4f} relative thickness). A "
+                "thinner profile disturbs the flow less and drags less. The "
+                "counterpart is structural — less inertia, so less stiffness — "
+                "and a more abrupt stall, since a sharper leading edge copes "
+                "badly with high incidence."
             )
         else:
             notes.append(
-                f"**Profil épaissi** ({float(initial['thickness']):.4f} → "
-                f"{float(final['thickness']):.4f}). L'épaisseur coûte "
-                "normalement de la traînée ; qu'elle progresse ici signale "
-                "qu'elle sert autre chose — un bord d'attaque plus rond "
-                "retarde le décollement et laisse monter l'incidence."
+                f"**Profile thickened** ({float(initial['thickness']):.4f} → "
+                f"{float(final['thickness']):.4f}). Thickness normally costs "
+                "drag; that it grows here signals it is serving something "
+                "else — a rounder leading edge delays separation and lets "
+                "incidence rise."
             )
 
     d_chord = moved("chord", 0.5)
     if d_chord is not None:
         notes.append(
-            f"**Corde portée à {float(final['chord']):.1f} mm** (depuis "
-            f"{float(initial['chord']):.1f}). Elle agit par deux voies : le "
-            "nombre de Reynolds augmente, ce qui abaisse légèrement le "
-            "coefficient de frottement, et la surface de référence change — "
-            "elle est recalculée à chaque itération, sans quoi la comparaison "
-            "des coefficients n'aurait aucun sens."
+            f"**Chord raised to {float(final['chord']):.1f} mm** (from "
+            f"{float(initial['chord']):.1f}). It acts in two ways: the "
+            "Reynolds number rises, which slightly lowers the friction "
+            "coefficient, and the reference area changes — it is recomputed at "
+            "every iteration, without which comparing the coefficients would "
+            "mean nothing."
         )
 
     # Lecture des coefficients eux-mêmes.
@@ -824,36 +822,36 @@ def explain_physics(
             gain_cd = (cd1 - cd0) / abs(cd0) * 100 if cd0 else 0.0
             if gain_cd < 0 and gain_cl > 0:
                 notes.append(
-                    f"**Le compromis chiffré** : la portance gagne "
-                    f"{gain_cl:+.0f} % *et* la traînée baisse de "
-                    f"{abs(gain_cd):.0f} %. Les deux termes s'améliorent à la "
-                    "fois — cas favorable, qui tient ici à ce que la surface "
-                    "de référence suit la corde."
+                    f"**The trade-off in numbers**: lift gains "
+                    f"{gain_cl:+.0f} % *and* drag falls by "
+                    f"{abs(gain_cd):.0f} %. Both terms improve at once — a "
+                    "favourable case, which here comes from the reference area "
+                    "following the chord."
                 )
             elif gain_cl > abs(gain_cd):
                 notes.append(
-                    f"**Le compromis chiffré** : la portance gagne "
-                    f"{gain_cl:+.0f} % pour seulement {gain_cd:+.0f} % de "
-                    "traînée. C'est exactement ce que cherche une optimisation "
-                    "de finesse — non pas traîner moins, mais porter beaucoup "
-                    "plus pour un supplément de traînée modeste."
+                    f"**The trade-off in numbers**: lift gains "
+                    f"{gain_cl:+.0f} % for only {gain_cd:+.0f} % of drag. That "
+                    "is exactly what a lift-to-drag optimisation seeks — not to "
+                    "drag less, but to lift a great deal more for a modest drag "
+                    "penalty."
                 )
             else:
                 notes.append(
-                    f"**Le compromis chiffré** : Cl {gain_cl:+.0f} %, "
+                    f"**The trade-off in numbers**: Cl {gain_cl:+.0f} %, "
                     f"Cd {gain_cd:+.0f} %."
                 )
 
     if cp and cp.get("upper"):
         peak = min(cp["upper"], key=lambda point: point[1])
         notes.append(
-            f"**Ce que montre la distribution de pression** : le pic de "
-            f"dépression atteint Cp = {peak[1]:.2f} à {peak[0] * 100:.0f} % de "
-            "corde. C'est l'extrados qui fait le travail — la dépression y "
-            "aspire le profil vers le haut, et elle pèse bien davantage que la "
-            "surpression d'intrados. Un pic très creusé suivi d'une remontée "
-            "brutale annoncerait un décollement ; une remontée progressive, "
-            "comme ici, indique un écoulement encore attaché."
+            f"**What the pressure distribution shows**: the suction peak "
+            f"reaches Cp = {peak[1]:.2f} at {peak[0] * 100:.0f} % of chord. "
+            "The upper surface does the work — the suction there pulls the "
+            "profile upwards, and it weighs far more than the lower-surface "
+            "overpressure. A very deep peak followed by an abrupt recovery "
+            "would signal separation; a gradual recovery, as here, indicates "
+            "flow that is still attached."
         )
 
     return notes
@@ -882,28 +880,29 @@ def _comparison_section(
     comparison: Mapping[str, Any], figures: Mapping[str, str]
 ) -> list[str]:
     """La section « avant / après », faite pour se lire d'un coup d'œil."""
-    lines: list[str] = ["## Avant / après", ""]
+    lines: list[str] = ["## Before / after", ""]
     regime = comparison.get("regime", "")
     before = comparison["before"]
     after = comparison["after"]
 
     lines.append(
-        f"Le seed de départ face au design retenu, tous deux mesurés "
-        f"**dans le même régime CFD** ({regime}) — comparer un maillage fin à "
-        f"un maillage d'exploration gonflerait le gain sans qu'il soit réel."
+        f"The starting seed against the retained design, both measured "
+        f"**in the same CFD regime** ({regime}) — comparing a fine mesh "
+        f"against an exploration mesh would inflate the gain without it being "
+        f"real."
     )
     lines.append("")
 
     if "comparison_performance" in figures:
-        lines.append(f"![Performances avant / après]({figures['comparison_performance']})")
+        lines.append(f"![Performance before / after]({figures['comparison_performance']})")
         lines.append("")
 
-    lines.append("| | seed | optimisé | écart |")
+    lines.append("| | seed | optimised | change |")
     lines.append("|---|---|---|---|")
     for label, key, spec, better in (
-        ("Portance Cl", "Cl", ".4f", "higher"),
-        ("Traînée Cd", "Cd", ".5f", "lower"),
-        ("Finesse Cl/Cd", "Cl_Cd", ".2f", "higher"),
+        ("Lift Cl", "Cl", ".4f", "higher"),
+        ("Drag Cd", "Cd", ".5f", "lower"),
+        ("Lift-to-drag Cl/Cd", "Cl_Cd", ".2f", "higher"),
     ):
         b, a = before.get(key), after.get(key)
         if not all(isinstance(v, (int, float)) for v in (b, a)):
@@ -917,34 +916,34 @@ def _comparison_section(
     lines.append("")
 
     if "comparison_sections" in figures:
-        lines.append(f"![Sections avant / après]({figures['comparison_sections']})")
+        lines.append(f"![Sections before / after]({figures['comparison_sections']})")
         lines.append("")
         lines.append(
-            "Les deux sections sont dessinées à la **même échelle** : mises "
-            "chacune à la taille de son cadre, elles paraîtraient identiques et "
-            "l'écart de corde comme l'incidence passeraient inaperçus."
+            "Both sections are drawn at the **same scale**: each fitted to its "
+            "own frame, they would look identical, and both the chord "
+            "difference and the incidence would go unnoticed."
         )
         lines.append("")
     if "comparison_overlay" in figures:
-        lines.append(f"![Sections superposées]({figures['comparison_overlay']})")
+        lines.append(f"![Superimposed sections]({figures['comparison_overlay']})")
         lines.append("")
 
     if "comparison_cp" in figures:
-        lines.append("### La pression, avant et après")
+        lines.append("### Pressure, before and after")
         lines.append("")
-        lines.append(f"![Cp avant / après]({figures['comparison_cp']})")
+        lines.append(f"![Cp before / after]({figures['comparison_cp']})")
         lines.append("")
         lines.append(
-            "L'aire comprise entre la courbe d'extrados et celle d'intrados "
-            "*est* la portance. Le design optimisé creuse davantage sa "
-            "dépression d'extrados et l'étale sur la corde : c'est là que se "
-            "gagne le supplément de portance."
+            "The area between the upper-surface curve and the lower-surface "
+            "curve *is* the lift. The optimised design deepens its "
+            "upper-surface suction and spreads it along the chord: that is "
+            "where the extra lift is won."
         )
         lines.append("")
 
     seed_images = list(comparison.get("images", []))
     if seed_images:
-        lines.append("### Les champs, côte à côte")
+        lines.append("### The fields, side by side")
         lines.append("")
         for name in ("pressure_field.png", "streamlines.png"):
             seed_name = f"seed_{name}"
@@ -952,18 +951,17 @@ def _comparison_section(
                 continue
             lines.append("<!-- side-by-side -->")
             lines.append(f"![Seed — {name.split('.')[0]}](figures/{seed_name})")
-            lines.append(f"![Optimisé — {name.split('.')[0]}](figures/{name})")
+            lines.append(f"![Optimised — {name.split('.')[0]}](figures/{name})")
             lines.append("<!-- /side-by-side -->")
             lines.append("")
         lines.append(
-            "Même échelle de couleurs des deux côtés — c'est la condition pour "
-            "que la comparaison veuille dire quelque chose. La dépression "
-            "d'extrados, en bleu, est nettement plus marquée et plus étendue "
-            "après optimisation."
+            "Same colour scale on both sides — that is the condition for the "
+            "comparison to mean anything. The upper-surface suction, in blue, "
+            "is markedly stronger and more extensive after optimisation."
         )
         lines.append("")
     elif comparison.get("visuals_error"):
-        lines.append(f"> Contours du seed non produits : {comparison['visuals_error']}")
+        lines.append(f"> Seed contours not produced: {comparison['visuals_error']}")
         lines.append("")
 
     return lines
@@ -990,21 +988,23 @@ def build_report(
     initial = (initial_design or {}).get("parameters", {})
     lines: list[str] = []
 
-    lines.append(f"# Design optimisé — `{design.get('design_id', 'sans nom')}`")
+    lines.append(f"# Optimised design — `{design.get('design_id', 'unnamed')}`")
     lines.append("")
     successes = sum(1 for r in history if r.get("success"))
     failures = len(history) - successes
+    # Le français accordait « réussie(s) » et « échouée(s) » ; l'anglais n'a
+    # pas d'accord sur le participe, et les « s » conditionnels qui restaient
+    # produisaient « 8 succeededs ».
     lines.append(
-        f"Meilleure des **{len(history)} itérations** de la série "
-        f"`{source.parent.name}` ({successes} réussie"
-        f"{'s' if successes > 1 else ''}, {failures} échouée"
-        f"{'s' if failures > 1 else ''}), retenue sur l'objectif "
+        f"Best of the **{len(history)} iterations** of run "
+        f"`{source.parent.name}` ({successes} succeeded, {failures} failed), "
+        f"selected on objective "
         f"`{(design.get('objectives') or {}).get('primary', '?')}`."
     )
     lines.append("")
 
     # ── Performances ──────────────────────────────────────────────────────
-    lines.append("## Performances")
+    lines.append("## Performance")
     lines.append("")
     first = next(
         (r for r in history
@@ -1015,17 +1015,17 @@ def build_report(
     lines.append("|---|---|---|---|")
     if first:
         lines.append(
-            f"| Départ (itération {first['iteration']}) | {_fmt(first.get('Cd'))} "
+            f"| Start (iteration {first['iteration']}) | {_fmt(first.get('Cd'))} "
             f"| {_fmt(first.get('Cl'))} | {_fmt(first.get('Cl_Cd'), '.2f')} |"
         )
     lines.append(
-        f"| **Optimisé (itération {record.get('iteration')})** "
+        f"| **Optimised (iteration {record.get('iteration')})** "
         f"| **{_fmt(results.get('Cd'))}** | **{_fmt(results.get('Cl'))}** "
         f"| **{_fmt(results.get('Cl_Cd'), '.2f')}** |"
     )
     if fast_results:
         lines.append(
-            f"| *— mesuré en exploration* | *{_fmt(fast_results.get('Cd'))}* "
+            f"| *— measured in exploration* | *{_fmt(fast_results.get('Cd'))}* "
             f"| *{_fmt(fast_results.get('Cl'))}* "
             f"| *{_fmt(fast_results.get('Cl_Cd'), '.2f')}* |"
         )
@@ -1042,32 +1042,32 @@ def build_report(
             # faut donc nommer le régime, pas seulement l'employer correctement.
             if fast_results:
                 lines.append(
-                    f"**Gain de finesse : {gain:+.1f} %** — entre les deux "
-                    f"mesures d'**exploration** : la ligne de départ et celle "
-                    f"en italique. Au réglage fin, la comparaison à régime "
-                    f"constant est donnée plus bas, dans « Avant / après » ; "
-                    f"elle est plus basse, un maillage grossier exagérant "
-                    f"les écarts."
+                    f"**Lift-to-drag gain: {gain:+.1f} %** — between the two "
+                    f"**exploration** measurements: the starting row and the "
+                    f"one in italics. At the fine settings, the "
+                    f"constant-regime comparison is given further down, under "
+                    f"“Before / after”; it is lower, because a coarse mesh "
+                    f"exaggerates differences."
                 )
             else:
-                lines.append(f"**Gain de finesse : {gain:+.1f} %**")
+                lines.append(f"**Lift-to-drag gain: {gain:+.1f} %**")
     lines.append("")
 
     mesh = results.get("mesh") or {}
     lines.append(
-        f"Maillage : {mesh.get('n_cells', '?')} cellules, non-orthogonalité "
+        f"Mesh: {mesh.get('n_cells', '?')} cells, non-orthogonality "
         f"{_fmt(mesh.get('max_non_orthogonality'), '.1f')}, skewness "
-        f"{_fmt(mesh.get('max_skewness'), '.2f')}. Coefficients moyennés sur "
-        f"{results.get('averaging_window', '?')} itérations, écart-type relatif "
-        f"{_fmt(results.get('Cd_rel_std'), '.1e')} sur Cd — "
-        f"{'stabilisés' if results.get('coefficients_stable') else '**encore instables**'}."
+        f"{_fmt(mesh.get('max_skewness'), '.2f')}. Coefficients averaged over "
+        f"{results.get('averaging_window', '?')} iterations, relative standard deviation "
+        f"{_fmt(results.get('Cd_rel_std'), '.1e')} on Cd — "
+        f"{'stabilised' if results.get('coefficients_stable') else '**encore instables**'}."
     )
     lines.append("")
 
     # ── Paramètres ────────────────────────────────────────────────────────
-    lines.append("## Paramètres : départ → arrivée")
+    lines.append("## Parameters: start → finish")
     lines.append("")
-    lines.append("| paramètre | départ | arrivée | écart | bornes |")
+    lines.append("| parameter | start | finish | change | bounds |")
     lines.append("|---|---|---|---|---|")
     for name, spec in parameters.items():
         final_value = float(spec["value"])
@@ -1094,29 +1094,29 @@ def build_report(
 
     # ── Pourquoi c'est mieux ──────────────────────────────────────────────
     if notes:
-        lines.append("## Pourquoi cette forme est meilleure")
+        lines.append("## Why this shape is better")
         lines.append("")
         for note in notes:
             lines.append(f"- {note}")
         lines.append("")
 
     # ── Trajectoire ───────────────────────────────────────────────────────
-    lines.append("## Déroulé de l'optimisation")
+    lines.append("## Course of the optimisation")
     lines.append("")
     for key, caption in (
         ("optimization_progress", "Lift-to-drag over the iterations"),
-        ("coefficients_progress", "Cd et Cl au fil des itérations"),
+        ("coefficients_progress", "Cd and Cl over the iterations"),
     ):
         if key in figures:
             lines.append(f"![{caption}]({figures[key]})")
             lines.append("")
 
-    lines.append("| itération | Cd | Cl | Cl/Cd | statut |")
+    lines.append("| iteration | Cd | Cl | Cl/Cd | status |")
     lines.append("|---|---|---|---|---|")
     for entry in history:
         marker = " ⭐" if entry.get("iteration") == record.get("iteration") else ""
         status = "OK" if entry.get("success") else (
-            f"échec — {_cell(entry.get('error_message', ''))[:90]}"
+            f"failed — {_cell(entry.get('error_message', ''))[:90]}"
         )
         lines.append(
             f"| {entry.get('iteration')}{marker} | {_fmt(entry.get('Cd'))} "
@@ -1126,38 +1126,38 @@ def build_report(
     lines.append("")
 
     # ── Visuels CFD ───────────────────────────────────────────────────────
-    lines.append("## L'écoulement")
+    lines.append("## The flow")
     lines.append("")
     if "cp_distribution" in figures:
-        lines.append(f"![Distribution de Cp]({figures['cp_distribution']})")
+        lines.append(f"![Cp distribution]({figures['cp_distribution']})")
         lines.append("")
         lines.append(
-            "Axe des Cp inversé, comme le veut l'usage : la courbe du haut est "
-            "l'extrados, en dépression. L'aire entre les deux courbes est la "
-            "portance."
+            "Cp axis inverted, as convention requires: the upper curve is the "
+            "upper surface, in suction. The area between the two curves is the "
+            "lift."
         )
         lines.append("")
 
     titles = {
-        "pressure_field.png": "Champ de pression autour du profil",
-        "streamlines.png": "Lignes de courant",
-        "velocity_field.png": "Module de la vitesse et sillage",
+        "pressure_field.png": "Pressure field around the profile",
+        "streamlines.png": "Streamlines",
+        "velocity_field.png": "Velocity magnitude and wake",
     }
     captions = {
         "pressure_field.png": (
-            "**Champ de pression.** Le rouge sous le bord d'attaque est le "
-            "point d'arrêt, où l'écoulement s'immobilise (Cp = +1). Le bleu au "
-            "dessus est la dépression qui porte le profil."
+            "**Pressure field.** The red under the leading edge is the "
+            "stagnation point, where the flow comes to rest (Cp = +1). The blue "
+            "above is the suction that lifts the profile."
         ),
         "streamlines.png": (
-            "**Lignes de courant**, colorées par la vitesse. L'accélération "
-            "sur l'extrados est la contrepartie de la dépression : c'est le "
-            "théorème de Bernoulli, où le fluide qui accélère voit sa pression "
-            "chuter."
+            "**Streamlines**, coloured by velocity. The acceleration over the "
+            "upper surface is the counterpart of the suction: this is "
+            "Bernoulli's theorem, where accelerating fluid sees its pressure "
+            "drop."
         ),
         "velocity_field.png": (
-            "**Module de la vitesse.** Le sillage se lit derrière le bord de "
-            "fuite ; plus il est mince, moins le profil traîne."
+            "**Velocity magnitude.** The wake can be read behind the trailing "
+            "edge; the thinner it is, the less the profile drags."
         ),
     }
     for image in images:
@@ -1168,127 +1168,130 @@ def build_report(
             lines.append("")
 
     if visuals_error:
-        lines.append(f"> Visuels CFD non produits : {visuals_error}")
+        lines.append(f"> CFD visuals not produced: {visuals_error}")
         lines.append("")
 
     if "solver_convergence" in figures:
-        lines.append("### Convergence du calcul")
+        lines.append("### Solver convergence")
         lines.append("")
         lines.append(f"![Convergence]({figures['solver_convergence']})")
         lines.append("")
         lines.append(
-            "Des courbes plates sur la fin sont la condition pour que les "
-            "coefficients veuillent dire quelque chose."
+            "Flat curves towards the end are the condition for the "
+            "coefficients to mean anything."
         )
         lines.append("")
 
     # ── Réserve sur les chiffres ──────────────────────────────────────────
-    lines.append("## Ce que valent ces chiffres")
+    lines.append("## What these numbers are worth")
     lines.append("")
     lines.append(
-        "Le modèle de turbulence `kOmegaSST` suppose la couche limite "
-        "turbulente dès le bord d'attaque. À Re ≈ 4 × 10⁵, une bonne part de "
-        "l'extrados est encore laminaire : **la traînée est surestimée**, d'un "
-        "facteur qui peut approcher 2. Ces valeurs classent correctement des "
-        "formes entre elles — ce qu'exige une optimisation — mais ne "
-        "constituent pas une prédiction de traînée absolue. Pour un chiffre "
-        "publiable, il faut un modèle avec transition laminaire-turbulent, ou "
-        "une soufflerie."
+        "The `kOmegaSST` turbulence model assumes a turbulent boundary layer "
+        "from the leading edge. At Re ≈ 4 × 10⁵ a good part of the upper "
+        "surface is still laminar: **drag is overestimated**, by a factor that "
+        "can approach 2. These values rank shapes against each other correctly "
+        "— which is what an optimisation requires — but do not constitute a "
+        "prediction of absolute drag. For a publishable figure you need a model "
+        "with laminar-turbulent transition, or a wind tunnel."
     )
     lines.append("")
 
     # ── Contenu et mode d'emploi ──────────────────────────────────────────
-    lines.append("## Contenu du dossier")
+    lines.append("## Folder contents")
     lines.append("")
-    lines.append("| fichier | quoi |")
+    lines.append("| file | what |")
     lines.append("|---|---|")
-    lines.append("| `geometry.stl` | la géométrie, **en mètres**, telle que simulée |")
+    lines.append("| `geometry.stl` | the geometry, **in metres**, as simulated |")
     if has_step:
-        lines.append("| `geometry.step` | la même, en CAO |")
-    lines.append("| `profile_section.csv` | section 2D en millimètres |")
-    lines.append("| `profile_section.dat` | même section au format profil |")
+        lines.append("| `geometry.step` | the same, as a CAD solid |")
+    lines.append("| `profile_section.csv` | 2D section in millimetres |")
+    lines.append("| `profile_section.dat` | same section in airfoil format |")
     lines.append(
-        "| `profile_chord.dat` | profil **redressé**, corde unitaire — "
-        "pour XFOIL / XFLR5 |"
+        "| `profile_chord.dat` | profile **straightened**, unit chord — "
+        "for XFOIL / XFLR5 |"
     )
-    lines.append("| `design_params.yaml` | les paramètres exacts, rejouables |")
-    lines.append("| `results.json` | les coefficients |")
-    lines.append("| `report.html` | ce rapport, autonome, pour un navigateur |")
-    lines.append("| `FUSION_RETURN.md` | comment reprendre ce design en CAO |")
-    lines.append("| `rebuild_in_fusion.py` | script Fusion qui retrace le profil |")
-    lines.append("| `figures/` | courbes et images |")
+    lines.append("| `design_params.yaml` | the exact parameters, replayable |")
+    lines.append("| `results.json` | the coefficients |")
+    lines.append("| `report.html` | this report, self-contained, for a browser |")
+    lines.append("| `FUSION_RETURN.md` | how to carry this design back into CAD |")
+    lines.append("| `rebuild_in_fusion.py` | CAD script that redraws the profile |")
+    lines.append("| `figures/` | curves and images |")
     if has_case:
-        lines.append("| `cfd/` | case OpenFOAM : maillage et champs finaux |")
-    lines.append("| `logs/` | journaux de chaque étape |")
+        lines.append("| `cfd/` | OpenFOAM case: mesh and final fields |")
+    lines.append("| `logs/` | logs of each step |")
     lines.append("")
 
     # ── Retour vers Fusion (§5 du document maître) ────────────────────────
-    lines.append("## Continuer ce design dans Fusion 360")
+    lines.append("## Continuing this design in CAD")
     lines.append("")
     lines.append(
-        "Une optimisation qui ne rend qu'un STL est un cul-de-sac de "
-        "conception : un solide facetté de plusieurs centaines de faces ne se "
-        "laisse ni congédier proprement, ni recoter. Trois voies ramènent "
-        "cette forme dans une CAO éditable, détaillées dans "
-        "**`FUSION_RETURN.md`**."
+        "An optimisation that only returns an STL is a design dead end: a "
+        "faceted solid of several hundred faces can neither be filleted "
+        "properly nor re-dimensioned. Several routes bring this shape back "
+        "into editable CAD, detailed in **`FUSION_RETURN.md`**."
     )
     lines.append("")
-    lines.append("| voie | ce qu'on obtient | quand la choisir |")
+    lines.append("| route | what you get | when to choose it |")
     lines.append("|---|---|---|")
+    if has_step:
+        lines.append(
+            "| **0. Open `geometry.step`** | native solid, one double-click | "
+            "the simplest — works in FreeCAD as well as Fusion |"
+        )
     lines.append(
-        "| **1. Rejouer les paramètres** | modèle natif, historique complet | "
-        "dès qu'un modèle de départ existe — c'est la seule voie réellement "
-        "paramétrique |"
+        "| **1. Replay the parameters** | native model, full history | as soon "
+        "as a starting model exists — the only genuinely parametric route |"
     )
     lines.append(
-        "| **2. Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans "
-        "intervention | sans modèle de départ ; rien à localiser ni à "
-        "convertir |"
+        "| **2. `rebuild_in_fusion.py` script** | sketch + extrusion, hands "
+        "off | no starting model; nothing to locate or convert |"
     )
     lines.append(
-        "| **3. Importer `profile_section.csv`** | esquisse tracée à la main | "
-        "pour garder la main, ou travailler dans une autre CAO |"
+        "| **3. Import `profile_section.csv`** | sketch drawn by hand | to stay "
+        "in control, or work in another CAD package |"
     )
     lines.append("")
     lines.append(
         "```bash\n"
-        "# voie 1 : rejouer les paramètres dans Fusion\n"
-        "cp design_params.yaml <projet>/configs/design_params.yaml\n"
-        "# puis Utilities → ADD-INS → Scripts → fusion/parametric_driver.py\n"
+        "# route 1: replay the parameters in Fusion\n"
+        "cp design_params.yaml <project>/configs/design_params.yaml\n"
+        "# then Utilities → ADD-INS → Scripts → fusion/parametric_driver.py\n"
         "\n"
-        "# voie 2 : script autonome\n"
+        "# route 2: standalone script\n"
         "# Utilities → ADD-INS → Scripts → + → rebuild_in_fusion.py → Run\n"
         "```"
     )
     lines.append("")
     lines.append(
-        "**L'incidence est déjà dans les coordonnées** de la section "
-        "exportée : c'est la géométrie réellement simulée. Si le montage aval "
-        "applique lui-même une incidence, elle serait comptée deux fois."
+        "**Incidence is already in the coordinates** of the exported section: "
+        "this is the geometry that was actually simulated. If a downstream "
+        "setup applies an incidence of its own, it would be counted twice."
     )
     lines.append("")
     if not has_step:
         lines.append(
-            "Il n'y a pas de fichier STEP dans ce dossier : la géométrie a été "
-            "produite par le calculateur interne, qui écrit directement un STL "
-            "sans passer par un noyau CAO. Les voies 1 et 2 en produisent un."
+            "There is no STEP file in this folder: the geometry was produced by "
+            "the internal computer, which writes an STL directly. It can also "
+            "write a STEP, but only when the optional CAD kernel is installed "
+            "(`pip install -r requirements-cad.txt`). Routes 1 and 2 produce "
+            "one as well."
         )
         lines.append("")
 
-    lines.append("## Ouvrir les fichiers")
+    lines.append("## Opening the files")
     lines.append("")
     lines.append("```bash")
-    lines.append("# la géométrie (STL en mètres)")
+    lines.append("# the geometry (STL in metres)")
     lines.append("paraview geometry.stl")
     lines.append("")
     if has_case:
-        lines.append("# les champs CFD")
+        lines.append("# the CFD fields")
         lines.append("paraview cfd/best_design.foam")
         lines.append("")
-        lines.append("# refaire les visuels après modification")
+        lines.append("# regenerate the visuals after a change")
         lines.append("xvfb-run -a pvbatch paraview_render.py cfd figures 20 1.225")
         lines.append("")
-    lines.append("# reprendre l'optimisation depuis ce design")
+    lines.append("# resume the optimisation from this design")
     lines.append("cp design_params.yaml configs/design_params.yaml")
     lines.append("python3 scripts/run_loop.py --max-iterations 20 \\")
     lines.append("    --cfd-settings configs/cfd_settings_fast.yaml")
@@ -1296,18 +1299,18 @@ def build_report(
     lines.append("")
     if has_case:
         lines.append(
-            "Dans ParaView, le pas de temps final porte `U` (vitesse), `p` "
-            "(pression **cinématique**, en m²/s² — multiplier par ρ = 1,225 "
-            "kg/m³ pour des pascals), `k`, `omega` et `nut`. Le patch `wing` "
-            "est la surface de l'aile."
+            "In ParaView, the final time step carries `U` (velocity), `p` "
+            "(**kinematic** pressure, in m²/s² — multiply by ρ = 1.225 kg/m³ "
+            "for pascals), `k`, `omega` and `nut`. The `wing` patch is the wing "
+            "surface."
         )
         lines.append("")
 
     lines.append("---")
     lines.append("")
     lines.append(
-        f"Exporté le {datetime.now(timezone.utc).strftime('%d/%m/%Y à %H:%M UTC')} "
-        f"par `scripts/export_best.py`."
+        f"Exported on {datetime.now(timezone.utc).strftime('%d/%m/%Y at %H:%M UTC')} "
+        f"by `scripts/export_best.py`."
     )
     return "\n".join(lines) + "\n"
 
@@ -1488,8 +1491,8 @@ def resolve_baseline(
     if baseline_dir is not None:
         path = Path(baseline_dir)
         if not (path / "results.json").is_file():
-            raise ExportError(f"référence sans results.json : {path}")
-        return path, "réglage fin"
+            raise ExportError(f"reference without results.json: {path}")
+        return path, "fine settings"
 
     first = next((r for r in history if r.get("success")), None)
     if first is None:
@@ -1497,7 +1500,7 @@ def resolve_baseline(
     path = iteration_dir(iterations_root, first["iteration"])
     if not (path / "results.json").is_file():
         return None, ""
-    return path, ("exploration" if qualified else "même régime")
+    return path, ("exploration" if qualified else "same regime")
 
 
 def export_best(
@@ -1517,7 +1520,7 @@ def export_best(
     record = best_iteration(iterations_root)
     source = iteration_dir(iterations_root, record["iteration"])
     if not source.is_dir():
-        raise ExportError(f"dossier de l'itération introuvable : {source}")
+        raise ExportError(f"iteration folder not found: {source}")
 
     primary = Path(qualified_dir) if qualified_dir else source
     if not primary.is_dir():
@@ -1604,7 +1607,7 @@ def export_best(
     if visuals and has_case:
         images, visuals_error = render_paraview(output / "cfd", output, u_inf, rho)
     elif visuals:
-        visuals_error = "case OpenFOAM absent du dossier exporté"
+        visuals_error = "OpenFOAM case missing from the exported folder"
 
     # ── Comparaison avant / après ────────────────────────────────────────
     comparison: dict[str, Any] = {}
@@ -1663,7 +1666,7 @@ def export_best(
     (output / "README.md").write_text(report, encoding="utf-8")
     (output / "report.html").write_text(
         markdown_to_html(report, output,
-                         f"Design optimisé — {design.get('design_id', '')}"),
+                         f"Optimised design — {design.get('design_id', '')}"),
         encoding="utf-8",
     )
     copied += ["README.md", "report.html"]
@@ -1760,8 +1763,8 @@ def _build_comparison(
         )
     elif visuals:
         visuals_error = (
-            "champs du seed indisponibles (maillage purgé) : les contours "
-            "avant / après demandent de réévaluer le seed avec "
+            "seed fields unavailable (mesh purged): the before/after contours "
+            "require re-evaluating the seed with "
             "`keep_case_after_run: true`"
         )
 
@@ -1807,7 +1810,7 @@ def _check_same_design(qualified: Mapping[str, Any], selected: Mapping[str, Any]
             )
     if differences:
         raise ExportError(
-            "la requalification ne porte pas sur le design sélectionné : "
+            "the re-qualification does not concern the selected design: "
             + " | ".join(differences)
         )
 

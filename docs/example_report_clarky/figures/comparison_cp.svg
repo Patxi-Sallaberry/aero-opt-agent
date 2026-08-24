@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
 <rect width="760" height="420" fill="#ffffff"/>
-<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Distribution de pression : avant / après</text>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Pressure distribution: before / after</text>
 <line x1="208.0" y1="46" x2="208.0" y2="362" stroke="#dcdcdc" stroke-width="1"/>
 <text x="208.0" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">0.200</text>
 <line x1="340.5" y1="46" x2="340.5" y2="362" stroke="#dcdcdc" stroke-width="1"/>
@@ -25,15 +25,15 @@
 <path d="M78.0,340.2 L85.6,335.8 L96.6,317.3 L111.2,286.5 L113.9,285.6 L129.8,260.2 L148.5,257.9 L150.0,257.7 L174.4,254.9 L200.3,253.3 L201.2,253.6 L228.6,253.1 L256.2,253.2 L283.8,254.3 L311.3,256.4 L338.9,258.7 L366.5,260.3 L394.1,261.2 L421.6,261.7 L449.2,262.0 L476.8,262.4 L504.5,262.9 L532.0,263.3 L559.6,263.8 L587.0,264.3 L612.7,265.3 L613.4,265.4 L633.5,266.3 L635.4,266.1 L648.7,266.3 L649.8,266.8 L662.9,267.6 L675.9,269.1 L691.6,257.9 L706.5,266.3 L711.6,267.1 L718.0,268.6 L726.8,270.2 L734.0,271.9" fill="none" stroke="#ef6c00" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/>
 <path d="M78.1,308.0 L84.5,218.0 L97.0,157.0 L98.1,156.6 L116.6,137.2 L141.4,68.7 L145.3,67.8 L174.7,123.7 L198.7,118.8 L224.9,114.2 L252.1,120.9 L252.2,119.9 L279.5,134.4 L307.0,148.1 L333.5,155.9 L357.9,160.1 L388.6,153.7 L420.2,147.1 L446.3,176.4 L472.3,189.8 L474.0,189.7 L497.3,192.4 L520.0,192.9 L537.0,184.8 L549.4,200.0 L561.1,209.4 L561.5,209.7 L572.5,213.7 L582.7,213.7 L584.8,213.9 L610.1,218.4 L612.8,218.7 L627.5,228.5 L629.2,228.0 L641.6,213.6 L646.7,214.3 L651.8,213.6 L662.0,216.7 L673.7,231.5 L689.5,245.0 L706.2,242.3 L719.8,253.6 L732.3,260.7" fill="none" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
 <path d="M78.1,338.6 L85.8,328.4 L97.4,306.7 L110.1,285.1 L125.4,268.9 L127.6,267.5 L149.6,263.0 L174.1,260.3 L200.4,258.5 L201.1,258.7 L228.5,257.9 L256.0,257.2 L283.7,257.0 L311.2,258.2 L338.8,261.1 L366.3,263.7 L393.9,265.5 L421.5,266.5 L449.1,267.0 L476.7,267.2 L504.3,267.2 L531.8,266.9 L532.0,266.9 L559.5,266.8 L586.9,266.8 L612.7,267.2 L613.5,267.3 L633.4,267.8 L635.3,267.4 L648.6,266.8 L649.6,267.1 L662.9,266.9 L676.7,267.9 L689.9,269.1 L705.8,257.1 L710.9,258.6 L720.2,264.0 L727.4,269.3 L733.6,272.3" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linejoin="round"/>
-<rect x="82" y="45" width="167" height="76" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
+<rect x="82" y="45" width="154" height="76" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
 <line x1="88" y1="56" x2="110" y2="56" stroke="#c1440e" stroke-width="2.5"/>
-<text x="116" y="60" font-size="12" fill="#222222">seed — extrados</text>
+<text x="116" y="60" font-size="12" fill="#222222">seed — upper</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#ef6c00" stroke-width="2.5"/>
-<text x="116" y="77" font-size="12" fill="#222222">seed — intrados</text>
+<text x="116" y="77" font-size="12" fill="#222222">seed — lower</text>
 <line x1="88" y1="90" x2="110" y2="90" stroke="#1f4e8c" stroke-width="2.5"/>
-<text x="116" y="94" font-size="12" fill="#222222">optimised — extrados</text>
+<text x="116" y="94" font-size="12" fill="#222222">optimised — upper</text>
 <line x1="88" y1="107" x2="110" y2="107" stroke="#2e7d32" stroke-width="2.5"/>
-<text x="116" y="111" font-size="12" fill="#222222">optimised — intrados</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / chord</text>
+<text x="116" y="111" font-size="12" fill="#222222">optimised — lower</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / corde</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cp</text>
 </svg>

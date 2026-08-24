@@ -2,8 +2,6 @@
 
 Best of the **25 iterations** of run `iterations_clarky` (25 succeeded, 0 failed), selected on objective `maximize_Cl_Cd`.
 
-> **Translated for publication.** `scripts/export_best.py` writes its reports in French; this copy was translated by hand so that the showcased result reads in English. The numbers, figures and tables are untouched.
-
 ## Performance
 
 | | Cd | Cl | Cl/Cd |
@@ -13,7 +11,7 @@ Best of the **25 iterations** of run `iterations_clarky` (25 succeeded, 0 failed
 
 **Lift-to-drag gain: +4.4 %**
 
-Mesh: 81,594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged over 120 iterations, relative standard deviation 1.2e-04 on Cd — stabilised.
+Mesh: 81594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged over 120 iterations, relative standard deviation 1.2e-04 on Cd — stabilised.
 
 ## Parameters: start → finish
 
@@ -49,7 +47,7 @@ Mesh: 81,594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged
 
 ## Before / after
 
-The starting seed against the retained design, both measured **in the same CFD regime** — comparing a fine mesh against an exploration mesh would inflate the gain without it being real.
+The starting seed against the retained design, both measured **in the same CFD regime** (same regime) — comparing a fine mesh against an exploration mesh would inflate the gain without it being real.
 
 ![Performance before / after](figures/comparison_performance.svg)
 
@@ -216,4 +214,4 @@ In ParaView, the final time step carries `U` (velocity), `p` (**kinematic** pres
 
 ---
 
-Exported on 24/08/2026 at 18:19 UTC by `scripts/export_best.py`.
+Exported on 24/08/2026 at 19:41 UTC by `scripts/export_best.py`.

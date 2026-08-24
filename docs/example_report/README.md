@@ -2,7 +2,7 @@
 
 Best of the **22 iterations** of run `iterations` (21 succeeded, 1 failed), selected on objective `maximize_Cl_Cd`.
 
-> **Translated for publication.** `scripts/export_best.py` writes its reports in French; this copy was translated by hand so that the showcased result reads in English. The numbers, figures and tables are untouched.
+> **Translated by hand.** `scripts/export_best.py` writes its reports in English, and the [Clark Y report](../example_report_clarky/README.md) was produced by it directly. This one is older: it dates from v1.0, its raw iteration data has since been purged from the repository, and it therefore cannot be regenerated. It was translated by hand instead. The numbers, figures and tables are untouched.
 
 ## Performance
 

@@ -165,7 +165,7 @@ def test_le_script_referme_un_bord_de_fuite_ouvert():
 def test_le_document_decrit_les_trois_voies():
     design, section = section_of()
     doc = build_return_doc(design, section, has_step=False)
-    assert "Voie 1" in doc and "Voie 2" in doc and "Voie 3" in doc
+    assert "Route 1" in doc and "Route 2" in doc and "Route 3" in doc
 
 
 def test_le_document_donne_les_cotes_de_la_forme():
@@ -180,8 +180,8 @@ def test_le_document_signale_l_absence_de_step():
     design, section = section_of()
     sans = build_return_doc(design, section, has_step=False)
     avec = build_return_doc(design, section, has_step=True)
-    assert "il n'y en a pas" in sans.lower()
-    assert "il n'y en a pas" not in avec.lower()
+    assert "there is none" in sans.lower()
+    assert "there is none" not in avec.lower()
 
 
 def test_le_document_met_le_step_en_avant_quand_il_existe():
@@ -189,7 +189,7 @@ def test_le_document_met_le_step_en_avant_quand_il_existe():
     design, section = section_of()
     avec = build_return_doc(design, section, has_step=True)
     assert "geometry.step" in avec
-    assert avec.index("geometry.step") < avec.index("Voie 1")
+    assert avec.index("geometry.step") < avec.index("Route 1")
 
 
 def test_le_document_previent_de_ne_pas_ouvrir_le_stl_a_la_place():
@@ -197,7 +197,7 @@ def test_le_document_previent_de_ne_pas_ouvrir_le_stl_a_la_place():
     design, section = section_of()
     avec = build_return_doc(design, section, has_step=True)
     assert "geometry.stl" in avec
-    assert "maillé" in avec or "maillage" in avec
+    assert "mesh body" in avec
 
 
 def test_l_absence_de_step_nomme_la_dependance():
@@ -211,7 +211,7 @@ def test_le_document_previent_du_double_comptage_de_l_incidence():
     """L'erreur la plus facile à commettre en reprenant la section."""
     design, section = section_of()
     doc = build_return_doc(design, section, has_step=False)
-    assert "comptée deux fois" in doc
+    assert "counted twice" in doc
 
 
 def test_le_document_deconseille_la_conversion_du_stl():

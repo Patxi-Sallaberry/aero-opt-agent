@@ -34,7 +34,6 @@
 </style></head><body>
 <h1>Optimised design — <code>CLARK_Y_AIRFOIL</code></h1>
 <p>Best of the <strong>25 iterations</strong> of run <code>iterations_clarky</code> (25 succeeded, 0 failed), selected on objective <code>maximize_Cl_Cd</code>.</p>
-<blockquote><strong>Translated for publication.</strong> <code>scripts/export_best.py</code> writes its reports in French; this copy was translated by hand so that the showcased result reads in English. The numbers, figures and tables are untouched.</blockquote>
 <h2>Performance</h2>
 <table>
 <tr><th></th><th>Cd</th><th>Cl</th><th>Cl/Cd</th></tr>
@@ -42,7 +41,7 @@
 <tr><td><strong>Optimised (iteration 24)</strong></td><td><strong>0.02653</strong></td><td><strong>0.77841</strong></td><td><strong>29.34</strong></td></tr>
 </table>
 <p><strong>Lift-to-drag gain: +4.4 %</strong></p>
-<p>Mesh: 81,594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged over 120 iterations, relative standard deviation 1.2e-04 on Cd — stabilised.</p>
+<p>Mesh: 81594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged over 120 iterations, relative standard deviation 1.2e-04 on Cd — stabilised.</p>
 <h2>Parameters: start → finish</h2>
 <table>
 <tr><th>parameter</th><th>start</th><th>finish</th><th>change</th><th>bounds</th></tr>
@@ -75,17 +74,17 @@
 <tr><td><code>aoa</code></td><td>3</td><td><strong>3</strong> deg</td><td>unchanged</td><td>-2 … 12</td></tr>
 </table>
 <h2>Before / after</h2>
-<p>The starting seed against the retained design, both measured <strong>in the same CFD regime</strong> — comparing a fine mesh against an exploration mesh would inflate the gain without it being real.</p>
+<p>The starting seed against the retained design, both measured <strong>in the same CFD regime</strong> (same regime) — comparing a fine mesh against an exploration mesh would inflate the gain without it being real.</p>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="system-ui, sans-serif">
 <rect width="900" height="300" fill="#ffffff"/>
-<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Performances — même régime</text>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Performance — same regime</text>
 <rect x="20.0" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
 <rect x="66.5" y="95.7" width="71.1" height="106.3" fill="#9aa5b1" rx="2"/>
 <text x="102.0" y="89.7" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.7659</text>
 <text x="102.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="175.8" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
 <text x="211.3" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.7784</text>
-<text x="211.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="211.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
 <text x="156.7" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Lift (Cl)</text>
 <text x="156.7" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+1.6 %</text>
 <text x="156.7" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
@@ -95,7 +94,7 @@
 <text x="395.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="469.1" y="96.8" width="71.1" height="105.2" fill="#2e7d32" rx="2"/>
 <text x="504.7" y="90.8" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.02653</text>
-<text x="504.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="504.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
 <text x="450.0" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Drag (Cd)</text>
 <text x="450.0" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">-2.6 %</text>
 <text x="450.0" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
@@ -105,7 +104,7 @@
 <text x="688.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="762.5" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
 <text x="798.0" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">29.34</text>
-<text x="798.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="798.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
 <text x="743.3" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Lift-to-drag (Cl/Cd)</text>
 <text x="743.3" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+4.4 %</text>
 <text x="743.3" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
@@ -118,33 +117,33 @@
 </table>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" width="900" height="330" font-family="system-ui, sans-serif">
 <rect width="900" height="330" fill="#ffffff"/>
-<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Section : avant / après</text>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Section: before / after</text>
 <rect x="22.0" y="46" width="417.0" height="216.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
 <line x1="38.68" y1="158.33" x2="422.32" y2="178.20" stroke="#5a5a5a" stroke-width="1" stroke-dasharray="5 4"/>
 <path d="M38.68,158.33 L38.82,157.55 L39.14,156.74 L39.66,155.90 L40.37,154.98 L41.28,153.98 L42.37,152.89 L43.66,151.72 L45.13,150.48 L46.80,149.18 L48.64,147.85 L50.67,146.52 L52.87,145.21 L55.25,143.93 L57.80,142.70 L60.52,141.54 L63.41,140.44 L66.46,139.40 L69.67,138.42 L73.03,137.49 L76.55,136.59 L80.23,135.74 L84.05,134.91 L88.01,134.11 L92.12,133.34 L96.36,132.62 L100.74,131.95 L105.24,131.33 L109.86,130.79 L114.60,130.34 L119.45,129.96 L124.41,129.68 L129.47,129.49 L134.63,129.38 L139.88,129.34 L145.22,129.37 L150.64,129.45 L156.14,129.58 L161.71,129.75 L167.35,129.96 L173.06,130.20 L178.82,130.48 L184.63,130.80 L190.49,131.16 L196.38,131.59 L202.31,132.06 L208.26,132.61 L214.24,133.21 L220.22,133.88 L226.22,134.62 L232.22,135.40 L238.22,136.24 L244.21,137.12 L250.19,138.03 L256.14,138.98 L262.07,139.95 L267.97,140.95 L273.84,141.98 L279.66,143.02 L285.43,144.10 L291.15,145.20 L296.80,146.33 L302.39,147.49 L307.91,148.66 L313.36,149.86 L318.72,151.07 L324.00,152.28 L329.18,153.49 L334.27,154.69 L339.26,155.88 L344.14,157.06 L348.91,158.22 L353.57,159.36 L358.11,160.48 L362.52,161.58 L366.80,162.67 L370.95,163.74 L374.96,164.80 L378.83,165.84 L382.55,166.86 L386.13,167.86 L389.55,168.82 L392.82,169.75 L395.93,170.64 L398.88,171.48 L401.67,172.27 L404.29,173.01 L406.74,173.70 L409.02,174.34 L411.12,174.92 L413.05,175.46 L414.80,175.95 L416.37,176.39 L417.76,176.80 L418.97,177.15 L419.99,177.46 L420.83,177.72 L421.48,177.93 L421.95,178.08 L422.23,178.17 L422.32,178.20 L422.30,178.66 L422.20,178.66 L421.92,178.65 L421.44,178.64 L420.78,178.63 L419.93,178.61 L418.89,178.59 L417.67,178.57 L416.26,178.55 L414.67,178.53 L412.89,178.51 L410.93,178.48 L408.80,178.45 L406.49,178.42 L404.00,178.39 L401.35,178.35 L398.52,178.30 L395.53,178.25 L392.38,178.20 L389.06,178.14 L385.59,178.08 L381.97,178.02 L378.19,177.96 L374.27,177.90 L370.21,177.83 L366.01,177.77 L361.67,177.70 L357.21,177.64 L352.61,177.57 L347.90,177.50 L343.07,177.43 L338.14,177.35 L333.09,177.27 L327.94,177.19 L322.70,177.11 L317.36,177.02 L311.94,176.93 L306.44,176.84 L300.86,176.75 L295.21,176.66 L289.50,176.57 L283.73,176.48 L277.91,176.40 L272.04,176.31 L266.12,176.22 L260.18,176.13 L254.20,176.04 L248.20,175.95 L242.18,175.85 L236.15,175.75 L230.11,175.65 L224.08,175.56 L218.05,175.46 L212.03,175.36 L206.03,175.26 L200.05,175.17 L194.10,175.08 L188.19,174.99 L182.32,174.90 L176.50,174.82 L170.72,174.73 L165.01,174.65 L159.36,174.56 L153.79,174.48 L148.28,174.39 L142.86,174.30 L137.53,174.21 L132.28,174.11 L127.14,174.00 L122.09,173.89 L117.16,173.77 L112.33,173.64 L107.62,173.49 L103.04,173.32 L98.58,173.12 L94.25,172.91 L90.06,172.67 L86.01,172.40 L82.10,172.11 L78.34,171.80 L74.73,171.46 L71.27,171.10 L67.97,170.73 L64.83,170.35 L61.86,169.95 L59.06,169.54 L56.42,169.11 L53.96,168.65 L51.67,168.18 L49.56,167.66 L47.63,167.10 L45.89,166.49 L44.33,165.82 L42.96,165.09 L41.77,164.28 L40.78,163.41 L39.98,162.48 L39.37,161.49 L38.95,160.45 L38.72,159.39 L38.68,158.33 Z" fill="#c1440e" fill-opacity="0.16" stroke="#c1440e" stroke-width="2" stroke-linejoin="round"/>
-<text x="230.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#c1440e">Seed (départ)</text>
-<text x="230.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">chord 300 mm · incidence 3.00° · épaisseur 0.117</text>
+<text x="230.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#c1440e">Seed (start)</text>
+<text x="230.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">corde 300 mm · incidence 3.00° · thickness 0.117</text>
 <rect x="461.0" y="46" width="417.0" height="216.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
 <line x1="477.68" y1="158.33" x2="861.32" y2="178.20" stroke="#5a5a5a" stroke-width="1" stroke-dasharray="5 4"/>
 <path d="M477.68,158.33 L477.82,157.55 L478.14,156.75 L478.66,155.90 L479.37,154.98 L480.28,153.99 L481.37,152.91 L482.66,151.74 L484.13,150.51 L485.79,149.22 L487.64,147.91 L489.67,146.59 L491.87,145.29 L494.25,144.03 L496.80,142.82 L499.52,141.68 L502.40,140.60 L505.45,139.58 L508.65,138.62 L512.02,137.71 L515.54,136.84 L519.21,136.01 L523.03,135.22 L526.99,134.46 L531.10,133.74 L535.34,133.06 L539.71,132.45 L544.21,131.90 L548.83,131.43 L553.56,131.05 L558.41,130.77 L563.36,130.57 L568.42,130.47 L573.57,130.45 L578.82,130.50 L584.15,130.61 L589.57,130.76 L595.07,130.95 L600.64,131.17 L606.28,131.41 L611.98,131.67 L617.74,131.95 L623.55,132.26 L629.41,132.59 L635.31,132.97 L641.24,133.39 L647.20,133.86 L653.17,134.38 L659.17,134.96 L665.17,135.60 L671.18,136.29 L677.18,137.02 L683.17,137.81 L689.15,138.63 L695.11,139.49 L701.05,140.39 L706.95,141.31 L712.82,142.28 L718.64,143.27 L724.42,144.30 L730.14,145.36 L735.80,146.46 L741.39,147.58 L746.91,148.74 L752.36,149.92 L757.72,151.11 L763.00,152.31 L768.18,153.52 L773.27,154.72 L778.26,155.91 L783.14,157.08 L787.91,158.24 L792.57,159.38 L797.10,160.50 L801.52,161.61 L805.80,162.70 L809.95,163.77 L813.96,164.83 L817.83,165.87 L821.55,166.89 L825.13,167.89 L828.55,168.85 L831.82,169.78 L834.93,170.67 L837.88,171.51 L840.67,172.30 L843.28,173.04 L845.74,173.73 L848.01,174.36 L850.12,174.94 L852.05,175.48 L853.80,175.97 L855.37,176.41 L856.76,176.81 L857.97,177.16 L858.99,177.47 L859.83,177.72 L860.48,177.93 L860.95,178.08 L861.23,178.17 L861.32,178.20 L861.30,178.66 L861.20,178.66 L860.92,178.65 L860.44,178.64 L859.78,178.63 L858.93,178.61 L857.89,178.59 L856.67,178.57 L855.26,178.55 L853.67,178.52 L851.89,178.49 L849.94,178.46 L847.80,178.42 L845.49,178.37 L843.01,178.31 L840.35,178.24 L837.53,178.16 L834.54,178.06 L831.39,177.95 L828.08,177.83 L824.61,177.70 L820.99,177.56 L817.22,177.42 L813.31,177.27 L809.25,177.11 L805.05,176.95 L800.72,176.80 L796.26,176.64 L791.67,176.48 L786.96,176.33 L782.14,176.18 L777.20,176.02 L772.16,175.87 L767.02,175.72 L761.78,175.57 L756.45,175.42 L751.03,175.27 L745.53,175.12 L739.95,174.98 L734.31,174.83 L728.60,174.69 L722.83,174.56 L717.01,174.42 L711.14,174.30 L705.23,174.18 L699.28,174.07 L693.31,173.97 L687.31,173.88 L681.29,173.81 L675.25,173.74 L669.22,173.69 L663.18,173.66 L657.14,173.63 L651.12,173.62 L645.11,173.62 L639.13,173.63 L633.18,173.65 L627.26,173.66 L621.38,173.68 L615.55,173.69 L609.78,173.69 L604.06,173.68 L598.41,173.65 L592.83,173.61 L587.33,173.56 L581.91,173.48 L576.57,173.39 L571.33,173.28 L566.18,173.15 L561.14,173.01 L556.20,172.85 L551.38,172.67 L546.68,172.47 L542.09,172.26 L537.64,172.03 L533.31,171.78 L529.12,171.52 L525.07,171.25 L521.16,170.96 L517.40,170.66 L513.78,170.35 L510.33,170.04 L507.02,169.73 L503.88,169.41 L500.91,169.09 L498.10,168.76 L495.46,168.42 L492.99,168.06 L490.70,167.67 L488.58,167.25 L486.65,166.77 L484.90,166.24 L483.34,165.64 L481.96,164.96 L480.78,164.20 L479.78,163.36 L478.98,162.45 L478.37,161.47 L477.95,160.45 L477.72,159.39 L477.68,158.33 Z" fill="#1f4e8c" fill-opacity="0.16" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
-<text x="669.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1f4e8c">Design optimised</text>
-<text x="669.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">chord 300 mm · incidence 3.00° · épaisseur 0.112</text>
+<text x="669.5" y="284.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1f4e8c">Optimised design</text>
+<text x="669.5" y="302.0" text-anchor="middle" font-size="11" fill="#5a5a5a">corde 300 mm · incidence 3.00° · thickness 0.112</text>
 </svg><figcaption>Sections before / after</figcaption></figure>
 <p>Both sections are drawn at the <strong>same scale</strong>: each fitted to its own frame, they would look identical, and both the chord difference and the incidence would go unnoticed.</p>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="system-ui, sans-serif">
 <rect width="900" height="300" fill="#ffffff"/>
-<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Les deux sections superposées</text>
+<text x="450.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">The two sections superimposed</text>
 <path d="M28.00,153.52 L28.30,151.80 L29.02,150.04 L30.16,148.17 L31.72,146.16 L33.71,143.96 L36.12,141.56 L38.95,138.99 L42.20,136.25 L45.86,133.40 L49.92,130.48 L54.38,127.55 L59.23,124.65 L64.46,121.84 L70.07,119.14 L76.06,116.58 L82.40,114.16 L89.11,111.88 L96.17,109.72 L103.57,107.67 L111.32,105.71 L119.40,103.82 L127.81,102.00 L136.53,100.24 L145.57,98.56 L154.90,96.96 L164.52,95.48 L174.43,94.14 L184.60,92.95 L195.02,91.94 L205.70,91.12 L216.60,90.50 L227.74,90.08 L239.08,89.83 L250.64,89.75 L262.38,89.81 L274.31,89.99 L286.41,90.28 L298.67,90.65 L311.08,91.11 L323.63,91.64 L336.30,92.25 L349.09,92.95 L361.97,93.76 L374.94,94.69 L387.98,95.74 L401.08,96.94 L414.22,98.27 L427.39,99.75 L440.59,101.36 L453.79,103.09 L466.98,104.92 L480.16,106.86 L493.31,108.87 L506.41,110.95 L519.46,113.09 L532.44,115.29 L545.34,117.55 L558.14,119.85 L570.84,122.22 L583.42,124.65 L595.86,127.13 L608.17,129.67 L620.31,132.26 L632.29,134.89 L644.09,137.54 L655.70,140.21 L667.10,142.87 L678.30,145.52 L689.27,148.15 L700.01,150.73 L710.51,153.28 L720.75,155.79 L730.73,158.25 L740.43,160.68 L749.85,163.07 L758.98,165.43 L767.81,167.76 L776.32,170.05 L784.51,172.29 L792.38,174.48 L799.91,176.60 L807.10,178.65 L813.95,180.60 L820.43,182.45 L826.56,184.20 L832.33,185.83 L837.72,187.34 L842.73,188.74 L847.36,190.03 L851.61,191.21 L855.46,192.29 L858.91,193.27 L861.97,194.15 L864.63,194.93 L866.88,195.61 L868.72,196.19 L870.15,196.64 L871.18,196.97 L871.79,197.17 L872.00,197.24 L871.95,198.25 L871.74,198.25 L871.11,198.23 L870.07,198.21 L868.61,198.18 L866.74,198.14 L864.46,198.10 L861.77,198.06 L858.67,198.01 L855.16,197.97 L851.25,197.91 L846.95,197.86 L842.26,197.79 L837.17,197.73 L831.71,197.65 L825.86,197.56 L819.65,197.46 L813.07,197.36 L806.13,197.24 L798.84,197.12 L791.20,196.98 L783.23,196.85 L774.92,196.71 L766.30,196.57 L757.36,196.43 L748.11,196.29 L738.57,196.15 L728.75,196.01 L718.65,195.86 L708.28,195.70 L697.66,195.54 L686.80,195.38 L675.69,195.20 L664.37,195.02 L652.83,194.83 L641.09,194.64 L629.17,194.44 L617.06,194.24 L604.79,194.05 L592.37,193.85 L579.80,193.66 L567.11,193.46 L554.29,193.27 L541.38,193.08 L528.37,192.89 L515.29,192.69 L502.14,192.49 L488.94,192.28 L475.69,192.07 L462.43,191.86 L449.15,191.64 L435.87,191.42 L422.60,191.20 L409.36,190.99 L396.16,190.77 L383.01,190.57 L369.92,190.37 L356.92,190.17 L344.00,189.98 L331.19,189.79 L318.50,189.61 L305.93,189.42 L293.50,189.24 L281.23,189.05 L269.13,188.86 L257.20,188.66 L245.46,188.45 L233.93,188.24 L222.61,188.01 L211.51,187.76 L200.65,187.50 L190.03,187.20 L179.67,186.87 L169.59,186.49 L159.78,186.07 L150.26,185.60 L141.03,185.07 L132.12,184.49 L123.52,183.84 L115.24,183.15 L107.30,182.41 L99.70,181.63 L92.44,180.81 L85.54,179.97 L79.00,179.09 L72.83,178.18 L67.03,177.23 L61.61,176.24 L56.58,175.19 L51.94,174.06 L47.70,172.83 L43.86,171.49 L40.43,170.01 L37.41,168.39 L34.81,166.62 L32.62,164.70 L30.86,162.65 L29.51,160.47 L28.59,158.20 L28.09,155.87 L28.00,153.52 Z" fill="#c1440e" fill-opacity="0.10" stroke="#c1440e" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="7 4"/>
 <line x1="300.0" y1="282" x2="326.0" y2="282" stroke="#c1440e" stroke-width="2.5" stroke-dasharray="7 4"/>
 <text x="332.0" y="286" font-size="12" fill="#222222">seed</text>
 <path d="M28.00,153.52 L28.30,151.80 L29.02,150.04 L30.16,148.18 L31.72,146.17 L33.71,143.97 L36.12,141.59 L38.95,139.03 L42.20,136.32 L45.85,133.49 L49.91,130.60 L54.37,127.70 L59.22,124.84 L64.45,122.07 L70.06,119.41 L76.04,116.89 L82.38,114.51 L89.09,112.27 L96.14,110.16 L103.55,108.16 L111.29,106.25 L119.37,104.43 L127.77,102.68 L136.49,101.01 L145.52,99.42 L154.85,97.94 L164.47,96.58 L174.36,95.38 L184.52,94.35 L194.94,93.52 L205.60,92.89 L216.50,92.46 L227.62,92.23 L238.96,92.18 L250.50,92.29 L262.24,92.53 L274.16,92.88 L286.25,93.30 L298.51,93.78 L310.91,94.31 L323.46,94.88 L336.13,95.50 L348.92,96.17 L361.81,96.91 L374.78,97.73 L387.83,98.65 L400.93,99.68 L414.08,100.84 L427.27,102.11 L440.47,103.51 L453.69,105.03 L466.89,106.65 L480.08,108.38 L493.24,110.19 L506.35,112.08 L519.41,114.05 L532.40,116.09 L545.30,118.21 L558.11,120.39 L570.82,122.65 L583.40,124.99 L595.85,127.40 L608.15,129.88 L620.30,132.42 L632.28,135.02 L644.08,137.64 L655.69,140.29 L667.10,142.94 L678.29,145.58 L689.27,148.19 L700.01,150.78 L710.50,153.33 L720.75,155.83 L730.73,158.30 L740.43,160.73 L749.85,163.13 L758.98,165.49 L767.80,167.82 L776.32,170.11 L784.51,172.36 L792.38,174.55 L799.91,176.68 L807.10,178.72 L813.94,180.67 L820.43,182.52 L826.56,184.26 L832.32,185.89 L837.71,187.40 L842.73,188.79 L847.36,190.07 L851.60,191.25 L855.46,192.32 L858.91,193.30 L861.97,194.17 L864.62,194.95 L866.87,195.63 L868.72,196.19 L870.15,196.65 L871.18,196.97 L871.79,197.17 L872.00,197.24 L871.95,198.25 L871.74,198.25 L871.11,198.23 L870.07,198.21 L868.61,198.18 L866.74,198.14 L864.46,198.10 L861.77,198.06 L858.67,198.01 L855.16,197.95 L851.26,197.88 L846.95,197.81 L842.26,197.72 L837.18,197.61 L831.72,197.48 L825.88,197.32 L819.66,197.14 L813.09,196.93 L806.16,196.70 L798.87,196.43 L791.24,196.15 L783.28,195.84 L774.98,195.52 L766.37,195.18 L757.44,194.84 L748.21,194.50 L738.68,194.15 L728.87,193.81 L718.78,193.47 L708.42,193.13 L697.81,192.79 L686.95,192.45 L675.86,192.12 L664.54,191.79 L653.01,191.46 L641.28,191.13 L629.36,190.80 L617.26,190.47 L605.00,190.15 L592.58,189.83 L580.02,189.52 L567.33,189.22 L554.52,188.93 L541.61,188.66 L528.61,188.40 L515.52,188.16 L502.38,187.94 L489.17,187.74 L475.93,187.58 L462.66,187.44 L449.37,187.33 L436.09,187.25 L422.81,187.20 L409.56,187.17 L396.35,187.17 L383.19,187.19 L370.09,187.22 L357.07,187.26 L344.14,187.29 L331.32,187.31 L318.62,187.32 L306.04,187.29 L293.61,187.24 L281.33,187.15 L269.22,187.02 L257.29,186.86 L245.56,186.66 L234.02,186.41 L222.70,186.13 L211.61,185.81 L200.75,185.46 L190.14,185.07 L179.79,184.64 L169.71,184.17 L159.90,183.67 L150.38,183.13 L141.16,182.55 L132.25,181.94 L123.65,181.31 L115.37,180.65 L107.43,179.98 L99.82,179.29 L92.56,178.60 L85.65,177.90 L79.10,177.19 L72.92,176.47 L67.11,175.72 L61.68,174.93 L56.64,174.08 L51.99,173.15 L47.74,172.10 L43.89,170.93 L40.45,169.60 L37.43,168.11 L34.82,166.43 L32.63,164.59 L30.86,162.59 L29.51,160.44 L28.59,158.19 L28.09,155.86 L28.00,153.52 Z" fill="#1f4e8c" fill-opacity="0.10" stroke="#1f4e8c" stroke-width="2.2" stroke-linejoin="round"/>
 <line x1="470.0" y1="282" x2="496.0" y2="282" stroke="#1f4e8c" stroke-width="2.5"/>
-<text x="502.0" y="286" font-size="12" fill="#222222">optimised</text>
+<text x="502.0" y="286" font-size="12" fill="#222222">optimisé</text>
 </svg><figcaption>Superimposed sections</figcaption></figure>
 <h3>Pressure, before and after</h3>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
 <rect width="760" height="420" fill="#ffffff"/>
-<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Distribution de pression : avant / après</text>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Pressure distribution: before / after</text>
 <line x1="208.0" y1="46" x2="208.0" y2="362" stroke="#dcdcdc" stroke-width="1"/>
 <text x="208.0" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">0.200</text>
 <line x1="340.5" y1="46" x2="340.5" y2="362" stroke="#dcdcdc" stroke-width="1"/>
@@ -169,16 +168,16 @@
 <path d="M78.0,340.2 L85.6,335.8 L96.6,317.3 L111.2,286.5 L113.9,285.6 L129.8,260.2 L148.5,257.9 L150.0,257.7 L174.4,254.9 L200.3,253.3 L201.2,253.6 L228.6,253.1 L256.2,253.2 L283.8,254.3 L311.3,256.4 L338.9,258.7 L366.5,260.3 L394.1,261.2 L421.6,261.7 L449.2,262.0 L476.8,262.4 L504.5,262.9 L532.0,263.3 L559.6,263.8 L587.0,264.3 L612.7,265.3 L613.4,265.4 L633.5,266.3 L635.4,266.1 L648.7,266.3 L649.8,266.8 L662.9,267.6 L675.9,269.1 L691.6,257.9 L706.5,266.3 L711.6,267.1 L718.0,268.6 L726.8,270.2 L734.0,271.9" fill="none" stroke="#ef6c00" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/>
 <path d="M78.1,308.0 L84.5,218.0 L97.0,157.0 L98.1,156.6 L116.6,137.2 L141.4,68.7 L145.3,67.8 L174.7,123.7 L198.7,118.8 L224.9,114.2 L252.1,120.9 L252.2,119.9 L279.5,134.4 L307.0,148.1 L333.5,155.9 L357.9,160.1 L388.6,153.7 L420.2,147.1 L446.3,176.4 L472.3,189.8 L474.0,189.7 L497.3,192.4 L520.0,192.9 L537.0,184.8 L549.4,200.0 L561.1,209.4 L561.5,209.7 L572.5,213.7 L582.7,213.7 L584.8,213.9 L610.1,218.4 L612.8,218.7 L627.5,228.5 L629.2,228.0 L641.6,213.6 L646.7,214.3 L651.8,213.6 L662.0,216.7 L673.7,231.5 L689.5,245.0 L706.2,242.3 L719.8,253.6 L732.3,260.7" fill="none" stroke="#1f4e8c" stroke-width="2" stroke-linejoin="round"/>
 <path d="M78.1,338.6 L85.8,328.4 L97.4,306.7 L110.1,285.1 L125.4,268.9 L127.6,267.5 L149.6,263.0 L174.1,260.3 L200.4,258.5 L201.1,258.7 L228.5,257.9 L256.0,257.2 L283.7,257.0 L311.2,258.2 L338.8,261.1 L366.3,263.7 L393.9,265.5 L421.5,266.5 L449.1,267.0 L476.7,267.2 L504.3,267.2 L531.8,266.9 L532.0,266.9 L559.5,266.8 L586.9,266.8 L612.7,267.2 L613.5,267.3 L633.4,267.8 L635.3,267.4 L648.6,266.8 L649.6,267.1 L662.9,266.9 L676.7,267.9 L689.9,269.1 L705.8,257.1 L710.9,258.6 L720.2,264.0 L727.4,269.3 L733.6,272.3" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linejoin="round"/>
-<rect x="82" y="45" width="167" height="76" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
+<rect x="82" y="45" width="154" height="76" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
 <line x1="88" y1="56" x2="110" y2="56" stroke="#c1440e" stroke-width="2.5"/>
-<text x="116" y="60" font-size="12" fill="#222222">seed — extrados</text>
+<text x="116" y="60" font-size="12" fill="#222222">seed — upper</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#ef6c00" stroke-width="2.5"/>
-<text x="116" y="77" font-size="12" fill="#222222">seed — intrados</text>
+<text x="116" y="77" font-size="12" fill="#222222">seed — lower</text>
 <line x1="88" y1="90" x2="110" y2="90" stroke="#1f4e8c" stroke-width="2.5"/>
-<text x="116" y="94" font-size="12" fill="#222222">optimised — extrados</text>
+<text x="116" y="94" font-size="12" fill="#222222">optimised — upper</text>
 <line x1="88" y1="107" x2="110" y2="107" stroke="#2e7d32" stroke-width="2.5"/>
-<text x="116" y="111" font-size="12" fill="#222222">optimised — intrados</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / chord</text>
+<text x="116" y="111" font-size="12" fill="#222222">optimised — lower</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / corde</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cp</text>
 </svg><figcaption>Cp before / after</figcaption></figure>
 <p>The area between the upper-surface curve and the lower-surface curve <em>is</em> the lift. The optimised design deepens its upper-surface suction and spreads it along the chord: that is where the extra lift is won.</p>
@@ -248,7 +247,7 @@
 <rect x="82" y="45" width="75" height="25" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
 <line x1="88" y1="56" x2="110" y2="56" stroke="#1f4e8c" stroke-width="2.5"/>
 <text x="116" y="60" font-size="12" fill="#222222">Cl/Cd</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">iteration</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cl / Cd</text>
 </svg><figcaption>Lift-to-drag over the iterations</figcaption></figure>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
@@ -333,7 +332,7 @@
 <text x="116" y="60" font-size="12" fill="#222222">Cd</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#c1440e" stroke-width="2.5"/>
 <text x="116" y="77" font-size="12" fill="#222222">Cl</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">iteration</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">coefficient</text>
 </svg><figcaption>Cd and Cl over the iterations</figcaption></figure>
 <table>
@@ -477,7 +476,7 @@
 <text x="116" y="60" font-size="12" fill="#222222">extrados</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#c1440e" stroke-width="2.5"/>
 <text x="116" y="77" font-size="12" fill="#222222">intrados</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / chord</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / corde</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cp</text>
 </svg><figcaption>Cp distribution</figcaption></figure>
 <p>Cp axis inverted, as convention requires: the upper curve is the upper surface, in suction. The area between the two curves is the lift.</p>
@@ -490,7 +489,7 @@
 <h3>Solver convergence</h3>
 <figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="system-ui, sans-serif">
 <rect width="760" height="420" fill="#ffffff"/>
-<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Convergence du calcul (seconde moitié)</text>
+<text x="380.0" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="#222222">Solver convergence (second half)</text>
 <line x1="207.1" y1="46" x2="207.1" y2="362" stroke="#dcdcdc" stroke-width="1"/>
 <text x="207.1" y="380" text-anchor="middle" font-size="11" fill="#5a5a5a">300</text>
 <line x1="338.8" y1="46" x2="338.8" y2="362" stroke="#dcdcdc" stroke-width="1"/>
@@ -520,7 +519,7 @@
 <text x="116" y="60" font-size="12" fill="#222222">Cd</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#c1440e" stroke-width="2.5"/>
 <text x="116" y="77" font-size="12" fill="#222222">Cl</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">iteration du solveur</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">solver iteration</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">coefficient</text>
 </svg><figcaption>Convergence</figcaption></figure>
 <p>Flat curves towards the end are the condition for the coefficients to mean anything.</p>
@@ -579,5 +578,5 @@ python3 scripts/run_loop.py --max-iterations 20 \
 </pre>
 <p>In ParaView, the final time step carries <code>U</code> (velocity), <code>p</code> (<strong>kinematic</strong> pressure, in m²/s² — multiply by ρ = 1.225 kg/m³ for pascals), <code>k</code>, <code>omega</code> and <code>nut</code>. The <code>wing</code> patch is the wing surface.</p>
 <hr/>
-<p>Exported on 24/08/2026 at 18:19 UTC by <code>scripts/export_best.py</code>.</p>
+<p>Exported on 24/08/2026 at 19:41 UTC by <code>scripts/export_best.py</code>.</p>
 </body></html>

@@ -48,6 +48,6 @@
 <rect x="82" y="45" width="75" height="25" fill="#ffffff" fill-opacity="0.86" stroke="#dcdcdc" stroke-width="1" rx="3"/>
 <line x1="88" y1="56" x2="110" y2="56" stroke="#1f4e8c" stroke-width="2.5"/>
 <text x="116" y="60" font-size="12" fill="#222222">Cl/Cd</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">iteration</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">itération</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cl / Cd</text>
 </svg>

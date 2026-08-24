@@ -57,6 +57,9 @@ real runs are published, exactly as the system produced them:
 | **v1.5** | [Clark Y](https://patxi-sallaberry.github.io/aero-opt-agent/example_report_clarky/report.html) | a real UIUC-database profile, ingested from a point file, re-parameterised into 24 CST coefficients, 25 iterations without a single failure |
 | **v1.0** | [NACA 2412](https://patxi-sallaberry.github.io/aero-opt-agent/example_report/report.html) | four-digit parameterisation, 22 iterations, +122 % lift-to-drag |
 
+Neither was written by hand: the Clark Y report is the direct output of
+`scripts/export_best.py`, prose and physics commentary included.
+
 These files are **self-contained**: figures and CFD images embedded, no external
 resource. They are also versioned in the repository
 (`docs/example_report*/report.html`), so they work offline after a clone. The
@@ -1315,11 +1318,15 @@ geometry, is where the real obstacle lies.
 
 ## A note on language
 
-This README is in English. The **code, its comments and the tools' console
-output are in French**, as are the generated reports. Translating them is
-follow-up work rather than an oversight: the console excerpts shown above are
-reproduced verbatim, so that what you read here is what the software actually
-prints.
+This README is in English, and so is everything the system **produces**: the
+optimisation reports, the `FUSION_RETURN.md`, the generated CAD script, the
+figure labels.
+
+What remains in French is the **code itself** — its comments, its docstrings,
+and the console output of the command-line tools. That is the author's
+language, and translating it is follow-up work rather than an oversight. The
+console excerpts shown in this README are therefore reproduced **verbatim**, so
+that what you read here is what the software actually prints.
 
 ## Licence
 

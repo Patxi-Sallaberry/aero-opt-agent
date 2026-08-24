@@ -83,26 +83,26 @@ def build_sketch_script(
             f"    ({x / 10.0:.6f}, {y / 10.0:.6f})," for x, y in points
         )
 
-    return f'''"""Retrace le profil optimisé dans Fusion 360, puis l'extrude.
+    return f'''"""Redraw the optimised profile in Fusion 360, then extrude it.
 
-Généré automatiquement par aero-opt-agent — ne pas modifier à la main.
+Generated automatically by aero-opt-agent — do not edit by hand.
 
-    Fusion 360 → Utilities → ADD-INS → Scripts and Add-Ins → + → ce fichier
+    Fusion 360 → Utilities → ADD-INS → Scripts and Add-Ins → + → this file
 
-Les coordonnées sont en CENTIMÈTRES : c'est l'unité interne de l'API Fusion,
-quelle que soit l'unité affichée dans le document.
+Coordinates are in CENTIMETRES: that is the internal unit of the Fusion API,
+whatever unit the document displays.
 """
 
 import adsk.core
 import adsk.fusion
 import traceback
 
-# Extrados, du bord d'attaque vers le bord de fuite (cm).
+# Upper surface, from leading edge to trailing edge (cm).
 UPPER = [
 {literal(kept_upper)}
 ]
 
-# Intrados, du bord d'attaque vers le bord de fuite (cm).
+# Lower surface, from leading edge to trailing edge (cm).
 LOWER = [
 {literal(kept_lower)}
 ]
@@ -119,8 +119,8 @@ def run(context):
         design = adsk.fusion.Design.cast(app.activeProduct)
         if design is None:
             ui.messageBox(
-                "Aucun design actif. Ouvrir ou créer un document Fusion, "
-                "puis relancer le script."
+                "No active design. Open or create a Fusion document, "
+                "then run the script again."
             )
             return
 
@@ -128,16 +128,16 @@ def run(context):
         sketch = root.sketches.add(root.xYConstructionPlane)
         sketch.name = NAME
 
-        # Une spline par surface, et non une seule sur tout le contour : au
-        # bord d'attaque la courbe rebrousse, et une spline unique y placerait
-        # un point d'inflexion au lieu d'un nez.
+        # One spline per surface, rather than a single one over the whole
+        # contour: at the leading edge the curve turns back on itself, and a
+        # single spline would put an inflection point there instead of a nose.
         for points in (UPPER, LOWER):
             collection = adsk.core.ObjectCollection.create()
             for x, y in points:
                 collection.add(adsk.core.Point3D.create(x, y, 0.0))
             sketch.sketchCurves.sketchFittedSplines.add(collection)
 
-        # Refermer le bord de fuite s'il est ouvert.
+        # Close the trailing edge if it is open.
         tail_upper = adsk.core.Point3D.create(UPPER[-1][0], UPPER[-1][1], 0.0)
         tail_lower = adsk.core.Point3D.create(LOWER[-1][0], LOWER[-1][1], 0.0)
         if tail_upper.distanceTo(tail_lower) > 1e-6:
@@ -146,9 +146,9 @@ def run(context):
         profiles = sketch.profiles
         if profiles.count == 0:
             ui.messageBox(
-                "L'esquisse a été tracée mais Fusion n'y voit aucun profil "
-                "fermé. Vérifier la jonction au bord d'attaque, puis extruder "
-                "à la main."
+                "The sketch was drawn but Fusion sees no closed profile in "
+                "it. Check the junction at the leading edge, then extrude by "
+                "hand."
             )
             return
 
@@ -164,15 +164,15 @@ def run(context):
         body.name = NAME
 
         ui.messageBox(
-            "Profil reconstruit et extrudé sur %.1f mm.\\n\\n"
-            "La géométrie est native : on peut désormais y ajouter des "
-            "congés, la vriller, ou en changer l'envergure."
+            "Profile rebuilt and extruded over %.1f mm.\\n\\n"
+            "The geometry is native: you can now add fillets to it, twist it, "
+            "or change its span."
             % (SPAN_CM * 10.0)
         )
 
     except Exception:
         if ui:
-            ui.messageBox("Échec du script :\\n{{}}".format(traceback.format_exc()))
+            ui.messageBox("Script failed:\\n{{}}".format(traceback.format_exc()))
 '''
 
 
@@ -191,187 +191,185 @@ def build_return_doc(
     aoa_deg = float(section.get("aoa_deg", 0.0))
 
     lines: list[str] = [
-        "# Reprendre ce design dans Fusion 360",
+        "# Carrying this design back into CAD",
         "",
-        "Le résultat d'une optimisation n'est utile que si l'on peut "
-        "continuer à le travailler. Ce document donne les trois façons de "
-        "ramener la forme optimisée dans Fusion, de la plus propre à la plus "
-        "universelle.",
+        "The result of an optimisation is only useful if you can carry on "
+        "working with it. This document gives the ways to bring the optimised "
+        "shape back into CAD, from the cleanest to the most universal.",
         "",
-        "## La forme à reproduire",
+        "## The shape to reproduce",
         "",
-        "| grandeur | valeur |",
+        "| quantity | value |",
         "|---|---|",
-        f"| corde | {chord_mm:.2f} mm |",
-        f"| envergure | {span_mm:.2f} mm |",
+        f"| chord | {chord_mm:.2f} mm |",
+        f"| span | {span_mm:.2f} mm |",
         f"| incidence | {aoa_deg:.2f}° |",
-        f"| épaisseur relative | {float(section.get('thickness', 0.0)):.4f} |",
-        f"| cambrure relative | {float(section.get('camber', 0.0)):.4f} |",
-        f"| paramétrisation | `{parameterization}` |",
+        f"| relative thickness | {float(section.get('thickness', 0.0)):.4f} |",
+        f"| relative camber | {float(section.get('camber', 0.0)):.4f} |",
+        f"| parameterisation | `{parameterization}` |",
     ]
     if source:
-        lines.append(f"| profil d'origine | `{source}` |")
+        lines.append(f"| source profile | `{source}` |")
     if provenance.get("cst_order") is not None:
         lines.append(
-            f"| ordre CST | {provenance['cst_order']} "
+            f"| CST order | {provenance['cst_order']} "
             f"({2 * (int(provenance['cst_order']) + 1)} coefficients) |"
         )
     lines.append("")
     lines.append(
-        "**L'incidence est déjà dans les coordonnées.** La section exportée "
-        "est celle qui a été simulée, profil incliné compris. Si le montage "
-        "aval applique lui-même une incidence, il faut partir du profil "
-        "redressé, sans quoi elle serait comptée deux fois."
+        "**Incidence is already in the coordinates.** The exported section is "
+        "the one that was simulated, tilt included. If a downstream setup "
+        "applies an incidence of its own, start from the straightened profile "
+        "instead, otherwise it would be counted twice."
     )
     lines.append("")
 
     # ── Voie 0 : le STEP, quand il est là ─────────────────────────────────
     if has_step:
         lines += [
-            "## Voie la plus courte — ouvrir `geometry.step`",
+            "## Shortest route — open `geometry.step`",
             "",
-            "*File → Open*, ou glisser-déposer le fichier dans Fusion. C'est un "
-            "vrai solide B-Rep de quelques faces : on peut y poser un congé, en "
-            "changer l'envergure, l'assembler. Aucune conversion, aucun script.",
+            "*File → Open*, or drag and drop the file into your CAD package. "
+            "It is a real B-Rep solid of a few faces: you can fillet it, "
+            "change its span, assemble it. No conversion, no script. "
+            "**FreeCAD reads it just as well as Fusion.**",
             "",
-            "> **Ne pas ouvrir `geometry.stl` à la place.** Fusion sait le lire, "
-            "mais il en fait un corps maillé de plusieurs centaines de facettes "
-            "planes, inutilisable pour de la conception. Le STL est là pour le "
-            "solveur et l'impression.",
+            "> **Do not open `geometry.stl` instead.** CAD will read it, but it "
+            "turns it into a mesh body of several hundred flat facets, useless "
+            "for design work. The STL is there for the solver and for "
+            "printing.",
             "",
-            "Cette voie ne rend pas un modèle *paramétrique* : le solide n'a pas "
-            "d'historique de features. Pour cela, voir la voie 1.",
+            "This route does not give a *parametric* model: the solid has no "
+            "feature history. For that, see route 1.",
             "",
         ]
 
     # ── Voie 1 ────────────────────────────────────────────────────────────
     lines += [
-        "## Voie 1 — rejouer les paramètres (recommandée)",
+        "## Route 1 — replay the parameters (recommended)",
         "",
-        "C'est la seule voie qui rend un modèle **paramétrique** : un "
-        "historique de features modifiable, pas une importation figée.",
+        "This is the only route that gives a **parametric** model: an editable "
+        "feature history, not a frozen import.",
         "",
         "```bash",
-        "cp design_params.yaml <projet>/configs/design_params.yaml",
+        "cp design_params.yaml <project>/configs/design_params.yaml",
         "```",
         "",
-        "Puis, dans Fusion : ouvrir le modèle de départ, aller dans "
-        "*Utilities → ADD-INS → Scripts and Add-Ins*, et lancer "
-        "`fusion/parametric_driver.py`. Le driver reconstruit exactement "
-        "cette forme et exporte STEP et STL.",
+        "Then, in Fusion: open the starting model, go to "
+        "*Utilities → ADD-INS → Scripts and Add-Ins*, and run "
+        "`fusion/parametric_driver.py`. The driver rebuilds exactly this shape "
+        "and exports STEP and STL.",
         "",
     ]
     if parameterization == "cst":
         lines.append(
-            "> Le driver accepte les deux paramétrisations. Sur un fichier "
-            "`cst`, il reconstruit la forme depuis les coefficients de Kulfan "
-            "— le tracé ne manipule que des points, la voie Fusion n'a donc "
-            "besoin d'aucun code supplémentaire."
+            "> The driver accepts both parameterisations. On a `cst` file it "
+            "rebuilds the shape from the Kulfan coefficients — its drawing "
+            "code only handles points, so the Fusion route needs no extra "
+            "support."
         )
         lines.append("")
     if backend != "fusion":
         lines.append(
-            "> Cette optimisation a tourné sur le calculateur **interne**, "
-            "sans Fusion. Les paramètres restent parfaitement rejouables : "
-            "c'est le même fichier qui décrit la forme des deux côtés."
+            "> This optimisation ran on the **internal** computer, without "
+            "Fusion. The parameters remain perfectly replayable: it is the "
+            "same file that describes the shape on both sides."
         )
         lines.append("")
 
     # ── Voie 2 ────────────────────────────────────────────────────────────
     lines += [
-        "## Voie 2 — script prêt à l'emploi",
+        "## Route 2 — ready-to-run script",
         "",
-        f"`{SKETCH_SCRIPT}` contient les coordonnées de CE profil et trace "
-        "l'esquisse tout seul, puis l'extrude sur l'envergure.",
+        f"`{SKETCH_SCRIPT}` contains the coordinates of THIS profile and draws "
+        "the sketch on its own, then extrudes it over the span.",
         "",
         "1. Fusion 360 → *Utilities → ADD-INS → Scripts and Add-Ins*",
-        f"2. Onglet **Scripts** → **+** → choisir `{SKETCH_SCRIPT}`",
+        f"2. **Scripts** tab → **+** → choose `{SKETCH_SCRIPT}`",
         "3. **Run**",
         "",
-        "Le script trace **une spline par surface** plutôt qu'une seule sur "
-        "tout le contour : au bord d'attaque la courbe rebrousse, et une "
-        "spline unique y placerait un point d'inflexion au lieu d'un nez — "
-        "ce qui abîmerait précisément la zone qui décide du décrochage.",
+        "The script draws **one spline per surface** rather than a single one "
+        "over the whole contour: at the leading edge the curve turns back on "
+        "itself, and a single spline would put an inflection point there "
+        "instead of a nose — which would damage precisely the region that "
+        "decides stall.",
         "",
-        "Aucun fichier à localiser, aucune unité à convertir : les "
-        "coordonnées sont écrites dans le script, en centimètres, l'unité "
-        "interne de l'API Fusion.",
+        "No file to locate, no unit to convert: the coordinates are written "
+        "into the script, in centimetres, the internal unit of the Fusion API.",
         "",
     ]
 
     # ── Voie 3 ────────────────────────────────────────────────────────────
     lines += [
-        "## Voie 3 — importer la section à la main",
+        "## Route 3 — import the section by hand",
         "",
-        "Utile si l'on préfère garder la main, ou travailler dans un autre "
-        "logiciel de CAO.",
+        "Useful if you prefer to stay in control, or to work in another CAD "
+        "package.",
         "",
-        "1. Ouvrir `profile_section.csv` — trois colonnes : `surface`, "
-        "`x_mm`, `y_mm`.",
-        "2. Dans Fusion : *Insert → Insert Manufacturing Model* ou un "
-        "add-in d'import de points ; sinon, tracer une spline en saisissant "
-        "les points.",
-        "3. Passer une spline ajustée par les points de chaque surface.",
-        "4. Refermer le bord de fuite, puis extruder sur "
+        "1. Open `profile_section.csv` — three columns: `surface`, `x_mm`, "
+        "`y_mm`.",
+        "2. In Fusion: *Insert → Insert Manufacturing Model* or a point-import "
+        "add-in; otherwise, draw a spline by entering the points.",
+        "3. Fit a spline through the points of each surface.",
+        "4. Close the trailing edge, then extrude over "
         f"{span_mm:.1f} mm.",
         "",
-        "`profile_section.dat` porte les mêmes points au format profil "
-        "standard.",
+        "`profile_section.dat` carries the same points in the standard airfoil "
+        "format.",
         "",
-        "`profile_chord.dat` porte le profil **redressé**, en corde unitaire. "
-        "C'est celui qu'il faut donner à XFOIL ou XFLR5 : ces outils pilotent "
-        "eux-mêmes l'incidence, et leur fournir une section déjà inclinée la "
-        "compterait deux fois — tout le polaire serait décalé sans que rien "
-        "ne le signale.",
+        "`profile_chord.dat` carries the profile **straightened**, at unit "
+        "chord. That is the one to give XFOIL or XFLR5: those tools drive the "
+        "incidence themselves, and feeding them an already-tilted section "
+        "would count it twice — the whole polar would be shifted with nothing "
+        "to say so.",
         "",
     ]
 
     # ── Ce qu'il ne faut pas faire ────────────────────────────────────────
     lines += [
-        "## Ce qu'il vaut mieux éviter",
+        "## What is better avoided",
         "",
-        "**Convertir `geometry.stl` en solide.** Fusion sait le faire, mais "
-        "le résultat est un maillage de plusieurs centaines de faces "
-        "planes : impossible d'y poser un congé propre, impossible d'en "
-        "changer une cote. Le STL est là pour la simulation et "
-        "l'impression, pas pour la conception.",
+        "**Converting `geometry.stl` into a solid.** CAD can do it, but the "
+        "result is a mesh of several hundred flat faces: impossible to fillet "
+        "properly, impossible to re-dimension. The STL is there for simulation "
+        "and printing, not for design.",
         "",
     ]
     if not has_step:
         lines += [
-            "**Chercher un fichier STEP dans ce dossier.** Il n'y en a pas. La "
-            "géométrie a été produite par le calculateur interne, qui écrit un "
-            "STL ; il sait aussi écrire un STEP, mais seulement si le noyau CAO "
-            "est installé (`pip install -r requirements-cad.txt`, environ 2 Go). "
-            "Sans lui, les voies 1 et 2 en produisent un.",
+            "**Looking for a STEP file in this folder.** There is none. The "
+            "geometry was produced by the internal computer, which writes an "
+            "STL; it can also write a STEP, but only when the CAD kernel is "
+            "installed (`pip install -r requirements-cad.txt`, about 2 GB). "
+            "Without it, routes 1 and 2 produce one.",
             "",
         ]
 
     lines += [
-        "## Vérifier que la reprise est fidèle",
+        "## Checking that the transfer is faithful",
         "",
-        "Après reconstruction, exporter un STL depuis Fusion et le comparer "
-        "à la section de CE dossier :",
+        "After rebuilding, export an STL from your CAD package and compare it "
+        "against the section in THIS folder:",
         "",
         "```bash",
-        "python3 -m profiles.roundtrip export_fusion.stl profile_chord.dat \\",
+        "python3 -m profiles.roundtrip exported.stl profile_chord.dat \\",
         f"    --chord {chord_mm:.1f} --aoa {aoa_deg:.2f}",
         "```",
         "",
-        "L'outil relit le fichier, en extrait la section et mesure sa "
-        "distance au profil — sans faire confiance à ce qui a servi à "
-        "l'écrire. Un écart au delà de 2 × 10⁻³ de corde signale une erreur "
-        "d'échelle, d'unité ou d'orientation.",
+        "The tool reads the file back, extracts its section and measures its "
+        "distance to the profile — trusting nothing that was used to write it. "
+        "A deviation beyond 2 × 10⁻³ of chord signals an error of scale, unit "
+        "or orientation.",
         "",
-        "La référence doit être `profile_chord.dat` ou `profile_section.dat`, "
-        "**pas le profil de départ**. Le design a été optimisé : il s'écarte "
-        "de son point de départ à dessein, et l'outil signalerait cet écart "
-        "voulu comme un défaut.",
+        "The reference must be `profile_chord.dat` or `profile_section.dat`, "
+        "**not the starting profile**. The design has been optimised: it "
+        "departs from its starting point by design, and the tool would flag "
+        "that intended difference as a defect.",
         "",
-        "Mesuré sur le solide de ce dossier : l'écart entre `design_params."
-        "yaml` et `geometry.stl` est de l'ordre de 10⁻⁶ de corde — la chaîne "
-        "de génération est exacte, ce qui reste à vérifier est ce que Fusion "
-        "en fait.",
+        "Measured on the solid in this folder: the deviation between "
+        "`design_params.yaml` and `geometry.stl` is of the order of 10⁻⁶ of "
+        "chord — the generation chain is exact; what remains to be checked is "
+        "what CAD makes of it.",
         "",
     ]
     return "\n".join(lines) + "\n"

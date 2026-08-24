@@ -251,8 +251,12 @@ def test_explication_incidence():
     )
     texte = " ".join(notes)
     assert "Incidence" in texte
-    assert "sommet de la courbe" in texte     # 5.04° tombe dans la plage utile
-    assert "cambrure" not in texte.lower()    # inchangée : rien à en dire
+    assert "top of the curve" in texte        # 5.04° falls in the useful range
+    # La cambrure n'a pas bougé : aucune NOTE ne doit lui être consacrée.
+    # On teste l'ouverture des notes, pas la présence du mot — « cambered »
+    # apparaît légitimement dans la prose sur l'incidence, et un simple `not
+    # in` confondait les deux.
+    assert not any(n.startswith("**Camber") for n in notes)
 
 
 def test_explication_amincissement():
@@ -261,7 +265,7 @@ def test_explication_amincissement():
         {"aoa": 0.0, "thickness": 0.10, "camber": 0.02, "chord": 300.0},
         None, {"Cd": 0.02, "Cl": 0.3}, None,
     )
-    assert any("aminci" in n for n in notes)
+    assert any("thinned" in n for n in notes)
 
 
 def test_explication_du_compromis_favorable():
@@ -272,7 +276,7 @@ def test_explication_du_compromis_favorable():
     texte = " ".join(notes)
     # Portance en hausse ET traînée en baisse : la phrase doit le dire sans
     # tourner à « n'augmente que de -18 % ».
-    assert "baisse de" in texte
+    assert "drag falls by" in texte
     assert "n'augmente que de -" not in texte
 
 
@@ -305,12 +309,12 @@ def test_rapport_complet(serie, config, tmp_path):
         None, mp.history(serie), section, {}, [], ["**Une note**"],
         False, True, serie / "iter_0000", None,
     )
-    for attendu in ("# Design optimisé", "## Performances", "## Paramètres",
-                    "## Déroulé de l'optimisation",
-                    "## Continuer ce design dans Fusion 360",
+    for attendu in ("# Optimised design", "## Performance", "## Parameters",
+                    "## Course of the optimisation",
+                    "## Continuing this design in CAD",
                     "FUSION_RETURN.md", "rebuild_in_fusion.py",
-                    "pas de fichier STEP dans ce dossier",
-                    "## Ce que valent ces chiffres", "Une note"):
+                    "no STEP file in this folder",
+                    "## What these numbers are worth", "Une note"):
         assert attendu in report
 
 
@@ -323,8 +327,8 @@ def test_le_rapport_tait_l_absence_de_step_quand_il_y_en_a_un(serie, config, tmp
         {"Cd": 0.02, "Cl": 0.7, "Cl_Cd": 35.0}, None, mp.history(serie),
         section, {}, [], [], True, True, serie / "iter_0000", None,
     )
-    assert "## Continuer ce design dans Fusion 360" in report
-    assert "pas de fichier STEP dans ce dossier" not in report
+    assert "## Continuing this design in CAD" in report
+    assert "no STEP file in this folder" not in report
 
 
 def test_le_gain_annonce_nomme_son_regime_quand_il_y_a_requalification(
@@ -351,7 +355,7 @@ def test_le_gain_annonce_nomme_son_regime_quand_il_y_a_requalification(
     )
     ligne = next(l for l in rapport.splitlines() if "Gain de finesse" in l)
     assert "exploration" in ligne
-    assert "italique" in ligne
+    assert "italics" in ligne
 
 
 def test_le_gain_reste_sobre_sans_requalification(serie, config, tmp_path):
@@ -380,7 +384,7 @@ def test_un_ecart_partant_de_presque_zero_est_donne_en_absolu():
     texte = eb._parameter_delta(
         0.00131412, 0.0280843, {"min": -0.132537, "max": 0.135165}
     )
-    assert "%" in texte and "plage" in texte
+    assert "%" in texte and "range" in texte
     assert "2037" not in texte
     assert "+0.0268" in texte or "+0.02677" in texte
 
@@ -398,7 +402,7 @@ def test_une_valeur_de_depart_nulle_ne_fait_pas_diviser_par_zero():
 
 
 def test_un_parametre_inchange_est_dit_inchange():
-    assert eb._parameter_delta(3.0, 3.0, {"min": -2.0, "max": 12.0}) == "inchangé"
+    assert eb._parameter_delta(3.0, 3.0, {"min": -2.0, "max": 12.0}) == "unchanged"
 
 
 def test_des_bornes_illisibles_ne_font_pas_echouer_le_rapport():
@@ -560,7 +564,7 @@ def test_cli_export_serie_vide(tmp_path, capsys):
 def test_reference_par_defaut_est_la_premiere_iteration(serie):
     baseline, regime = eb.resolve_baseline(serie, mp.history(serie), None, False)
     assert baseline.name == "iter_0000"
-    assert regime == "même régime"
+    assert regime == "same regime"
 
 
 def test_reference_explicite(serie, tmp_path):
@@ -570,7 +574,7 @@ def test_reference_explicite(serie, tmp_path):
                                       encoding="utf-8")
     baseline, regime = eb.resolve_baseline(serie, mp.history(serie), ref, True)
     assert baseline == ref
-    assert regime == "réglage fin"
+    assert regime == "fine settings"
 
 
 def test_reference_explicite_sans_resultats(serie, tmp_path):
@@ -699,9 +703,9 @@ def test_le_seed_est_archive_dans_comparison(serie, tmp_path):
 def test_le_rapport_contient_la_comparaison(serie, tmp_path):
     eb.export_best(serie, tmp_path / "sortie", visuals=False)
     report = (tmp_path / "sortie" / "README.md").read_text(encoding="utf-8")
-    assert "## Avant / après" in report
-    assert "| **Portance Cl** |" in report
-    assert "même régime CFD" in report
+    assert "## Before / after" in report
+    assert "| **Lift Cl** |" in report
+    assert "same CFD regime" in report
 
 
 def test_comparaison_desactivable(serie, tmp_path):
