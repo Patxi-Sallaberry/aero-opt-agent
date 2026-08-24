@@ -31,7 +31,12 @@ htmlcov/
 # Résultats d'itérations (lourds, régénérables)
 # Seuls les fichiers de synthèse sont versionnés.
 # ─────────────────────────────────────────────────────────────
-data/iterations/*
+# Toute serie d iterations, quel que soit son nom. Le motif ne visait que
+# `data/iterations/` ; une serie nommee autrement — `data/iterations_clarky/`
+# lors des essais sur profil reel — passait au travers, et 576 Mo de maillages
+# OpenFOAM sont entres dans l historique sans que rien ne le signale.
+data/
+!data/.gitkeep
 !data/iterations/.gitkeep
 
 # ─────────────────────────────────────────────────────────────
