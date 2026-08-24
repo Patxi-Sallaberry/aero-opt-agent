@@ -110,11 +110,11 @@ def write_step(
             fuite, incidence déjà appliquée.
         span_mm: longueur d'extrusion.
     """
-    if not available():
-        return _unavailable("écriture STEP")
-
-    import cadquery as cq
-
+    # Les arguments sont jugés AVANT la disponibilité du noyau. Une envergure
+    # nulle est une erreur de l'appelant, pas de son installation : il doit
+    # l'entendre dans les deux cas, sinon le contrat de la fonction dépendrait
+    # de l'environnement — et un même appel fautif dirait deux choses
+    # différentes selon la machine.
     target = Path(target)
     if span_mm <= 0:
         return StepResult(False, f"envergure non positive : {span_mm}")
@@ -124,6 +124,11 @@ def write_step(
             f"surfaces trop pauvres : {len(upper)} points à l'extrados, "
             f"{len(lower)} à l'intrados",
         )
+
+    if not available():
+        return _unavailable("écriture STEP")
+
+    import cadquery as cq
 
     warnings: list[str] = []
     haut, bas = _thin(upper), _thin(lower)

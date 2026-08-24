@@ -185,6 +185,12 @@ def test_un_contour_trop_dense_est_allege(tmp_path):
 
 
 def test_une_envergure_nulle_est_refusee(tmp_path):
+    """Et le refus ne dépend pas de la présence du noyau.
+
+    Une envergure nulle est une erreur de l'appelant, pas de son installation.
+    Si le contrôle venait après la vérification du noyau, un même appel fautif
+    dirait deux choses différentes selon la machine.
+    """
     result = write_step(*surfaces(), 0.0, tmp_path / "plat.step")
     assert not result.success
     assert "envergure" in result.message
