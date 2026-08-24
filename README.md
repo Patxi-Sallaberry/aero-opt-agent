@@ -40,23 +40,30 @@ git checkout v1.0-stable
 
 ## Voir un rapport produit par le système
 
+### → **[patxi-sallaberry.github.io/aero-opt-agent](https://patxi-sallaberry.github.io/aero-opt-agent/)**
+
 Le système rédige lui-même son rapport en fin de série : paramètres de départ
 face aux paramètres finaux, évolution des coefficients itération par itération,
 sections avant/après, distributions de pression, champs CFD, et une lecture
-physique de ce qui a changé. Deux exemplaires complets sont versionnés dans le
-dépôt :
+physique de ce qui a changé — déduite des écarts mesurés, jamais d'un texte
+générique. Deux séries réelles sont publiées, telles que le système les a
+écrites :
 
-- **[Rapport — Clark Y, v1.5](docs/example_report_clarky/README.md)** — profil
-  réel ingéré depuis la base UIUC, re-paramétré en 24 coefficients CST.
-- **[Rapport — NACA 2412, v1.0](docs/example_report/README.md)** —
-  paramétrisation à quatre chiffres.
+| | rapport | ce qu'il montre |
+|---|---|---|
+| **v1.5** | [Clark Y](https://patxi-sallaberry.github.io/aero-opt-agent/example_report_clarky/report.html) | profil réel de la base UIUC, ingéré depuis un fichier de points, re-paramétré en 24 coefficients CST, 25 itérations sans un échec |
+| **v1.0** | [NACA 2412](https://patxi-sallaberry.github.io/aero-opt-agent/example_report/report.html) | paramétrisation à quatre chiffres, 22 itérations, +122 % de finesse |
 
-Les liens ci-dessus mènent à la version Markdown, que GitHub affiche
-directement. Le rapport tel que le système l'écrit est un fichier HTML
-autoportant — figures et images CFD embarquées, aucun fichier annexe à
-récupérer : `docs/example_report_clarky/report.html` et
-`docs/example_report/report.html`, à ouvrir dans un navigateur après un clone.
-`docs/index.html` en est la page d'accueil.
+Ces fichiers sont **autoportants** : figures et images CFD embarquées, aucune
+ressource externe. Ils sont aussi versionnés dans le dépôt
+(`docs/example_report*/report.html`), donc consultables hors ligne après un
+clone. Les mêmes rapports en Markdown, que GitHub affiche directement :
+[Clark Y](docs/example_report_clarky/README.md) ·
+[NACA 2412](docs/example_report/README.md).
+
+Le dossier du Clark Y contient aussi
+[`geometry.step`](docs/example_report_clarky/geometry.step) — le solide
+optimisé, à ouvrir tel quel dans Fusion 360 ou FreeCAD.
 
 ## Optimiser n'importe quel profil, en trois commandes
 
