@@ -10,7 +10,7 @@ Meilleure des **22 itérations** de la série `iterations` (21 réussies, 1 éch
 | **Optimisé (itération 21)** | **0.02563** | **0.76572** | **29.88** |
 | *— mesuré en exploration* | *0.04037* | *0.82534* | *20.45* |
 
-**Gain de finesse : +151.5 %**
+**Gain de finesse : +151.5 %** — entre les deux mesures d'**exploration** : la ligne de départ et celle en italique. Au réglage fin, la comparaison à régime constant est donnée plus bas, dans « Avant / après » ; elle est plus basse, un maillage grossier exagérant les écarts.
 
 Maillage : 168394 cellules, non-orthogonalité 47.4, skewness 2.10. Coefficients moyennés sur 200 itérations, écart-type relatif 3.7e-05 sur Cd — stabilisés.
 

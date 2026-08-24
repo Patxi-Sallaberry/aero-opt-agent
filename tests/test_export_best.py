@@ -327,6 +327,47 @@ def test_le_rapport_tait_l_absence_de_step_quand_il_y_en_a_un(serie, config, tmp
     assert "pas de fichier STEP dans ce dossier" not in report
 
 
+def test_le_gain_annonce_nomme_son_regime_quand_il_y_a_requalification(
+    serie, config, tmp_path
+):
+    """Le calcul était juste, sa présentation trompait.
+
+    Quand le meilleur design est requalifié au réglage fin, le tableau met en
+    GRAS ses chiffres fins et laisse en italique sa mesure d'exploration. Le
+    gain, lui, compare correctement exploration à exploration — donc la ligne
+    en italique, pas celle en gras. Un lecteur rapporte naturellement le
+    pourcentage aux chiffres mis en avant, et se trompe du double.
+
+    Il ne suffit pas d'employer le bon régime : il faut le nommer.
+    """
+    design = load_yaml(config)
+    section = eb.write_profile_section(design, tmp_path)
+    rapport = eb.build_report(
+        design, design, eb.best_iteration(serie),
+        {"Cd": 0.02563, "Cl": 0.76572, "Cl_Cd": 29.88},
+        {"Cd": 0.04037, "Cl": 0.82534, "Cl_Cd": 20.45},
+        mp.history(serie), section, {}, [], [], False, False,
+        serie / "iter_0000", None,
+    )
+    ligne = next(l for l in rapport.splitlines() if "Gain de finesse" in l)
+    assert "exploration" in ligne
+    assert "italique" in ligne
+
+
+def test_le_gain_reste_sobre_sans_requalification(serie, config, tmp_path):
+    """Sans deuxième régime, il n'y a rien à préciser — et donc rien à ajouter."""
+    design = load_yaml(config)
+    section = eb.write_profile_section(design, tmp_path)
+    rapport = eb.build_report(
+        design, design, eb.best_iteration(serie),
+        {"Cd": 0.02, "Cl": 0.7, "Cl_Cd": 35.0}, None,
+        mp.history(serie), section, {}, [], [], False, False,
+        serie / "iter_0000", None,
+    )
+    ligne = next(l for l in rapport.splitlines() if "Gain de finesse" in l)
+    assert "exploration" not in ligne
+
+
 def test_un_ecart_partant_de_presque_zero_est_donne_en_absolu():
     """« +2037 % » sur un coefficient parti de 0,0013 n'informe personne.
 

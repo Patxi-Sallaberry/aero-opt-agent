@@ -1034,7 +1034,23 @@ def build_report(
         if isinstance(reference.get("Cl_Cd"), (int, float)):
             gain = (reference["Cl_Cd"] - first["Cl_Cd"]) / abs(first["Cl_Cd"]) * 100
             lines.append("")
-            lines.append(f"**Gain de finesse : {gain:+.1f} %**")
+            # Le gain compare TOUJOURS deux mesures du même régime — sans quoi
+            # il serait gonflé. Mais quand le design a été requalifié au réglage
+            # fin, la ligne comparée n'est plus celle en gras : c'est celle en
+            # italique. Le lecteur, lui, rapporte naturellement le pourcentage
+            # aux chiffres mis en avant, et se trompe de deux fois l'écart. Il
+            # faut donc nommer le régime, pas seulement l'employer correctement.
+            if fast_results:
+                lines.append(
+                    f"**Gain de finesse : {gain:+.1f} %** — entre les deux "
+                    f"mesures d'**exploration** : la ligne de départ et celle "
+                    f"en italique. Au réglage fin, la comparaison à régime "
+                    f"constant est donnée plus bas, dans « Avant / après » ; "
+                    f"elle est plus basse, un maillage grossier exagérant "
+                    f"les écarts."
+                )
+            else:
+                lines.append(f"**Gain de finesse : {gain:+.1f} %**")
     lines.append("")
 
     mesh = results.get("mesh") or {}
