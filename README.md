@@ -1287,6 +1287,48 @@ because OpenCASCADE runs headless.
 
 ---
 
+## Roadmap — what comes next
+
+Two steps, deliberately in this order. Nothing below is implemented yet.
+
+### 1. Performance first (recommended)
+
+**Add a multi-fidelity / surrogate layer, so that evaluations become far
+cheaper — before moving to 3D.**
+
+The reason for putting this first is measurable in the numbers already on this
+page. Each CFD evaluation costs about a minute at the exploration preset and
+roughly a quarter of an hour at the fine one. A full probing cycle over the
+twenty-seven variables of a CST design space takes fifty-four iterations. The
+Clark Y run spent 25 of them to gain 4.4 %, and the search was still crawling
+one coordinate at a time when it stopped.
+
+So the binding constraint is not the geometry, nor the parameterisation — it is
+**the cost of one evaluation, and the number of them the search needs**. Two
+complementary ways out:
+
+- **Multi-fidelity** — run most of the search on a coarse mesh and re-qualify
+  only the promising shapes on the fine one. The system already does a manual
+  version of this: two presets, and a `--qualified-dir` that keeps the regimes
+  honest when comparing. Making it automatic means letting the loop decide when
+  a shape deserves the expensive evaluation.
+- **Surrogate model** — fit a cheap response model to the evaluations already
+  archived, search *that* model, and spend real CFD only where the model is
+  uncertain or promising. Every iteration is already archived with its exact
+  parameters and coefficients, which is precisely the training set such a model
+  needs.
+
+Both pay off in 2D straight away, and both are what make step 2 tractable.
+
+### 2. Then 3D (v2.0)
+
+Detailed below. It multiplies the cost of a single evaluation by roughly an
+order of magnitude — which is exactly why the cost problem is worth solving
+first. Attacking 3D on the current search would mean waiting days for what
+already takes half an hour in 2D.
+
+---
+
 ## Towards 3D (v2.0)
 
 v1.5 deliberately stayed in 2D, but its architecture was built so that moving to
@@ -1312,7 +1354,8 @@ What will have to change, on the other hand: the symmetry planes of the quasi-2D
 case will give way to a real 3D domain, the CFD cost per iteration will rise by
 an order of magnitude, and pattern search over twenty-four variables will
 probably have to give way to a gradient-based method — that, and not the
-geometry, is where the real obstacle lies.
+geometry, is where the real obstacle lies. Which is the whole argument for
+[doing step 1 first](#1-performance-first-recommended).
 
 ---
 
