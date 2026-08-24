@@ -160,6 +160,6 @@
 <text x="116" y="60" font-size="12" fill="#222222">extrados</text>
 <line x1="88" y1="73" x2="110" y2="73" stroke="#c1440e" stroke-width="2.5"/>
 <text x="116" y="77" font-size="12" fill="#222222">intrados</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / corde</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / chord</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cp</text>
 </svg>

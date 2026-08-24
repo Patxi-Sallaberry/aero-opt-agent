@@ -7,8 +7,8 @@
 <text x="102.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="175.8" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
 <text x="211.3" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.7784</text>
-<text x="211.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
-<text x="156.7" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Portance (Cl)</text>
+<text x="211.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="156.7" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Lift (Cl)</text>
 <text x="156.7" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+1.6 %</text>
 <text x="156.7" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
 <rect x="313.3" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
@@ -17,8 +17,8 @@
 <text x="395.3" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="469.1" y="96.8" width="71.1" height="105.2" fill="#2e7d32" rx="2"/>
 <text x="504.7" y="90.8" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">0.02653</text>
-<text x="504.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
-<text x="450.0" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Traînée (Cd)</text>
+<text x="504.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="450.0" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Drag (Cd)</text>
 <text x="450.0" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">-2.6 %</text>
 <text x="450.0" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
 <rect x="606.7" y="46" width="273.3" height="190.0" fill="#fbfbfc" stroke="#dcdcdc" stroke-width="1" rx="4"/>
@@ -27,8 +27,8 @@
 <text x="688.7" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">seed</text>
 <rect x="762.5" y="94.0" width="71.1" height="108.0" fill="#2e7d32" rx="2"/>
 <text x="798.0" y="88.0" text-anchor="middle" font-size="12" font-weight="600" fill="#222222">29.34</text>
-<text x="798.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimisé</text>
-<text x="743.3" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Finesse (Cl/Cd)</text>
+<text x="798.0" y="222.0" text-anchor="middle" font-size="11" fill="#5a5a5a">optimised</text>
+<text x="743.3" y="66.0" text-anchor="middle" font-size="13" font-weight="600" fill="#222222">Lift-to-drag (Cl/Cd)</text>
 <text x="743.3" y="266.0" text-anchor="middle" font-size="15" font-weight="700" fill="#2e7d32">+4.4 %</text>
 <text x="743.3" y="284.0" text-anchor="middle" font-size="11" fill="#5a5a5a">mieux</text>
 </svg>

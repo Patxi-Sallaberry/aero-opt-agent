@@ -1,102 +1,104 @@
-# Design optimisé — `CLARK_Y_AIRFOIL`
+# Optimised design — `CLARK_Y_AIRFOIL`
 
-Meilleure des **25 itérations** de la série `iterations_clarky` (25 réussies, 0 échouée), retenue sur l'objectif `maximize_Cl_Cd`.
+Best of the **25 iterations** of run `iterations_clarky` (25 succeeded, 0 failed), selected on objective `maximize_Cl_Cd`.
 
-## Performances
+> **Translated for publication.** `scripts/export_best.py` writes its reports in French; this copy was translated by hand so that the showcased result reads in English. The numbers, figures and tables are untouched.
+
+## Performance
 
 | | Cd | Cl | Cl/Cd |
 |---|---|---|---|
-| Départ (itération 0) | 0.02725 | 0.76590 | 28.11 |
-| **Optimisé (itération 24)** | **0.02653** | **0.77841** | **29.34** |
+| Start (iteration 0) | 0.02725 | 0.76590 | 28.11 |
+| **Optimised (iteration 24)** | **0.02653** | **0.77841** | **29.34** |
 
-**Gain de finesse : +4.4 %**
+**Lift-to-drag gain: +4.4 %**
 
-Maillage : 81594 cellules, non-orthogonalité 74.4, skewness 4.52. Coefficients moyennés sur 120 itérations, écart-type relatif 1.2e-04 sur Cd — stabilisés.
+Mesh: 81,594 cells, non-orthogonality 74.4, skewness 4.52. Coefficients averaged over 120 iterations, relative standard deviation 1.2e-04 on Cd — stabilised.
 
-## Paramètres : départ → arrivée
+## Parameters: start → finish
 
-| paramètre | départ | arrivée | écart | bornes |
+| parameter | start | finish | change | bounds |
 |---|---|---|---|---|
-| `cst_upper_0` | 0.129395 | **0.129395** unitless | inchangé | 0.0804316 … 0.178358 |
+| `cst_upper_0` | 0.129395 | **0.129395** unitless | unchanged | 0.0804316 … 0.178358 |
 | `cst_upper_1` | 0.458745 | **0.454158** unitless | -1.0 % | 0.324895 … 0.592596 |
-| `cst_upper_2` | -0.412568 | **-0.412568** unitless | inchangé | -0.55456 … -0.270577 |
-| `cst_upper_3` | 1.67908 | **1.67908** unitless | inchangé | 1.52856 … 1.82959 |
+| `cst_upper_2` | -0.412568 | **-0.412568** unitless | unchanged | -0.55456 … -0.270577 |
+| `cst_upper_3` | 1.67908 | **1.67908** unitless | unchanged | 1.52856 … 1.82959 |
 | `cst_upper_4` | -2.16544 | **-2.20571** unitless | -1.9 % | -2.3257 … -2.00519 |
-| `cst_upper_5` | 3.26636 | **3.26636** unitless | inchangé | 3.0945 … 3.43821 |
-| `cst_upper_6` | -2.67847 | **-2.67847** unitless | inchangé | -2.86468 … -2.49226 |
-| `cst_upper_7` | 2.43253 | **2.43253** unitless | inchangé | 2.22782 … 2.63725 |
-| `cst_upper_8` | -1.01333 | **-1.01333** unitless | inchangé | -1.24332 … -0.783351 |
-| `cst_upper_9` | 0.781425 | **0.781425** unitless | inchangé | 0.513899 … 1.04895 |
-| `cst_upper_10` | 0.0775655 | **0.0775655** unitless | inchangé | -0.25476 … 0.409891 |
+| `cst_upper_5` | 3.26636 | **3.26636** unitless | unchanged | 3.0945 … 3.43821 |
+| `cst_upper_6` | -2.67847 | **-2.67847** unitless | unchanged | -2.86468 … -2.49226 |
+| `cst_upper_7` | 2.43253 | **2.43253** unitless | unchanged | 2.22782 … 2.63725 |
+| `cst_upper_8` | -1.01333 | **-1.01333** unitless | unchanged | -1.24332 … -0.783351 |
+| `cst_upper_9` | 0.781425 | **0.781425** unitless | unchanged | 0.513899 … 1.04895 |
+| `cst_upper_10` | 0.0775655 | **0.0775655** unitless | unchanged | -0.25476 … 0.409891 |
 | `cst_upper_11` | 0.273441 | **0.270706** unitless | -1.0 % | 0.0777792 … 0.469102 |
-| `cst_lower_0` | -0.17699 | **-0.17699** unitless | inchangé | -0.225954 … -0.128027 |
-| `cst_lower_1` | 0.00131412 | **0.0280843** unitless | +0.02677 (+10 % de la plage) | -0.132537 … 0.135165 |
-| `cst_lower_2` | -0.283066 | **-0.283066** unitless | inchangé | -0.425057 … -0.141074 |
-| `cst_lower_3` | 0.275626 | **0.275626** unitless | inchangé | 0.12511 … 0.426143 |
-| `cst_lower_4` | -0.540046 | **-0.540046** unitless | inchangé | -0.700301 … -0.379791 |
-| `cst_lower_5` | 0.51587 | **0.51587** unitless | inchangé | 0.34402 … 0.687721 |
+| `cst_lower_0` | -0.17699 | **-0.17699** unitless | unchanged | -0.225954 … -0.128027 |
+| `cst_lower_1` | 0.00131412 | **0.0280843** unitless | +0.02677 (+10 % of the range) | -0.132537 … 0.135165 |
+| `cst_lower_2` | -0.283066 | **-0.283066** unitless | unchanged | -0.425057 … -0.141074 |
+| `cst_lower_3` | 0.275626 | **0.275626** unitless | unchanged | 0.12511 … 0.426143 |
+| `cst_lower_4` | -0.540046 | **-0.540046** unitless | unchanged | -0.700301 … -0.379791 |
+| `cst_lower_5` | 0.51587 | **0.51587** unitless | unchanged | 0.34402 … 0.687721 |
 | `cst_lower_6` | -0.59732 | **-0.537588** unitless | +10.0 % | -0.783533 … -0.411108 |
 | `cst_lower_7` | 0.37281 | **0.369082** unitless | -1.0 % | 0.168098 … 0.577522 |
-| `cst_lower_8` | -0.291223 | **-0.291223** unitless | inchangé | -0.521205 … -0.0612405 |
+| `cst_lower_8` | -0.291223 | **-0.291223** unitless | unchanged | -0.521205 … -0.0612405 |
 | `cst_lower_9` | 0.0696012 | **0.123106** unitless | +76.9 % | -0.197925 … 0.337127 |
-| `cst_lower_10` | -0.0745027 | **-0.0745027** unitless | inchangé | -0.406828 … 0.257822 |
-| `cst_lower_11` | -0.0298241 | **-0.0298241** unitless | inchangé | -0.225486 … 0.165837 |
-| `chord` | 300 | **300** mm | inchangé | 210 … 420 |
-| `span` | 80 | **80** mm | inchangé | 79.2 … 80.8 |
-| `aoa` | 3 | **3** deg | inchangé | -2 … 12 |
+| `cst_lower_10` | -0.0745027 | **-0.0745027** unitless | unchanged | -0.406828 … 0.257822 |
+| `cst_lower_11` | -0.0298241 | **-0.0298241** unitless | unchanged | -0.225486 … 0.165837 |
+| `chord` | 300 | **300** mm | unchanged | 210 … 420 |
+| `span` | 80 | **80** mm | unchanged | 79.2 … 80.8 |
+| `aoa` | 3 | **3** deg | unchanged | -2 … 12 |
 
-## Avant / après
+## Before / after
 
-Le seed de départ face au design retenu, tous deux mesurés **dans le même régime CFD** (même régime) — comparer un maillage fin à un maillage d'exploration gonflerait le gain sans qu'il soit réel.
+The starting seed against the retained design, both measured **in the same CFD regime** — comparing a fine mesh against an exploration mesh would inflate the gain without it being real.
 
-![Performances avant / après](figures/comparison_performance.svg)
+![Performance before / after](figures/comparison_performance.svg)
 
-| | seed | optimisé | écart |
+| | seed | optimised | change |
 |---|---|---|---|
-| **Portance Cl** | 0.7659 | **0.7784** | +1.6 % ✓ |
-| **Traînée Cd** | 0.02725 | **0.02653** | -2.6 % ✓ |
-| **Finesse Cl/Cd** | 28.11 | **29.34** | +4.4 % ✓ |
+| **Lift Cl** | 0.7659 | **0.7784** | +1.6 % ✓ |
+| **Drag Cd** | 0.02725 | **0.02653** | -2.6 % ✓ |
+| **Lift-to-drag Cl/Cd** | 28.11 | **29.34** | +4.4 % ✓ |
 
-![Sections avant / après](figures/comparison_sections.svg)
+![Sections before / after](figures/comparison_sections.svg)
 
-Les deux sections sont dessinées à la **même échelle** : mises chacune à la taille de son cadre, elles paraîtraient identiques et l'écart de corde comme l'incidence passeraient inaperçus.
+Both sections are drawn at the **same scale**: each fitted to its own frame, they would look identical, and both the chord difference and the incidence would go unnoticed.
 
-![Sections superposées](figures/comparison_overlay.svg)
+![Superimposed sections](figures/comparison_overlay.svg)
 
-### La pression, avant et après
+### Pressure, before and after
 
-![Cp avant / après](figures/comparison_cp.svg)
+![Cp before / after](figures/comparison_cp.svg)
 
-L'aire comprise entre la courbe d'extrados et celle d'intrados *est* la portance. Le design optimisé creuse davantage sa dépression d'extrados et l'étale sur la corde : c'est là que se gagne le supplément de portance.
+The area between the upper-surface curve and the lower-surface curve *is* the lift. The optimised design deepens its upper-surface suction and spreads it along the chord: that is where the extra lift is won.
 
-### Les champs, côte à côte
+### The fields, side by side
 
 <!-- side-by-side -->
 ![Seed — pressure_field](figures/seed_pressure_field.png)
-![Optimisé — pressure_field](figures/pressure_field.png)
+![Optimised — pressure_field](figures/pressure_field.png)
 <!-- /side-by-side -->
 
 <!-- side-by-side -->
 ![Seed — streamlines](figures/seed_streamlines.png)
-![Optimisé — streamlines](figures/streamlines.png)
+![Optimised — streamlines](figures/streamlines.png)
 <!-- /side-by-side -->
 
-Même échelle de couleurs des deux côtés — c'est la condition pour que la comparaison veuille dire quelque chose. La dépression d'extrados, en bleu, est nettement plus marquée et plus étendue après optimisation.
+Same colour scale on both sides — that is the condition for the comparison to mean anything. The upper-surface suction, in blue, is markedly stronger and more extensive after optimisation.
 
-## Pourquoi cette forme est meilleure
+## Why this shape is better
 
-- **Cambrure accentuée** (0.0344 → 0.0351). La cambrure décale toute la courbe de portance : un profil cambré porte déjà à incidence nulle. Elle se paie en traînée de forme et en moment de tangage, d'où l'existence d'un optimum plutôt qu'une croissance sans fin.
-- **Profil aminci** (0.1171 → 0.1118 d'épaisseur relative). Un profil plus fin perturbe moins l'écoulement et traîne moins. La contrepartie est structurelle — moins d'inertie, donc moins de rigidité — et un décrochage plus brutal, le bord d'attaque plus aigu supportant mal les fortes incidences.
-- **Le compromis chiffré** : la portance gagne +2 % *et* la traînée baisse de 3 %. Les deux termes s'améliorent à la fois — cas favorable, qui tient ici à ce que la surface de référence suit la corde.
-- **Ce que montre la distribution de pression** : le pic de dépression atteint Cp = -1.46 à 11 % de corde. C'est l'extrados qui fait le travail — la dépression y aspire le profil vers le haut, et elle pèse bien davantage que la surpression d'intrados. Un pic très creusé suivi d'une remontée brutale annoncerait un décollement ; une remontée progressive, comme ici, indique un écoulement encore attaché.
+- **Camber increased** (0.0344 → 0.0351). Camber shifts the whole lift curve: a cambered profile already lifts at zero incidence. It is paid for in form drag and in pitching moment, hence the existence of an optimum rather than endless growth.
+- **Profile thinned** (0.1171 → 0.1118 relative thickness). A thinner profile disturbs the flow less and drags less. The counterpart is structural — less inertia, so less stiffness — and a more abrupt stall, since a sharper leading edge copes badly with high incidence.
+- **The trade-off in numbers**: lift gains +2 % *and* drag falls by 3 %. Both terms improve at once — a favourable case, which here comes from the reference area following the chord.
+- **What the pressure distribution shows**: the suction peak reaches Cp = -1.46 at 11 % of chord. The upper surface does the work — the suction there pulls the profile upwards, and it weighs far more than the lower-surface overpressure. A very deep peak followed by an abrupt recovery would signal separation; a gradual recovery, as here, indicates flow that is still attached.
 
-## Déroulé de l'optimisation
+## Course of the optimisation
 
-![Finesse au fil des itérations](figures/optimization_progress.svg)
+![Lift-to-drag over the iterations](figures/optimization_progress.svg)
 
-![Cd et Cl au fil des itérations](figures/coefficients_progress.svg)
+![Cd and Cl over the iterations](figures/coefficients_progress.svg)
 
-| itération | Cd | Cl | Cl/Cd | statut |
+| iteration | Cd | Cl | Cl/Cd | status |
 |---|---|---|---|---|
 | 0 | 0.02725 | 0.76590 | 28.11 | OK |
 | 1 | 0.03389 | 0.92242 | 27.22 | OK |
@@ -124,93 +126,94 @@ Même échelle de couleurs des deux côtés — c'est la condition pour que la c
 | 23 | 0.03106 | 0.77341 | 24.90 | OK |
 | 24 ⭐ | 0.02653 | 0.77841 | 29.34 | OK |
 
-## L'écoulement
+## The flow
 
-![Distribution de Cp](figures/cp_distribution.svg)
+![Cp distribution](figures/cp_distribution.svg)
 
-Axe des Cp inversé, comme le veut l'usage : la courbe du haut est l'extrados, en dépression. L'aire entre les deux courbes est la portance.
+Cp axis inverted, as convention requires: the upper curve is the upper surface, in suction. The area between the two curves is the lift.
 
-![Champ de pression autour du profil](figures/pressure_field.png)
+![Pressure field around the profile](figures/pressure_field.png)
 
-**Champ de pression.** Le rouge sous le bord d'attaque est le point d'arrêt, où l'écoulement s'immobilise (Cp = +1). Le bleu au dessus est la dépression qui porte le profil.
+**Pressure field.** The red under the leading edge is the stagnation point, where the flow comes to rest (Cp = +1). The blue above is the suction that lifts the profile.
 
-![Module de la vitesse et sillage](figures/velocity_field.png)
+![Velocity magnitude and wake](figures/velocity_field.png)
 
-**Module de la vitesse.** Le sillage se lit derrière le bord de fuite ; plus il est mince, moins le profil traîne.
+**Velocity magnitude.** The wake can be read behind the trailing edge; the thinner it is, the less the profile drags.
 
-![Lignes de courant](figures/streamlines.png)
+![Streamlines](figures/streamlines.png)
 
-**Lignes de courant**, colorées par la vitesse. L'accélération sur l'extrados est la contrepartie de la dépression : c'est le théorème de Bernoulli, où le fluide qui accélère voit sa pression chuter.
+**Streamlines**, coloured by velocity. The acceleration over the upper surface is the counterpart of the suction: this is Bernoulli's theorem, where accelerating fluid sees its pressure drop.
 
-### Convergence du calcul
+### Solver convergence
 
 ![Convergence](figures/solver_convergence.svg)
 
-Des courbes plates sur la fin sont la condition pour que les coefficients veuillent dire quelque chose.
+Flat curves towards the end are the condition for the coefficients to mean anything.
 
-## Ce que valent ces chiffres
+## What these numbers are worth
 
-Le modèle de turbulence `kOmegaSST` suppose la couche limite turbulente dès le bord d'attaque. À Re ≈ 4 × 10⁵, une bonne part de l'extrados est encore laminaire : **la traînée est surestimée**, d'un facteur qui peut approcher 2. Ces valeurs classent correctement des formes entre elles — ce qu'exige une optimisation — mais ne constituent pas une prédiction de traînée absolue. Pour un chiffre publiable, il faut un modèle avec transition laminaire-turbulent, ou une soufflerie.
+The `kOmegaSST` turbulence model assumes a turbulent boundary layer from the leading edge. At Re ≈ 4 × 10⁵ a good part of the upper surface is still laminar: **drag is overestimated**, by a factor that can approach 2. These values rank shapes against each other correctly — which is what an optimisation requires — but do not constitute a prediction of absolute drag. For a publishable figure you need a model with laminar-turbulent transition, or a wind tunnel.
 
-## Contenu du dossier
+## Folder contents
 
-| fichier | quoi |
+| file | what |
 |---|---|
-| `geometry.stl` | la géométrie, **en mètres**, telle que simulée |
-| `geometry.step` | la même, en CAO |
-| `profile_section.csv` | section 2D en millimètres |
-| `profile_section.dat` | même section au format profil |
-| `profile_chord.dat` | profil **redressé**, corde unitaire — pour XFOIL / XFLR5 |
-| `design_params.yaml` | les paramètres exacts, rejouables |
-| `results.json` | les coefficients |
-| `report.html` | ce rapport, autonome, pour un navigateur |
-| `FUSION_RETURN.md` | comment reprendre ce design en CAO |
-| `rebuild_in_fusion.py` | script Fusion qui retrace le profil |
-| `figures/` | courbes et images |
-| `cfd/` | case OpenFOAM : maillage et champs finaux |
-| `logs/` | journaux de chaque étape |
+| `geometry.stl` | the geometry, **in metres**, as simulated |
+| `geometry.step` | the same, as a CAD solid |
+| `profile_section.csv` | 2D section in millimetres |
+| `profile_section.dat` | same section in airfoil format |
+| `profile_chord.dat` | profile **straightened**, unit chord — for XFOIL / XFLR5 |
+| `design_params.yaml` | the exact parameters, replayable |
+| `results.json` | the coefficients |
+| `report.html` | this report, self-contained, for a browser |
+| `FUSION_RETURN.md` | how to carry this design back into CAD |
+| `rebuild_in_fusion.py` | CAD script that redraws the profile |
+| `figures/` | curves and images |
+| `cfd/` | OpenFOAM case: mesh and final fields |
+| `logs/` | logs of each step |
 
-## Continuer ce design dans Fusion 360
+## Continuing this design in CAD
 
-Une optimisation qui ne rend qu'un STL est un cul-de-sac de conception : un solide facetté de plusieurs centaines de faces ne se laisse ni congédier proprement, ni recoter. Trois voies ramènent cette forme dans une CAO éditable, détaillées dans **`FUSION_RETURN.md`**.
+An optimisation that only returns an STL is a design dead end: a faceted solid of several hundred faces can neither be filleted properly nor re-dimensioned. Several routes bring this shape back into editable CAD, detailed in **`FUSION_RETURN.md`**.
 
-| voie | ce qu'on obtient | quand la choisir |
+| route | what you get | when to choose it |
 |---|---|---|
-| **1. Rejouer les paramètres** | modèle natif, historique complet | dès qu'un modèle de départ existe — c'est la seule voie réellement paramétrique |
-| **2. Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans intervention | sans modèle de départ ; rien à localiser ni à convertir |
-| **3. Importer `profile_section.csv`** | esquisse tracée à la main | pour garder la main, ou travailler dans une autre CAO |
+| **0. Open `geometry.step`** | native solid, one double-click | the simplest — works in FreeCAD as well as Fusion |
+| **1. Replay the parameters** | native model, full history | as soon as a starting model exists — the only genuinely parametric route |
+| **2. `rebuild_in_fusion.py` script** | sketch + extrusion, hands off | no starting model; nothing to locate or convert |
+| **3. Import `profile_section.csv`** | sketch drawn by hand | to stay in control, or work in another CAD package |
 
 ```bash
-# voie 1 : rejouer les paramètres dans Fusion
-cp design_params.yaml <projet>/configs/design_params.yaml
-# puis Utilities → ADD-INS → Scripts → fusion/parametric_driver.py
+# route 1: replay the parameters in Fusion
+cp design_params.yaml <project>/configs/design_params.yaml
+# then Utilities → ADD-INS → Scripts → fusion/parametric_driver.py
 
-# voie 2 : script autonome
+# route 2: standalone script
 # Utilities → ADD-INS → Scripts → + → rebuild_in_fusion.py → Run
 ```
 
-**L'incidence est déjà dans les coordonnées** de la section exportée : c'est la géométrie réellement simulée. Si le montage aval applique lui-même une incidence, elle serait comptée deux fois.
+**Incidence is already in the coordinates** of the exported section: this is the geometry that was actually simulated. If a downstream setup applies an incidence of its own, it would be counted twice.
 
-## Ouvrir les fichiers
+## Opening the files
 
 ```bash
-# la géométrie (STL en mètres)
+# the geometry (STL in metres)
 paraview geometry.stl
 
-# les champs CFD
+# the CFD fields
 paraview cfd/best_design.foam
 
-# refaire les visuels après modification
+# regenerate the visuals after a change
 xvfb-run -a pvbatch paraview_render.py cfd figures 20 1.225
 
-# reprendre l'optimisation depuis ce design
+# resume the optimisation from this design
 cp design_params.yaml configs/design_params.yaml
 python3 scripts/run_loop.py --max-iterations 20 \
     --cfd-settings configs/cfd_settings_fast.yaml
 ```
 
-Dans ParaView, le pas de temps final porte `U` (vitesse), `p` (pression **cinématique**, en m²/s² — multiplier par ρ = 1,225 kg/m³ pour des pascals), `k`, `omega` et `nut`. Le patch `wing` est la surface de l'aile.
+In ParaView, the final time step carries `U` (velocity), `p` (**kinematic** pressure, in m²/s² — multiply by ρ = 1.225 kg/m³ for pascals), `k`, `omega` and `nut`. The `wing` patch is the wing surface.
 
 ---
 
-Exporté le 24/08/2026 à 18:19 UTC par `scripts/export_best.py`.
+Exported on 24/08/2026 at 18:19 UTC by `scripts/export_best.py`.

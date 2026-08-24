@@ -431,7 +431,7 @@ def build_figures(
         write(
             "optimization_progress.svg",
             plots.chart(
-                [cl_cd], title="Finesse au fil des itérations",
+                [cl_cd], title="Lift-to-drag over the iterations",
                 x_label="itération", y_label="Cl / Cd",
             ),
         )
@@ -439,7 +439,7 @@ def build_figures(
             "coefficients_progress.svg",
             plots.chart(
                 [series("Cd", "Cd"), series("Cl", "Cl")],
-                title="Cd et Cl au fil des itérations",
+                title="Cd and Cl over the iterations",
                 x_label="itération", y_label="coefficient", y_zero_line=True,
             ),
         )
@@ -547,11 +547,11 @@ def build_comparison_figures(
     )
 
     groups = [
-        {"label": "Portance (Cl)", "before": before_results.get("Cl"),
+        {"label": "Lift (Cl)", "before": before_results.get("Cl"),
          "after": after_results.get("Cl"), "better": "higher", "format": ".4f"},
-        {"label": "Traînée (Cd)", "before": before_results.get("Cd"),
+        {"label": "Drag (Cd)", "before": before_results.get("Cd"),
          "after": after_results.get("Cd"), "better": "lower", "format": ".5f"},
-        {"label": "Finesse (Cl/Cd)", "before": before_results.get("Cl_Cd"),
+        {"label": "Lift-to-drag (Cl/Cd)", "before": before_results.get("Cl_Cd"),
          "after": after_results.get("Cl_Cd"), "better": "higher", "format": ".2f"},
     ]
     write(
@@ -1104,7 +1104,7 @@ def build_report(
     lines.append("## Déroulé de l'optimisation")
     lines.append("")
     for key, caption in (
-        ("optimization_progress", "Finesse au fil des itérations"),
+        ("optimization_progress", "Lift-to-drag over the iterations"),
         ("coefficients_progress", "Cd et Cl au fil des itérations"),
     ):
         if key in figures:

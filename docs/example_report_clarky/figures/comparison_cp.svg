@@ -31,9 +31,9 @@
 <line x1="88" y1="73" x2="110" y2="73" stroke="#ef6c00" stroke-width="2.5"/>
 <text x="116" y="77" font-size="12" fill="#222222">seed — intrados</text>
 <line x1="88" y1="90" x2="110" y2="90" stroke="#1f4e8c" stroke-width="2.5"/>
-<text x="116" y="94" font-size="12" fill="#222222">optimisé — extrados</text>
+<text x="116" y="94" font-size="12" fill="#222222">optimised — extrados</text>
 <line x1="88" y1="107" x2="110" y2="107" stroke="#2e7d32" stroke-width="2.5"/>
-<text x="116" y="111" font-size="12" fill="#222222">optimisé — intrados</text>
-<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / corde</text>
+<text x="116" y="111" font-size="12" fill="#222222">optimised — intrados</text>
+<text x="406.0" y="406" text-anchor="middle" font-size="12" fill="#222222">x / chord</text>
 <text x="18" y="204.0" text-anchor="middle" font-size="12" fill="#222222" transform="rotate(-90 18 204.0)">Cp</text>
 </svg>

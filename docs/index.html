@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>aero-opt-agent — rapports d'optimisation</title>
+<title>aero-opt-agent — optimisation reports</title>
 <style>
   :root {
     --fond: #ffffff;
@@ -78,13 +78,13 @@
 <body>
 <main>
 
-  <h1>aero-opt-agent — rapports d'optimisation</h1>
+  <h1>aero-opt-agent — optimisation reports</h1>
   <p class="chapeau">
-    Deux rapports produits automatiquement par le système en fin de série
-    d'optimisation. Chacun contient les paramètres de départ face aux paramètres
-    finaux, l'évolution des coefficients itération par itération, les sections
-    avant/après, les distributions de pression, les champs CFD et une lecture
-    physique de ce qui a changé. Ils sont écrits par la machine, pas à la main.
+    Two reports produced automatically by the system at the end of an
+    optimisation run. Each contains the starting parameters against the final
+    ones, the coefficient history iteration by iteration, before/after sections,
+    pressure distributions, CFD fields and a plain-language reading of the
+    physics. They are written by the machine, not by hand.
   </p>
 
   <div class="cartes">
@@ -93,29 +93,29 @@
       <span class="etiquette">v1.5 — Universal 2D</span>
       <h2>Clark Y</h2>
       <p>
-        Profil réel ingéré depuis la base UIUC, re-paramétré en 24 coefficients
-        CST. <span class="chiffre">25 itérations, 0 échec.</span>
-        Finesse Cl/Cd <span class="chiffre">28,11 → 29,34</span>
-        (<span class="chiffre">+4,4 %</span>).
+        A real profile ingested from the UIUC database, re-parameterised into
+        24 CST coefficients. <span class="chiffre">25 iterations, 0 failures.</span>
+        Lift-to-drag Cl/Cd <span class="chiffre">28.11 → 29.34</span>
+        (<span class="chiffre">+4.4 %</span>).
       </p>
       <div class="liens">
-        <a href="example_report_clarky/report.html">Rapport HTML</a>
-        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report_clarky/README.md">Version Markdown</a>
+        <a href="example_report_clarky/report.html">HTML report</a>
+        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report_clarky/README.md">Markdown version</a>
       </div>
     </section>
 
     <section class="carte">
-      <span class="etiquette">v1.0 — profils NACA</span>
+      <span class="etiquette">v1.0 — NACA profiles</span>
       <h2>NACA 2412</h2>
       <p>
-        Paramétrisation à quatre chiffres, incidence de départ nulle.
-        <span class="chiffre">22 itérations.</span>
-        Finesse Cl/Cd <span class="chiffre">13,43 → 29,88</span>
+        Four-digit parameterisation, zero starting incidence.
+        <span class="chiffre">22 iterations.</span>
+        Lift-to-drag Cl/Cd <span class="chiffre">13.43 → 29.88</span>
         (<span class="chiffre">+122 %</span>).
       </p>
       <div class="liens">
-        <a href="example_report/report.html">Rapport HTML</a>
-        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report/README.md">Version Markdown</a>
+        <a href="example_report/report.html">HTML report</a>
+        <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent/blob/main/docs/example_report/README.md">Markdown version</a>
       </div>
     </section>
 
@@ -123,14 +123,14 @@
 
   <footer>
     <p>
-      Le système reçoit un profil et un objectif, puis construit la géométrie,
-      la maille, lance un calcul CFD OpenFOAM, lit les coefficients, propose une
-      forme meilleure, et recommence — sans intervention.
+      The system is given a profile and an objective, then builds the geometry,
+      meshes it, runs an OpenFOAM CFD computation, reads the coefficients,
+      proposes a better shape, and starts again — unattended.
     </p>
     <p>
-      Code, documentation et mode d'emploi :
+      Code, documentation and instructions:
       <a href="https://github.com/Patxi-Sallaberry/aero-opt-agent">github.com/Patxi-Sallaberry/aero-opt-agent</a>.
-      La branche <code>main</code> porte la v1.5 ; la v1.0 est figée au tag
+      Branch <code>main</code> carries v1.5; v1.0 is frozen at tag
       <code>v1.0-stable</code>.
     </p>
   </footer>
