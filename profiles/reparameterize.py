@@ -316,10 +316,7 @@ def build_design_params(
         "design_id": design_id or _identifier(profile.name),
         "parameterization": "cst",
         "parameters": parameters,
-        "constraints": {
-            "topology_preserving": True,
-            "min_wall_thickness_mm": 1.5,
-        },
+        "constraints": _constraints(fitted, trailing_gap),
         "objectives": {"primary": objective},
         "provenance": {
             "source": str(profile.source) if profile.source else None,
@@ -336,6 +333,47 @@ def build_design_params(
             "original_chord_mm": profile.metadata.get("chord_mm"),
             "removed_incidence_deg": round(profile.transform.rotation_deg, 4),
         },
+    }
+
+
+#: Marge accordée aux trois grandeurs que le §4 veut « sous contrôle
+#: explicite », en proportion de leur valeur d'origine. Assez large pour que
+#: l'optimiseur travaille, assez serrée pour qu'une dérive se voie : à ±40 %,
+#: un profil à 12 % d'épaisseur ne peut ni descendre sous 7 % — il ne serait
+#: plus maillable ni fabricable — ni monter au dessus de 17 %.
+CONSTRAINT_MARGIN = 0.4
+
+#: Le bord de fuite, lui, n'a pas de valeur de référence utile quand il est
+#: fermé : sa marge est absolue, en fraction de corde. Un bord de fuite qui
+#: s'épaissit au delà de 2 % traîne beaucoup et cesse d'être un profil.
+TRAILING_EDGE_CEILING = 0.02
+
+
+def _constraints(fitted: CSTProfile, trailing_gap: float) -> dict[str, Any]:
+    """Bornes géométriques explicites, calées sur la forme d'origine.
+
+    Le §4 exige que le rayon de bord d'attaque, l'épaisseur maximale et
+    l'épaisseur de bord de fuite restent sous contrôle explicite. Les bornes des
+    coefficients les contiennent déjà indirectement — chacun ne peut déplacer sa
+    surface que de 1,5 % de corde — mais indirectement ne suffit pas : rien
+    n'empêche deux coefficients de conspirer dans le même sens, et surtout rien
+    ne le signalerait. Ces bornes-ci sont vérifiées sur la forme reconstruite,
+    à chaque itération.
+    """
+    thickness, _ = fitted.max_thickness()
+    radius = fitted.leading_edge_radius
+    return {
+        "topology_preserving": True,
+        "min_wall_thickness_mm": 1.5,
+        "min_thickness_ratio": round(thickness * (1.0 - CONSTRAINT_MARGIN), 6),
+        "max_thickness_ratio": round(thickness * (1.0 + CONSTRAINT_MARGIN), 6),
+        "min_leading_edge_radius": round(radius * (1.0 - CONSTRAINT_MARGIN), 6),
+        "max_leading_edge_radius": round(radius * (1.0 + CONSTRAINT_MARGIN), 6),
+        "max_trailing_edge_thickness": round(
+            max(abs(trailing_gap) * (1.0 + CONSTRAINT_MARGIN),
+                TRAILING_EDGE_CEILING),
+            6,
+        ),
     }
 
 

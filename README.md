@@ -37,7 +37,7 @@ vingt-quatre coefficients CST, sans rien perdre de ce qui précède.
 
 | | v1.0 | v1.5 |
 |---|---|---|
-| Entrée | 4 chiffres NACA | + fichiers `.dat` / `.csv` (Selig, Lednicer, CSV) |
+| Entrée | 4 chiffres NACA | + fichiers `.dat` / `.csv` (Selig, Lednicer, CSV) et dessins `.dxf` |
 | Description de la forme | épaisseur, cambrure | + 24 coefficients de Kulfan |
 | Producteurs de géométrie | interne, Fusion | les deux, derrière une interface commune |
 | Fidélité contrôlée | emprise du STL | + porte de reconstruction, aller-retour STL |
@@ -109,7 +109,7 @@ cp .env.example .env        # puis renseigner FOAM_BASHRC
 Vérifier que tout répond :
 
 ```bash
-python3 -m pytest tests/ -q                       # 726 tests, ~30 s
+python3 -m pytest tests/ -q                       # 766 tests, ~25 s
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
@@ -226,7 +226,8 @@ configs/
   cfd_settings_demo.yaml         le rapide, mais qui garde les cases (visuels)
 examples/profiles/               profils d'exemple (NACA, Clark Y, E387, S1223)
 profiles/
-  loader.py                      lecture Selig / Lednicer / CSV
+  loader.py                      lecture Selig / Lednicer / CSV / DXF
+  dxf.py                         extraction du contour d'un dessin 2D
   profile.py                     profil normalisé + mesures géométriques
   validation.py                  contrôles de validité
   cst.py                         paramétrisation de Kulfan + ajustement
@@ -256,7 +257,7 @@ agent/
 scripts/
   run_loop.py                    boucle d'optimisation
 data/iterations/                 archives (non versionné)
-tests/                           726 tests
+tests/                           766 tests
 ```
 
 ---
@@ -359,6 +360,7 @@ incompatibles, qu'aucun en-tête n'identifie :
 | **Selig** | un contour continu : bord de fuite → extrados → nez → intrados → bord de fuite. Le plus répandu (UIUC, XFOIL). |
 | **Lednicer** | un en-tête de deux nombres — les comptes de points —, puis chaque surface du nez vers la queue. |
 | **CSV** | colonnes `x, y`, éventuellement précédées d'une colonne de surface. C'est ce que ce projet exporte. |
+| **DXF** | un dessin, pas une liste de points. Reconnu à son extension, traité à part (ci-dessous). |
 
 Selig et Lednicer ont exactement la même allure : deux colonnes de nombres.
 Seule la façon dont l'abscisse évolue les sépare — elle décroît puis remonte
@@ -392,6 +394,40 @@ réels.
 Rien ne lève : le chargement comme la validation rendent un compte rendu, à
 l'image de `GeometryBackend.generate`. Un fichier douteux ne doit pas
 interrompre une boucle.
+
+### Partir d'un dessin 2D (DXF)
+
+```bash
+python3 profiles/loader.py mon_dessin.dxf
+python3 -m profiles.reparameterize mon_dessin.dxf --chord 300
+```
+
+Un DXF n'est pas une liste de coordonnées : c'est un dessin. Les entités y sont
+dans l'ordre où elles ont été tracées, chacune dans le sens où la main est
+passée, le contour est souvent découpé en morceaux, et il traîne un cartouche
+à côté. Rien de tout cela n'est une anomalie — c'est ce que produit une CAO.
+
+La lecture reconstitue donc sans rien supposer du fichier : elle raboute les
+morceaux par proximité de leurs extrémités **en les retournant au besoin**,
+retient le contour le plus étendu parmi ceux qu'elle trouve, le fait partir du
+point d'abscisse maximale — le bord de fuite — et le parcourt dans le sens qui
+passe par l'extrados en premier. Après quoi le chemin est exactement celui d'un
+fichier de points, nettoyage et validation compris.
+
+Sont lus : `LWPOLYLINE`, `POLYLINE`/`VERTEX`, `LINE`, `ARC`, `CIRCLE` et
+`SPLINE`. Toute entité non gérée est **signalée** — si le contour en dépendait,
+il faut le savoir.
+
+Le fichier d'exemple `examples/profiles/naca2412.dxf` est volontairement peu
+coopératif : dix-sept polylignes mélangées, sens de parcours inversé, une ligne
+de fermeture et un cartouche parasite. Il redonne le profil d'origine au bit
+près, et les mêmes coefficients CST à 10⁻⁸.
+
+> **Le STEP n'est pas lu.** Un DXF est un format texte dont les entités 2D se
+> déchiffrent sans dépendance ; un STEP décrit une topologie B-Rep où le
+> contour n'est pas écrit mais se déduit de faces, d'arêtes et de courbes NURBS
+> chaînées. Le reconstituer demande un noyau CAO. Plutôt qu'une approximation
+> silencieuse, la limite est dite : exporter le contour en DXF depuis la CAO.
 
 ---
 
@@ -472,6 +508,33 @@ C'est aussi pourquoi un fichier grossier ne se « répare » pas en montant
 l'ordre : les 61 points de l'E387 sont refusés à tous les ordres raisonnables,
 et le message conseille un fichier plus dense plutôt qu'un surajustement.
 
+### La méthode de repli, mesurée puis écartée
+
+Le §4 propose, si CST échoue, une décomposition en **épaisseur + cambrure** :
+ajuster séparément `t(x)` avec une base en racine de x et `yc(x)` avec une base
+à puissances entières. L'idée est séduisante — c'est exactement la nature des
+deux termes, et cela explique le plancher structurel de CST sur les profils
+cambrés.
+
+Elle a été implémentée en ajustement conjoint sur les points d'origine, à
+nombre de coefficients égal, et mesurée :
+
+| profil | ordre | CST, écart max | repli, écart max |
+|---|---|---|---|
+| NACA 2412 | 11 | **2,92 × 10⁻⁴** | 5,55 × 10⁻⁴ |
+| Clark Y | 11 | **3,25 × 10⁻⁴** | 6,58 × 10⁻⁴ |
+| E387 | 11 | **1,01 × 10⁻³** | 1,35 × 10⁻³ |
+| S1223 | 11 | 1,56 × 10⁻³ | **1,37 × 10⁻³** |
+
+CST gagne sur trois profils des quatre. Le repli ne l'emporte que sur le S1223,
+très fortement cambré — et **pas assez pour franchir la porte**, qui est à
+5 × 10⁻⁴. Il ne rachète donc aucun des cas qu'il est censé rattraper.
+
+Le code n'a pas été retenu. Ajouter une seconde paramétrisation à toute la
+chaîne — variables, bornes, reconstruction, rapport — pour zéro cas sauvé
+n'aurait acheté que de la surface d'erreur. Le résultat est consigné ici parce
+qu'il répond à la question, et qu'un futur lecteur n'a pas à refaire la mesure.
+
 ### Des bornes qui ont un sens géométrique
 
 Sur un profil réel, les coefficients ne sont pas du même ordre : le Clark Y en
@@ -488,6 +551,34 @@ le rayon de nez et l'angle de bord de fuite.
 
 Vérifié : sur quarante-huit bornes poussées à l'extrême, aucune ne produit un
 profil invalide.
+
+### Trois grandeurs sous contrôle explicite
+
+Le §4 exige que le **rayon de bord d'attaque**, l'**épaisseur maximale** et
+l'**épaisseur de bord de fuite** restent sous contrôle explicite. Les bornes
+des coefficients les contiennent déjà indirectement — chacun ne déplace sa
+surface que de 1,5 % de corde — mais indirectement ne suffit pas : rien
+n'empêche deux coefficients de conspirer dans le même sens, et surtout **rien
+ne le signalerait**. Un profil qui s'amincirait de 12 % à 6 % au fil de vingt
+itérations passerait toutes les autres portes.
+
+La re-paramétrisation écrit donc des bornes explicites, calées à ±40 % de la
+forme d'origine :
+
+```yaml
+constraints:
+  topology_preserving: true
+  min_wall_thickness_mm: 1.5
+  min_thickness_ratio: 0.070289      # ces cinq clés sont facultatives ;
+  max_thickness_ratio: 0.164009      # les fichiers de la v1.0 n'en ont pas
+  min_leading_edge_radius: 0.00721   # et restent valides
+  max_leading_edge_radius: 0.016824
+  max_trailing_edge_thickness: 0.02
+```
+
+Elles sont vérifiées **à chaque itération, sur la forme reconstruite**, par
+`pipeline/geometry_validator.py`. Une violation fait échouer l'itération comme
+une géométrie aberrante — franchement, plutôt que de laisser dériver.
 
 ### Aller-retour
 
@@ -948,7 +1039,7 @@ ses paramètres n'est rattachable à rien.
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q          # 726 tests, ~30 s
+python3 -m pytest tests/ -q          # 766 tests, ~25 s
 ```
 
 Ce qui est couvert sans dépendance externe : validation du contrat, unités et
@@ -979,7 +1070,8 @@ tournent réellement, sur un document qui reproduit celui du premier run réel.
 | `configs/cfd_settings_fast.yaml` | Le réglage fin coûte 15 min par itération, soit 5 h pour 20 itérations. |
 | Mode `rebuild` par défaut | Le seed livré n'est pas réellement piloté par ses paramètres (voir plus haut). |
 | Coordonnées en listes de tuples, pas en `np.ndarray` | Le driver tourne dans l'interpréteur embarqué de Fusion, où numpy n'est pas garanti. Aucune opération n'en tire profit ici. |
-| Modes 3 et 4 du §3 (STEP/DXF, design Fusion existant) non implémentés | Ils demandent un noyau CAO ou une session Fusion pilotable. Les modes 1 et 2 couvrent l'usage visé, et l'interface `GeometryBackend` laisse la place. |
+| Mode 3 du §3 : DXF lu, **STEP non lu** | Un DXF est un format texte dont les entités 2D se déchiffrent sans dépendance ; un STEP décrit une topologie B-Rep dont le contour se déduit de faces et de courbes NURBS chaînées, ce qui demande un noyau CAO. |
+| §4, méthode de repli non retenue | Mesurée puis écartée : la décomposition épaisseur/cambrure ne bat CST que sur un profil des quatre testés, et jamais assez pour franchir la porte. Voir ci-dessous. |
 | Ordonnées de bord de fuite dans `provenance`, pas dans `parameters` | Le contrat exige `min < max` : une grandeur qui décrit la forme sans être optimisable n'a pas sa place parmi les variables. |
 | Tolérance sur un défaut de skewness rare et contenu | Un bord de fuite épaissi produit quelques faces gauchies qu'aucun préréglage ne résout. Trois faces sur 258 814 ne rendent pas un maillage inexploitable ; le défaut est rapporté, pas tu. |
 
@@ -1024,21 +1116,29 @@ Les critères du §10 du document maître, et ce qui les atteste :
 |---|---|---|
 | La v1.0 tourne toujours | ✅ | branche figée au tag `v1.0-stable`, jamais modifiée |
 | Un profil CSV/DAT ingéré et re-paramétré à faible erreur | ✅ | Clark Y : 3,25 × 10⁻⁴ de corde en écart maximal |
+| Les trois grandeurs de forme sous contrôle explicite | ✅ | bornes écrites et vérifiées à chaque itération |
 | Une optimisation de ≥ 15 itérations aboutit de façon fiable | ✅ | 25 itérations, **0 échec** |
 | Les deux producteurs de géométrie fonctionnent | ✅ | interne exercé en continu ; Fusion couvert par une émulation de l'API `adsk` |
 | Un paquet `best_design` complet est produit automatiquement | ✅ | [exemple versionné](docs/example_report_clarky/) |
 | Des instructions claires et vérifiables pour reprendre en CAO | ✅ | `FUSION_RETURN.md` + script généré + contrôle d'aller-retour |
 | Une structure prête pour un backend 3D | ✅ | voir ci-dessous |
 
-Ce qui reste hors périmètre, assumé : les modes 3 et 4 du §3 — ingestion d'un
-STEP/DXF et d'un design Fusion existant — demandent un noyau CAO ou une session
-Fusion pilotable, que rien ici ne fournit.
+Les quatre modes d'entrée du §3 :
 
-Une réserve honnête sur le producteur Fusion : il est exercé contre une
-**émulation** de l'API `adsk`, pas contre Fusion. Un faux valide la logique du
-driver, pas la lecture de l'API — un bug de ce genre est déjà passé au travers
-de 206 tests parce que la doublure encodait la même erreur de compréhension que
-le code.
+| mode | état |
+|---|---|
+| 1 — paramétrique natif (NACA) | ✅ conservé de la v1.0 |
+| 2 — points ordonnés (CSV/DAT) | ✅ Selig, Lednicer, CSV |
+| 3 — CAO 2D | ✅ **DXF** ; ❌ STEP, qui demande un noyau CAO |
+| 4 — design Fusion existant | ✅ `FUSION_GEOMETRY_BACKEND=fusion` en mode `parameters` |
+
+**La seule réserve de fond porte sur Fusion.** Le producteur et le chemin de
+retour sont exercés contre une **émulation** de l'API `adsk`, pas contre Fusion
+360 — qui n'a pas de mode headless et ne peut donc pas être piloté depuis une
+boucle automatique. Un faux valide la logique du driver, pas la lecture de
+l'API : un bug de ce genre est déjà passé au travers de 206 tests parce que la
+doublure encodait la même erreur de compréhension que le code. Confirmer les
+deux demande une session Fusion réelle, et rien d'autre ne peut trancher.
 
 ---
 

@@ -46,6 +46,7 @@ from profiles.profile import Point, Profile, ProfileTransform  # noqa: E402
 FORMAT_SELIG = "selig"
 FORMAT_LEDNICER = "lednicer"
 FORMAT_CSV = "csv"
+FORMAT_DXF = "dxf"
 FORMAT_UNKNOWN = "inconnu"
 
 #: En deçà, deux points sont considérés confondus (en fraction de corde).
@@ -421,6 +422,40 @@ def load_profile(
             False, STATUS_FILE_MISSING, message=f"fichier introuvable : {path}"
         )
 
+    # ── Mode 3 : dessin 2D ────────────────────────────────────────────────
+    # Un DXF n'est pas une liste de coordonnées mais un dessin : entités
+    # dispersées, dans un ordre et un sens quelconques. On en extrait le contour
+    # et on le ramène à la convention Selig — après quoi le chemin est
+    # exactement celui du Mode 2, nettoyage et validation compris. C'est ce que
+    # demande le §3 : « then same path as Mode 2 ».
+    if path.suffix.lower() == ".dxf":
+        from profiles.dxf import contour_to_selig, read_dxf_contour
+
+        extraction = read_dxf_contour(path)
+        if not extraction.success:
+            return IngestionResult(
+                False, extraction.status, message=extraction.message,
+                warnings=list(extraction.warnings),
+            )
+        warnings.extend(extraction.warnings)
+        rows = contour_to_selig(extraction.contour)
+        if len(rows) < MIN_POINTS:
+            return IngestionResult(
+                False, STATUS_TOO_FEW_POINTS,
+                message=(
+                    f"{len(rows)} point(s) dans le contour extrait de "
+                    f"{path.name} — il en faut au moins {MIN_POINTS}"
+                ),
+                warnings=warnings,
+            )
+        text, textual, counts = "", [], None
+        layout = FORMAT_DXF
+        upper_raw, lower_raw = split_surfaces(rows, FORMAT_SELIG, None)
+        return _finish_profile(
+            upper_raw, lower_raw, rows, textual, path, name,
+            close_te_below, warnings, layout,
+        )
+
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
@@ -481,6 +516,30 @@ def load_profile(
             [(row[0], row[1]) for row in rows], layout, counts
         )
 
+    return _finish_profile(
+        upper_raw, lower_raw, rows, textual, path, name,
+        close_te_below, warnings, layout,
+    )
+
+
+def _finish_profile(
+    upper_raw: list[Point],
+    lower_raw: list[Point],
+    rows: Sequence[Sequence[float]],
+    textual: Sequence[str],
+    path: Path,
+    name: str | None,
+    close_te_below: float,
+    warnings: list[str],
+    layout: str,
+) -> IngestionResult:
+    """Nettoyage, normalisation et emballage, communs à tous les formats.
+
+    Partagée par les quatre entrées — Selig, Lednicer, CSV et DXF — plutôt que
+    recopiée : un contour venu d'un dessin doit subir exactement les mêmes
+    contrôles qu'un fichier de coordonnées, sans quoi la confiance qu'on
+    accorde au second ne s'étendrait pas au premier.
+    """
     upper = drop_duplicates(upper_raw)
     lower = drop_duplicates(lower_raw)
     removed = (len(upper_raw) - len(upper)) + (len(lower_raw) - len(lower))

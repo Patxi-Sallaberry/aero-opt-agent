@@ -36,8 +36,14 @@ from profiles.geometry import (  # noqa: F401
     cst_measures,
     cst_profile,
 )
+from profiles.dxf import (  # noqa: F401
+    DXFResult,
+    contour_to_selig,
+    read_dxf_contour,
+)
 from profiles.loader import (  # noqa: F401
     FORMAT_CSV,
+    FORMAT_DXF,
     FORMAT_LEDNICER,
     FORMAT_SELIG,
     FORMAT_UNKNOWN,
@@ -69,7 +75,11 @@ __all__ = [
     "ContourError",
     "CSTProfile",
     "CSTSurface",
+    "DXFResult",
     "FORMAT_CSV",
+    "FORMAT_DXF",
+    "contour_to_selig",
+    "read_dxf_contour",
     "ReconstructionError",
     "RoundTripReport",
     "check_roundtrip",

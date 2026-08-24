@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import json
 import sys
 from pathlib import Path
@@ -86,6 +87,111 @@ def fingerprint(path: Path) -> str:
         for block in iter(lambda: fh.read(65536), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+#: Contraintes géométriques facultatives, en fraction de corde. Le §4 exige que
+#: le rayon de bord d'attaque, l'épaisseur maximale et l'épaisseur de bord de
+#: fuite « restent sous contrôle explicite ». Les bornes des coefficients CST
+#: les contiennent indirectement — chaque coefficient ne peut déplacer la
+#: surface que de 1,5 % de corde — mais indirectement n'est pas explicitement :
+#: rien n'empêche DEUX coefficients de conspirer, et rien ne le SIGNALERAIT.
+#:
+#: Ces clés sont facultatives et absentes des fichiers de la v1.0, qui restent
+#: donc valides. Déclarées, elles sont vérifiées à chaque itération sur la forme
+#: RECONSTRUITE, et une violation fait échouer l'itération comme une géométrie
+#: aberrante — franchement, plutôt que de dériver en silence.
+GEOMETRIC_CONSTRAINTS: tuple[tuple[str, str, str], ...] = (
+    ("min_thickness_ratio", "thickness", "min"),
+    ("max_thickness_ratio", "thickness", "max"),
+    ("min_leading_edge_radius", "leading_edge_radius", "min"),
+    ("max_leading_edge_radius", "leading_edge_radius", "max"),
+    ("max_trailing_edge_thickness", "trailing_edge_thickness", "max"),
+)
+
+CONSTRAINT_LABELS = {
+    "thickness": "épaisseur relative",
+    "leading_edge_radius": "rayon de bord d'attaque",
+    "trailing_edge_thickness": "épaisseur de bord de fuite",
+}
+
+
+def profile_measures(design: Mapping[str, Any]) -> dict[str, float] | None:
+    """Grandeurs de forme de la géométrie décrite, en fraction de corde.
+
+    Passe par la même fonction de profil que le driver plutôt que par une
+    formule dupliquée : ce qui est mesuré ici est exactement ce qui sera écrit.
+    """
+    try:
+        from fusion.parametric_driver import profile_from_parameters
+
+        plan = profile_from_parameters(
+            design.get("parameters") or {},
+            design.get("parameterization"),
+            design.get("provenance"),
+        )
+    except Exception:
+        return None
+
+    profile = plan.get("profile") or {}
+    upper, lower = profile.get("upper") or [], profile.get("lower") or []
+    chord_cm = float(plan.get("chord_cm") or 0.0)
+    if not upper or not lower or chord_cm <= 0:
+        return None
+
+    measures = {
+        "thickness": float(plan.get("thickness", 0.0)),
+        "camber": float(plan.get("camber", 0.0)),
+        "trailing_edge_thickness": (
+            math.dist(upper[-1], lower[-1]) / chord_cm
+        ),
+    }
+    if "leading_edge_radius" in plan:
+        measures["leading_edge_radius"] = float(plan["leading_edge_radius"])
+    return measures
+
+
+def _check_geometric_constraints(
+    design: Mapping[str, Any], report: dict
+) -> list[str]:
+    """Vérifie les bornes géométriques déclarées. Silencieux si aucune ne l'est."""
+    constraints = design.get("constraints") or {}
+    declared = [c for c in GEOMETRIC_CONSTRAINTS if c[0] in constraints]
+    if not declared:
+        return []
+
+    measures = profile_measures(design)
+    if measures is None:
+        return [
+            "contraintes géométriques déclarées mais la forme n'est pas "
+            "mesurable : impossible de les vérifier"
+        ]
+    report["profile_measures"] = {k: round(v, 6) for k, v in measures.items()}
+
+    problems: list[str] = []
+    for key, quantity, sense in declared:
+        value = measures.get(quantity)
+        if value is None:
+            problems.append(
+                f"{key} déclarée mais {CONSTRAINT_LABELS[quantity]} non "
+                f"mesurable sur cette paramétrisation"
+            )
+            continue
+        try:
+            limit = float(constraints[key])
+        except (TypeError, ValueError):
+            problems.append(f"constraints.{key} : nombre attendu")
+            continue
+        if sense == "min" and value < limit:
+            problems.append(
+                f"{CONSTRAINT_LABELS[quantity]} {value:.5f} c sous le minimum "
+                f"{limit:.5f} c (constraints.{key})"
+            )
+        elif sense == "max" and value > limit:
+            problems.append(
+                f"{CONSTRAINT_LABELS[quantity]} {value:.5f} c au dessus du "
+                f"maximum {limit:.5f} c (constraints.{key})"
+            )
+    return problems
 
 
 def _thickness_ratio(
@@ -256,6 +362,7 @@ def validate_geometry(
             )
 
     problems = _check_thickness(bbox, design, report)
+    problems += _check_geometric_constraints(design, report)
     if problems:
         raise GeometryError(
             STATUS_CONSTRAINT_VIOLATED, " | ".join(problems), details=problems
