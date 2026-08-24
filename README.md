@@ -683,6 +683,28 @@ l'extrude sur une longueur brute. **Modifier ses paramètres n'y déplace pas un
 point** — sans `rebuild`, chaque itération exporterait une géométrie identique
 et l'agent optimiserait dans le vide, sans la moindre erreur pour le signaler.
 
+### Partir d'un modèle Fusion existant
+
+C'est le Mode 4 du §3, et il ne demande aucun code particulier : si votre modèle
+est **réellement** paramétrique — ses cotes pilotées par des User Parameters —
+le driver n'a qu'à les mettre à jour et laisser Fusion recalculer.
+
+```bash
+export FUSION_GEOMETRY_BACKEND=fusion
+export FUSION_GEOMETRY_MODE=parameters
+```
+
+Les noms de `parameters` dans `design_params.yaml` doivent alors correspondre
+**exactement** aux User Parameters du modèle ; un nom absent fait échouer
+l'itération en `PARAM_NOT_FOUND` plutôt que de passer inaperçu.
+
+Attention au piège que le seed livré illustre : beaucoup de modèles *exposent*
+des User Parameters sans que la géométrie en dépende. Le mode `parameters` y
+exporterait une forme identique à chaque itération, et l'agent optimiserait
+dans le vide sans la moindre erreur pour le signaler. En cas de doute, garder
+`rebuild` — le contrôle d'empreinte de géométrie attrape le cas, mais après
+avoir dépensé une itération.
+
 ### Lancer le driver dans Fusion
 
 1. Ouvrir le modèle (ou déposer le seed en `fusion/seed_design.f3d`).
