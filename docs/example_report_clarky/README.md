@@ -214,4 +214,4 @@ In ParaView, the final time step carries `U` (velocity), `p` (**kinematic** pres
 
 ---
 
-Exported on 24/08/2026 at 19:41 UTC by `scripts/export_best.py`.
+Exported on 24/08/2026 at 19:50 UTC by `scripts/export_best.py`.

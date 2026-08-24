@@ -432,7 +432,7 @@ def build_figures(
             "optimization_progress.svg",
             plots.chart(
                 [cl_cd], title="Lift-to-drag over the iterations",
-                x_label="itération", y_label="Cl / Cd",
+                x_label="iteration", y_label="Cl / Cd",
             ),
         )
         write(
@@ -440,7 +440,7 @@ def build_figures(
             plots.chart(
                 [series("Cd", "Cd"), series("Cl", "Cl")],
                 title="Cd and Cl over the iterations",
-                x_label="itération", y_label="coefficient", y_zero_line=True,
+                x_label="iteration", y_label="coefficient", y_zero_line=True,
             ),
         )
 
@@ -486,7 +486,7 @@ def build_figures(
                     {"points": cp["lower"], "label": "intrados", "markers": True},
                 ],
                 title="Distribution de pression sur le profil",
-                x_label="x / corde", y_label="Cp",
+                x_label="x / chord", y_label="Cp",
                 invert_y=True, y_zero_line=True,
             ),
         )
@@ -577,7 +577,7 @@ def build_comparison_figures(
                      "color": plots.COLORS[2]},
                 ],
                 title="Pressure distribution: before / after",
-                x_label="x / corde", y_label="Cp",
+                x_label="x / chord", y_label="Cp",
                 invert_y=True, y_zero_line=True,
             ),
         )

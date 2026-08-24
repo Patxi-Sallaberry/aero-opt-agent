@@ -353,7 +353,7 @@ def test_le_gain_annonce_nomme_son_regime_quand_il_y_a_requalification(
         mp.history(serie), section, {}, [], [], False, False,
         serie / "iter_0000", None,
     )
-    ligne = next(l for l in rapport.splitlines() if "Gain de finesse" in l)
+    ligne = next(l for l in rapport.splitlines() if "Lift-to-drag gain" in l)
     assert "exploration" in ligne
     assert "italics" in ligne
 
@@ -368,7 +368,7 @@ def test_le_gain_reste_sobre_sans_requalification(serie, config, tmp_path):
         mp.history(serie), section, {}, [], [], False, False,
         serie / "iter_0000", None,
     )
-    ligne = next(l for l in rapport.splitlines() if "Gain de finesse" in l)
+    ligne = next(l for l in rapport.splitlines() if "Lift-to-drag gain" in l)
     assert "exploration" not in ligne
 
 
