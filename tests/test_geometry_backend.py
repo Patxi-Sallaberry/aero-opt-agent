@@ -211,7 +211,42 @@ def test_generation_interne(config, tmp_path):
     assert result.backend == "internal"
     assert result.status == "OK"
     assert result.stl_path is not None and result.stl_path.is_file()
-    assert result.has_cad is False        # le calcul interne ne fait pas de CAO
+
+
+def test_le_step_suit_la_presence_du_noyau_cao(config, tmp_path):
+    """Un STEP est écrit si et seulement si le noyau CAO est installé.
+
+    `cadquery` est une dépendance FACULTATIVE de près de deux gigaoctets. Le
+    système doit tourner sans elle exactement comme avant — donc ce test ne
+    peut pas exiger un STEP, ni son absence : il exige la cohérence entre les
+    deux.
+    """
+    from geometry.step_io import available
+
+    out = tmp_path / "iterations" / "iter_0000"
+    out.mkdir(parents=True)
+    result = geometry.get_backend("internal").generate(config, out)
+
+    assert result.success, result.message
+    if available():
+        assert result.step_path is not None and result.step_path.is_file()
+        assert result.has_cad is True
+        assert result.raw["step_faces"] >= 4   # deux surfaces et deux bouts
+        assert result.raw["step_volume_mm3"] > 0
+    else:
+        assert result.step_path is None
+        assert result.has_cad is False
+
+
+def test_le_step_peut_etre_refuse_explicitement(config, tmp_path):
+    """Une longue série n'a pas besoin d'un STEP par itération."""
+    out = tmp_path / "iterations" / "iter_0000"
+    out.mkdir(parents=True)
+    result = geometry.get_backend("internal").generate(config, out, step=False)
+
+    assert result.success, result.message
+    assert result.step_path is None
+    assert not (out / "geometry.step").exists()
 
 
 def test_le_stl_est_en_metres(config, tmp_path):

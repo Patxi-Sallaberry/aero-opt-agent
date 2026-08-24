@@ -1200,8 +1200,8 @@ def _drive_internal(
     summary["purged_entities"] = 0
     summary["stl_units"] = "m"
     warnings = [
-        "géométrie produite sans Fusion (mode interne) : pas de STEP, pas "
-        "d'historique CAO. La forme est celle de design_params.yaml."
+        "géométrie produite sans Fusion (mode interne) : pas d'historique CAO. "
+        "La forme est celle de design_params.yaml."
     ]
     return summary, stl_path, warnings
 

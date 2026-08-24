@@ -184,6 +184,29 @@ def test_le_document_signale_l_absence_de_step():
     assert "il n'y en a pas" not in avec.lower()
 
 
+def test_le_document_met_le_step_en_avant_quand_il_existe():
+    """C'est la voie la plus courte : elle doit être la première proposée."""
+    design, section = section_of()
+    avec = build_return_doc(design, section, has_step=True)
+    assert "geometry.step" in avec
+    assert avec.index("geometry.step") < avec.index("Voie 1")
+
+
+def test_le_document_previent_de_ne_pas_ouvrir_le_stl_a_la_place():
+    """Fusion ouvre le STL sans broncher — et en fait un maillage inutilisable."""
+    design, section = section_of()
+    avec = build_return_doc(design, section, has_step=True)
+    assert "geometry.stl" in avec
+    assert "maillé" in avec or "maillage" in avec
+
+
+def test_l_absence_de_step_nomme_la_dependance():
+    """Dire qu'il manque quelque chose sans dire comment l'obtenir n'aide pas."""
+    design, section = section_of()
+    sans = build_return_doc(design, section, has_step=False)
+    assert "requirements-cad.txt" in sans
+
+
 def test_le_document_previent_du_double_comptage_de_l_incidence():
     """L'erreur la plus facile à commettre en reprenant la section."""
     design, section = section_of()

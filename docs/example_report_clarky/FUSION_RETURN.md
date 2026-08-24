@@ -17,6 +17,14 @@ Le résultat d'une optimisation n'est utile que si l'on peut continuer à le tra
 
 **L'incidence est déjà dans les coordonnées.** La section exportée est celle qui a été simulée, profil incliné compris. Si le montage aval applique lui-même une incidence, il faut partir du profil redressé, sans quoi elle serait comptée deux fois.
 
+## Voie la plus courte — ouvrir `geometry.step`
+
+*File → Open*, ou glisser-déposer le fichier dans Fusion. C'est un vrai solide B-Rep de quelques faces : on peut y poser un congé, en changer l'envergure, l'assembler. Aucune conversion, aucun script.
+
+> **Ne pas ouvrir `geometry.stl` à la place.** Fusion sait le lire, mais il en fait un corps maillé de plusieurs centaines de facettes planes, inutilisable pour de la conception. Le STL est là pour le solveur et l'impression.
+
+Cette voie ne rend pas un modèle *paramétrique* : le solide n'a pas d'historique de features. Pour cela, voir la voie 1.
+
 ## Voie 1 — rejouer les paramètres (recommandée)
 
 C'est la seule voie qui rend un modèle **paramétrique** : un historique de features modifiable, pas une importation figée.
@@ -59,8 +67,6 @@ Utile si l'on préfère garder la main, ou travailler dans un autre logiciel de 
 ## Ce qu'il vaut mieux éviter
 
 **Convertir `geometry.stl` en solide.** Fusion sait le faire, mais le résultat est un maillage de plusieurs centaines de faces planes : impossible d'y poser un congé propre, impossible d'en changer une cote. Le STL est là pour la simulation et l'impression, pas pour la conception.
-
-**Chercher un fichier STEP dans ce dossier.** Il n'y en a pas : la géométrie a été produite par le calculateur interne, qui écrit directement un STL sans passer par un noyau CAO. Les voies 1 et 2 en produisent un.
 
 ## Vérifier que la reprise est fidèle
 

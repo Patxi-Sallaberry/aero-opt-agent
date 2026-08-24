@@ -47,6 +47,7 @@ FORMAT_SELIG = "selig"
 FORMAT_LEDNICER = "lednicer"
 FORMAT_CSV = "csv"
 FORMAT_DXF = "dxf"
+FORMAT_STEP = "step"
 FORMAT_UNKNOWN = "inconnu"
 
 #: En deçà, deux points sont considérés confondus (en fraction de corde).
@@ -420,6 +421,50 @@ def load_profile(
     if not path.is_file():
         return IngestionResult(
             False, STATUS_FILE_MISSING, message=f"fichier introuvable : {path}"
+        )
+
+    # ── Mode 3 : CAO 2D, voie STEP ────────────────────────────────────────
+    # Le contour n'est pas écrit dans un STEP : il se déduit d'une topologie de
+    # faces, d'arêtes et de courbes NURBS. Il faut donc un noyau CAO — et si
+    # l'utilisateur n'en a pas, il vaut mieux le lui dire que d'échouer sur un
+    # « format non reconnu » qui l'enverrait chercher au mauvais endroit.
+    if path.suffix.lower() in (".step", ".stp"):
+        from geometry.step_io import available as step_available
+        from geometry.step_io import read_step_contour
+        from profiles.dxf import contour_to_selig
+
+        if not step_available():
+            return IngestionResult(
+                False, STATUS_FORMAT_UNKNOWN,
+                message=(
+                    f"{path.name} est un STEP, dont la lecture demande un "
+                    f"noyau CAO absent de cette installation. "
+                    f"`pip install cadquery` l'ajoute — ou exporter le contour "
+                    f"en DXF depuis la CAO, qui se lit sans dépendance."
+                ),
+            )
+
+        extraction = read_step_contour(path)
+        if not extraction.success:
+            return IngestionResult(
+                False, STATUS_UNREADABLE, message=extraction.message,
+                warnings=list(extraction.warnings),
+            )
+        warnings.extend(extraction.warnings)
+        rows = contour_to_selig(extraction.contour)
+        if len(rows) < MIN_POINTS:
+            return IngestionResult(
+                False, STATUS_TOO_FEW_POINTS,
+                message=(
+                    f"{len(rows)} point(s) dans le contour extrait de "
+                    f"{path.name} — il en faut au moins {MIN_POINTS}"
+                ),
+                warnings=warnings,
+            )
+        upper_raw, lower_raw = split_surfaces(rows, FORMAT_SELIG, None)
+        return _finish_profile(
+            upper_raw, lower_raw, rows, [], path, name,
+            close_te_below, warnings, FORMAT_STEP,
         )
 
     # ── Mode 3 : dessin 2D ────────────────────────────────────────────────

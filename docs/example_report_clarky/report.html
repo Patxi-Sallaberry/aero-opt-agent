@@ -529,6 +529,7 @@
 <table>
 <tr><th>fichier</th><th>quoi</th></tr>
 <tr><td><code>geometry.stl</code></td><td>la géométrie, <strong>en mètres</strong>, telle que simulée</td></tr>
+<tr><td><code>geometry.step</code></td><td>la même, en CAO</td></tr>
 <tr><td><code>profile_section.csv</code></td><td>section 2D en millimètres</td></tr>
 <tr><td><code>profile_section.dat</code></td><td>même section au format profil</td></tr>
 <tr><td><code>profile_chord.dat</code></td><td>profil <strong>redressé</strong>, corde unitaire — pour XFOIL / XFLR5</td></tr>
@@ -558,7 +559,6 @@ cp design_params.yaml &lt;projet&gt;/configs/design_params.yaml
 # Utilities → ADD-INS → Scripts → + → rebuild_in_fusion.py → Run
 </pre>
 <p><strong>L'incidence est déjà dans les coordonnées</strong> de la section exportée : c'est la géométrie réellement simulée. Si le montage aval applique lui-même une incidence, elle serait comptée deux fois.</p>
-<p>Il n'y a pas de fichier STEP dans ce dossier : la géométrie a été produite par le calculateur interne, qui écrit directement un STL sans passer par un noyau CAO. Les voies 1 et 2 en produisent un.</p>
 <h2>Ouvrir les fichiers</h2>
 <pre>
 # la géométrie (STL en mètres)
@@ -577,5 +577,5 @@ python3 scripts/run_loop.py --max-iterations 20 \
 </pre>
 <p>Dans ParaView, le pas de temps final porte <code>U</code> (vitesse), <code>p</code> (pression <strong>cinématique</strong>, en m²/s² — multiplier par ρ = 1,225 kg/m³ pour des pascals), <code>k</code>, <code>omega</code> et <code>nut</code>. Le patch <code>wing</code> est la surface de l'aile.</p>
 <hr/>
-<p>Exporté le 20/08/2026 à 23:05 UTC par <code>scripts/export_best.py</code>.</p>
+<p>Exporté le 24/08/2026 à 18:19 UTC par <code>scripts/export_best.py</code>.</p>
 </body></html>

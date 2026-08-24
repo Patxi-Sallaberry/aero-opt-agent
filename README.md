@@ -37,10 +37,11 @@ vingt-quatre coefficients CST, sans rien perdre de ce qui précède.
 
 | | v1.0 | v1.5 |
 |---|---|---|
-| Entrée | 4 chiffres NACA | + fichiers `.dat` / `.csv` (Selig, Lednicer, CSV) et dessins `.dxf` |
+| Entrée | 4 chiffres NACA | + `.dat` / `.csv` (Selig, Lednicer, CSV), dessins `.dxf`, pièces `.step` |
 | Description de la forme | épaisseur, cambrure | + 24 coefficients de Kulfan |
 | Producteurs de géométrie | interne, Fusion | les deux, derrière une interface commune |
 | Fidélité contrôlée | emprise du STL | + porte de reconstruction, aller-retour STL |
+| Sortie CAO | STL seul | + **STEP** : un vrai solide, ouvrable tel quel |
 | Retour en CAO | section CSV | + `FUSION_RETURN.md` et script Fusion généré |
 
 **La v1.0 n'a pas été modifiée** : elle vit sur sa propre branche, figée au tag
@@ -103,13 +104,16 @@ sudo apt-get install openfoam2506-default
 # facultatif : visuels CFD du rapport
 sudo apt-get install paraview xvfb
 
+# facultatif : STEP en entrée et en sortie (~2 Go, OpenCASCADE)
+python3 -m pip install -r requirements-cad.txt
+
 cp .env.example .env        # puis renseigner FOAM_BASHRC
 ```
 
 Vérifier que tout répond :
 
 ```bash
-python3 -m pytest tests/ -q                       # 766 tests, ~25 s
+python3 -m pytest tests/ -q                       # 788 tests, ~40 s
 python3 pipeline/utils.py configs/design_params.yaml --show-ranges
 ```
 
@@ -147,7 +151,8 @@ results/run_AAAAMMJJ_HHMMSS/best_design/
 ├── README.md              le même rapport, en Markdown
 ├── FUSION_RETURN.md       comment reprendre le design en CAO
 ├── rebuild_in_fusion.py   script Fusion qui retrace le profil
-├── geometry.stl           la géométrie optimisée, en mètres
+├── geometry.step          le solide CAO, en millimètres ← à ouvrir dans Fusion
+├── geometry.stl           le maillage pour le solveur, en mètres
 ├── profile_section.csv    la section telle que simulée
 ├── profile_chord.dat      le profil redressé, pour XFOIL / XFLR5
 ├── design_params.yaml     les paramètres exacts, rejouables
@@ -238,6 +243,7 @@ geometry/
   base.py                        interface GeometryBackend + registre
   internal_backend.py            producteur interne (toujours disponible)
   fusion_backend.py              producteur Fusion 360
+  step_io.py                     STEP en entrée et en sortie (noyau facultatif)
   common.py                      normalisation des comptes rendus
 fusion/
   seed_design.f3d                modèle Fusion (non versionné)
@@ -257,7 +263,7 @@ agent/
 scripts/
   run_loop.py                    boucle d'optimisation
 data/iterations/                 archives (non versionné)
-tests/                           766 tests
+tests/                           788 tests
 ```
 
 ---
@@ -423,11 +429,25 @@ coopératif : dix-sept polylignes mélangées, sens de parcours inversé, une li
 de fermeture et un cartouche parasite. Il redonne le profil d'origine au bit
 près, et les mêmes coefficients CST à 10⁻⁸.
 
-> **Le STEP n'est pas lu.** Un DXF est un format texte dont les entités 2D se
-> déchiffrent sans dépendance ; un STEP décrit une topologie B-Rep où le
-> contour n'est pas écrit mais se déduit de faces, d'arêtes et de courbes NURBS
-> chaînées. Le reconstituer demande un noyau CAO. Plutôt qu'une approximation
-> silencieuse, la limite est dite : exporter le contour en DXF depuis la CAO.
+### Partir d'un STEP
+
+```bash
+python3 -m pip install -r requirements-cad.txt   # une fois, ~2 Go
+python3 -m profiles.reparameterize ma_piece.step --chord 300
+```
+
+Un STEP ne contient pas de contour : il décrit une topologie B-Rep, où la forme
+se déduit de faces, d'arêtes et de courbes NURBS chaînées. Là où un DXF se
+déchiffre à la main, celui-ci demande un **noyau CAO** — d'où la dépendance
+facultative, qui embarque OpenCASCADE en entier.
+
+La lecture retient la plus grande face **plane** — la section d'un prisme, ou
+le dessin lui-même — puis discrétise sa boucle extérieure arête par arête, en
+resserrant sur les courbes et pas sur les droites.
+
+Sans le noyau, un `.step` n'échoue pas sur un « format non reconnu » qui
+enverrait chercher au mauvais endroit : le message nomme la dépendance et
+rappelle qu'un export DXF depuis la CAO se lit sans elle.
 
 ---
 
@@ -1001,9 +1021,20 @@ le `report.html` en porte une section dédiée.
 
 | voie | ce qu'on obtient | quand la choisir |
 |---|---|---|
+| **Ouvrir `geometry.step`** | solide natif, en un double-clic | **le plus simple**, si le noyau CAO est installé |
 | **Rejouer les paramètres** | modèle natif, historique CAO complet | dès qu'un modèle de départ existe |
-| **Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans intervention | sans modèle de départ |
+| **Script `rebuild_in_fusion.py`** | esquisse + extrusion, sans intervention | sans modèle de départ ni noyau CAO |
 | **Importer `profile_section.csv`** | esquisse tracée à la main | pour garder la main, ou une autre CAO |
+
+**La voie la plus courte, si `requirements-cad.txt` est installé** : le dossier
+contient un `geometry.step`, que Fusion ouvre directement — *File → Open*, ou
+glisser-déposer. C'est un vrai solide B-Rep de quelques faces, pas un maillage :
+on peut y poser un congé, en changer l'envergure, l'assembler. Aucune
+conversion, aucun script.
+
+> Ne pas confondre avec l'import du STL. Fusion sait aussi l'ouvrir, mais il en
+> fait un corps maillé de plusieurs centaines de facettes planes — inutilisable
+> pour de la conception. Le STL est là pour le solveur et l'impression.
 
 ```bash
 # voie 1 — le driver reconstruit la forme et exporte STEP et STL
@@ -1061,7 +1092,7 @@ ses paramètres n'est rattachable à rien.
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q          # 766 tests, ~25 s
+python3 -m pytest tests/ -q          # 788 tests, ~40 s
 ```
 
 Ce qui est couvert sans dépendance externe : validation du contrat, unités et
@@ -1092,7 +1123,7 @@ tournent réellement, sur un document qui reproduit celui du premier run réel.
 | `configs/cfd_settings_fast.yaml` | Le réglage fin coûte 15 min par itération, soit 5 h pour 20 itérations. |
 | Mode `rebuild` par défaut | Le seed livré n'est pas réellement piloté par ses paramètres (voir plus haut). |
 | Coordonnées en listes de tuples, pas en `np.ndarray` | Le driver tourne dans l'interpréteur embarqué de Fusion, où numpy n'est pas garanti. Aucune opération n'en tire profit ici. |
-| Mode 3 du §3 : DXF lu, **STEP non lu** | Un DXF est un format texte dont les entités 2D se déchiffrent sans dépendance ; un STEP décrit une topologie B-Rep dont le contour se déduit de faces et de courbes NURBS chaînées, ce qui demande un noyau CAO. |
+| STEP derrière une dépendance facultative | `cadquery` embarque OpenCASCADE en entier : près de deux gigaoctets. L'imposer à qui ne veut que la CFD serait disproportionné ; tout fonctionne sans, et son absence est dite avec la commande pour y remédier. |
 | §4, méthode de repli non retenue | Mesurée puis écartée : la décomposition épaisseur/cambrure ne bat CST que sur un profil des quatre testés, et jamais assez pour franchir la porte. Voir ci-dessous. |
 | Ordonnées de bord de fuite dans `provenance`, pas dans `parameters` | Le contrat exige `min < max` : une grandeur qui décrit la forme sans être optimisable n'a pas sa place parmi les variables. |
 | Tolérance sur un défaut de skewness rare et contenu | Un bord de fuite épaissi produit quelques faces gauchies qu'aucun préréglage ne résout. Trois faces sur 258 814 ne rendent pas un maillage inexploitable ; le défaut est rapporté, pas tu. |
@@ -1151,7 +1182,7 @@ Les quatre modes d'entrée du §3 :
 |---|---|
 | 1 — paramétrique natif (NACA) | ✅ conservé de la v1.0 |
 | 2 — points ordonnés (CSV/DAT) | ✅ Selig, Lednicer, CSV |
-| 3 — CAO 2D | ✅ **DXF** ; ❌ STEP, qui demande un noyau CAO |
+| 3 — CAO 2D | ✅ **DXF** sans dépendance ; ✅ **STEP** avec `requirements-cad.txt` |
 | 4 — design Fusion existant | ✅ `FUSION_GEOMETRY_BACKEND=fusion` en mode `parameters` |
 
 **La seule réserve de fond porte sur Fusion.** Le producteur et le chemin de

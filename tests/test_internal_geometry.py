@@ -170,12 +170,19 @@ def test_iteration_complete_sans_fusion(tmp_path):
     assert (out / "fusion_driver.log").is_file()
 
 
-def test_pas_de_step_en_mode_interne(tmp_path):
+def test_le_driver_seul_n_ecrit_pas_de_step(tmp_path):
+    """Le driver écrit un STL, rien d'autre.
+
+    Le STEP, lorsqu'un noyau CAO est installé, est ajouté par le BACKEND et non
+    par le driver. La séparation est voulue : le driver doit rester importable
+    dans l'interpréteur embarqué de Fusion, où aucune dépendance lourde n'est
+    disponible.
+    """
     status = pd.drive(config_path=REAL_CONFIG, iterations_root=tmp_path,
                       geometry_backend="internal")
     assert status["step_path"] is None
     assert not (tmp_path / "iter_0000" / "geometry.step").exists()
-    assert any("pas de STEP" in w for w in status["warnings"])
+    assert any("historique CAO" in w for w in status["warnings"])
 
 
 def test_les_parametres_sont_rapportes(tmp_path):

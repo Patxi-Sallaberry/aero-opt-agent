@@ -444,7 +444,9 @@ def test_export_complet(serie, tmp_path):
         assert (output / name).is_file(), name
     assert (output / "figures").is_dir()
     assert summary["iteration"] == eb.best_iteration(serie)["iteration"]
-    assert summary["has_step"] is False
+    # La série de test est fabriquée sans STEP : l'export doit refléter ce
+    # qu'il trouve, pas ce qu'il aimerait trouver.
+    assert summary["has_step"] == (serie / "iter_0000" / "geometry.step").exists()
 
 
 def test_export_sans_paraview_le_signale(serie, tmp_path, monkeypatch):

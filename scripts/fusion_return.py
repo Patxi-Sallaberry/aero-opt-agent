@@ -225,6 +225,25 @@ def build_return_doc(
     )
     lines.append("")
 
+    # ── Voie 0 : le STEP, quand il est là ─────────────────────────────────
+    if has_step:
+        lines += [
+            "## Voie la plus courte — ouvrir `geometry.step`",
+            "",
+            "*File → Open*, ou glisser-déposer le fichier dans Fusion. C'est un "
+            "vrai solide B-Rep de quelques faces : on peut y poser un congé, en "
+            "changer l'envergure, l'assembler. Aucune conversion, aucun script.",
+            "",
+            "> **Ne pas ouvrir `geometry.stl` à la place.** Fusion sait le lire, "
+            "mais il en fait un corps maillé de plusieurs centaines de facettes "
+            "planes, inutilisable pour de la conception. Le STL est là pour le "
+            "solveur et l'impression.",
+            "",
+            "Cette voie ne rend pas un modèle *paramétrique* : le solide n'a pas "
+            "d'historique de features. Pour cela, voir la voie 1.",
+            "",
+        ]
+
     # ── Voie 1 ────────────────────────────────────────────────────────────
     lines += [
         "## Voie 1 — rejouer les paramètres (recommandée)",
@@ -320,10 +339,11 @@ def build_return_doc(
     ]
     if not has_step:
         lines += [
-            "**Chercher un fichier STEP dans ce dossier.** Il n'y en a pas : "
-            "la géométrie a été produite par le calculateur interne, qui "
-            "écrit directement un STL sans passer par un noyau CAO. Les "
-            "voies 1 et 2 en produisent un.",
+            "**Chercher un fichier STEP dans ce dossier.** Il n'y en a pas. La "
+            "géométrie a été produite par le calculateur interne, qui écrit un "
+            "STL ; il sait aussi écrire un STEP, mais seulement si le noyau CAO "
+            "est installé (`pip install -r requirements-cad.txt`, environ 2 Go). "
+            "Sans lui, les voies 1 et 2 en produisent un.",
             "",
         ]
 

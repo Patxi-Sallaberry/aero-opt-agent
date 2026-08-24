@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────
+# Noyau CAO — FACULTATIF
+# Installation : python3 -m pip install -r requirements-cad.txt
+# ─────────────────────────────────────────────────────────────
+#
+# Ajoute le STEP dans les deux sens :
+#
+#   • en SORTIE — le producteur interne écrit `geometry.step` à côté du STL.
+#     Un STL est un maillage de facettes planes : importé dans une CAO il reste
+#     un maillage, qu'on ne peut ni recoter ni congédier. Un STEP décrit des
+#     SURFACES, et Fusion, SolidWorks ou FreeCAD l'ouvrent comme un solide
+#     natif, éditable.
+#
+#   • en ENTRÉE — `profiles/loader.py` accepte les `.step` / `.stp` (Mode 3 du
+#     document maître). Le contour n'est pas écrit dans un STEP : il se déduit
+#     d'une topologie de faces, d'arêtes et de courbes NURBS. Cela demande un
+#     noyau, là où un DXF se déchiffre à la main.
+#
+# ── Le prix ──────────────────────────────────────────────────
+#
+# Près de deux gigaoctets : cadquery embarque OpenCASCADE en entier, via les
+# liaisons OCP. C'est pourquoi il n'est PAS dans requirements.txt.
+#
+# Rien d'autre n'en dépend. Sans ce paquet, tout le système fonctionne comme
+# avant : le STL est écrit, la CFD tourne, l'optimisation aboutit, le rapport
+# sort. Seul le STEP manque — et son absence est dite, avec la commande pour y
+# remédier, plutôt que déguisée en « format non reconnu ».
+#
+# Le driver Fusion, lui, ne l'utilise jamais : il doit rester importable dans
+# l'interpréteur embarqué de Fusion, où l'on ne peut rien installer. C'est
+# aussi pourquoi le STEP est écrit par le BACKEND et non par le driver.
+# ─────────────────────────────────────────────────────────────
+
+cadquery==2.8.0          # OpenCASCADE + API Python (LGPL 2.1)

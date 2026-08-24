@@ -157,6 +157,7 @@ Le modèle de turbulence `kOmegaSST` suppose la couche limite turbulente dès le
 | fichier | quoi |
 |---|---|
 | `geometry.stl` | la géométrie, **en mètres**, telle que simulée |
+| `geometry.step` | la même, en CAO |
 | `profile_section.csv` | section 2D en millimètres |
 | `profile_section.dat` | même section au format profil |
 | `profile_chord.dat` | profil **redressé**, corde unitaire — pour XFOIL / XFLR5 |
@@ -190,8 +191,6 @@ cp design_params.yaml <projet>/configs/design_params.yaml
 
 **L'incidence est déjà dans les coordonnées** de la section exportée : c'est la géométrie réellement simulée. Si le montage aval applique lui-même une incidence, elle serait comptée deux fois.
 
-Il n'y a pas de fichier STEP dans ce dossier : la géométrie a été produite par le calculateur interne, qui écrit directement un STL sans passer par un noyau CAO. Les voies 1 et 2 en produisent un.
-
 ## Ouvrir les fichiers
 
 ```bash
@@ -214,4 +213,4 @@ Dans ParaView, le pas de temps final porte `U` (vitesse), `p` (pression **ciném
 
 ---
 
-Exporté le 20/08/2026 à 23:05 UTC par `scripts/export_best.py`.
+Exporté le 24/08/2026 à 18:19 UTC par `scripts/export_best.py`.
